@@ -6,7 +6,9 @@ import {
   ChartBarIcon,
   EnvelopeIcon,
   UserCircleIcon,
-  FunnelIcon
+  FunnelIcon,
+  UsersIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline'
 
 const Sidebar = () => {
@@ -17,6 +19,8 @@ const Sidebar = () => {
     { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon },
     { name: 'Leads', href: '/leads', icon: FunnelIcon },
     { name: 'Usuarios', href: '/users', icon: UserCircleIcon },
+    { name: 'Vendedores', href: '/sellers', icon: UsersIcon },
+    { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon },
     { name: 'Contenido', href: '/content', icon: DocumentTextIcon },
   ]
 

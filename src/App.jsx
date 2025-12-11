@@ -5,6 +5,8 @@ import Dashboard from './components/Dashboard'
 import Prospects from './components/Prospects'
 import Leads from './components/Leads'
 import Users from './components/Users'
+import Sellers from './components/Sellers'
+import Coaches from './components/Coaches'
 import ContentManagement from './components/ContentManagement'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -80,6 +82,8 @@ function App() {
                 <Route path="/prospects" element={<Prospects />} />
                 <Route path="/leads" element={<Leads />} />
                 <Route path="/users" element={<Users />} />
+                <Route path="/sellers" element={<Sellers />} />
+                <Route path="/coaches" element={<Coaches />} />
                 <Route path="/content" element={<ContentManagement />} />
               </Routes>
             </div>
