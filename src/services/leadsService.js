@@ -1,21 +1,22 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:1337/api'
-const API_TOKEN = import.meta.env.VITE_STRAPI_API_TOKEN
-
-const getAuthHeaders = () => {
-  return {
-    Authorization: `Bearer ${API_TOKEN}`
-  }
-}
+import { supabase } from '../lib/supabase'
 
 export const leadsService = {
   async getLeads() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/leads`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          prospects (
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error fetching leads:', error)
       throw error
@@ -24,10 +25,21 @@ export const leadsService = {
 
   async getLead(id) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/leads/${id}`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          prospects (
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error fetching lead:', error)
       throw error
@@ -36,12 +48,15 @@ export const leadsService = {
 
   async updateLead(id, data) {
     try {
-      const response = await axios.put(`${API_BASE_URL}/leads/${id}`, {
-        data
-      }, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data: result, error } = await supabase
+        .from('leads')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data: result }
     } catch (error) {
       console.error('Error updating lead:', error)
       throw error
@@ -50,10 +65,13 @@ export const leadsService = {
 
   async deleteLead(id) {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/leads/${id}`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      return { success: true }
     } catch (error) {
       console.error('Error deleting lead:', error)
       throw error
@@ -62,10 +80,13 @@ export const leadsService = {
 
   async exportLeads() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/leads`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error exporting leads:', error)
       throw error
@@ -74,44 +95,52 @@ export const leadsService = {
 
   async convertToUser(leadId, leadData, membershipData) {
     try {
-      // Create user with lead data
+      // Get current user for profile association
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      // Create user (customer) with lead data
       const userData = {
-        firstName: leadData.firstName,
-        lastName: leadData.lastName,
+        profile_id: user.id,
+        lead_id: leadId,
+        first_name: leadData.first_name,
+        last_name: leadData.last_name,
         email: leadData.email,
         phone: leadData.phone,
-        trainingGoal: leadData.trainingGoal,
-        membershipType: membershipData.membershipType,
-        membershipStatus: 'activo',
-        startDate: membershipData.startDate,
-        endDate: membershipData.endDate,
-        emergencyContact: membershipData.emergencyContact || '',
-        emergencyPhone: membershipData.emergencyPhone || '',
-        medicalNotes: membershipData.medicalNotes || '',
+        training_goal: leadData.training_goal,
+        membership_type: membershipData.membershipType,
+        membership_status: 'activo',
+        start_date: membershipData.startDate,
+        end_date: membershipData.endDate,
+        emergency_contact: membershipData.emergencyContact || '',
+        emergency_phone: membershipData.emergencyPhone || '',
+        medical_notes: membershipData.medicalNotes || '',
         notes: leadData.notes || '',
-        convertedAt: new Date().toISOString(),
-        lead: leadId,
-        seller: leadData.seller || null
+        converted_at: new Date().toISOString()
       }
 
-      const userResponse = await axios.post(`${API_BASE_URL}/users`, {
-        data: userData
-      }, {
-        headers: getAuthHeaders()
-      })
+      const { data: customer, error: userError } = await supabase
+        .from('users')
+        .insert([userData])
+        .select()
+        .single()
+
+      if (userError) throw userError
 
       // Update lead to mark as converted
-      await axios.put(`${API_BASE_URL}/leads/${leadId}`, {
-        data: {
+      const { error: leadError } = await supabase
+        .from('leads')
+        .update({
           status: 'convertido',
-          convertedToUser: true,
-          user: userResponse.data.data.id
-        }
-      }, {
-        headers: getAuthHeaders()
-      })
+          converted_to_user: true,
+          user_id: customer.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId)
 
-      return userResponse.data
+      if (leadError) throw leadError
+
+      return { data: customer }
     } catch (error) {
       console.error('Error converting lead to user:', error)
       throw error

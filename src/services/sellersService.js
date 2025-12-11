@@ -1,21 +1,15 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:1337/api'
-const API_TOKEN = import.meta.env.VITE_STRAPI_API_TOKEN
-
-const getAuthHeaders = () => {
-  return {
-    Authorization: `Bearer ${API_TOKEN}`
-  }
-}
+import { supabase } from '../lib/supabase'
 
 export const sellersService = {
   async getSellers() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/sellers`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error fetching sellers:', error)
       throw error
@@ -24,38 +18,47 @@ export const sellersService = {
 
   async getSeller(id) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/sellers/${id}`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error fetching seller:', error)
       throw error
     }
   },
 
-  async createSeller(data) {
+  async createSeller(sellerData) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/sellers`, {
-        data
-      }, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('sellers')
+        .insert([sellerData])
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error creating seller:', error)
       throw error
     }
   },
 
-  async updateSeller(id, data) {
+  async updateSeller(id, sellerData) {
     try {
-      const response = await axios.put(`${API_BASE_URL}/sellers/${id}`, {
-        data
-      }, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('sellers')
+        .update(sellerData)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error updating seller:', error)
       throw error
@@ -64,12 +67,61 @@ export const sellersService = {
 
   async deleteSeller(id) {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/sellers/${id}`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { error } = await supabase
+        .from('sellers')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      return { success: true }
     } catch (error) {
       console.error('Error deleting seller:', error)
+      throw error
+    }
+  },
+
+  async assignLeadToSeller(leadId, sellerId) {
+    try {
+      const { data, error } = await supabase
+        .from('seller_leads')
+        .insert([{
+          seller_id: sellerId,
+          lead_id: leadId,
+          assigned_at: new Date().toISOString()
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data }
+    } catch (error) {
+      console.error('Error assigning lead to seller:', error)
+      throw error
+    }
+  },
+
+  async getSellerLeads(sellerId) {
+    try {
+      const { data, error } = await supabase
+        .from('seller_leads')
+        .select(`
+          *,
+          leads (
+            id,
+            first_name,
+            last_name,
+            email,
+            phone,
+            status
+          )
+        `)
+        .eq('seller_id', sellerId)
+        .order('assigned_at', { ascending: false })
+
+      if (error) throw error
+      return { data }
+    } catch (error) {
+      console.error('Error fetching seller leads:', error)
       throw error
     }
   }

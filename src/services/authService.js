@@ -1,32 +1,77 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:1337/api'
-const API_TOKEN = import.meta.env.VITE_STRAPI_API_TOKEN
+import { supabase } from '../lib/supabase'
 
 const authService = {
   async login(email, password) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/local`, {
-        identifier: email,
-        password: password
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       })
-      return response.data
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Credenciales inválidas. Verifica tu email y contraseña.')
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Email no confirmado. Revisa tu bandeja de entrada.')
+        } else {
+          throw new Error(`Error de autenticación: ${error.message}`)
+        }
+      }
+
+      return {
+        user: data.user,
+        session: data.session,
+        jwt: data.session?.access_token
+      }
     } catch (error) {
-      throw new Error('Credenciales inválidas')
+      throw error
     }
   },
 
-  async verifyToken(token) {
-    // If token exists in localStorage, trust it
-    // We don't actually verify it against the API since we use API tokens for data access
-    // The JWT token is just for login session management
-    if (!token) {
+  async logout() {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error during logout:', error)
+      }
+      return { success: !error }
+    } catch (error) {
+      console.error('Logout error:', error)
+      return { success: false, error }
+    }
+  },
+
+  async verifyToken() {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (error) {
+        console.error('Session verification error:', error)
+        return false
+      }
+      return !!session
+    } catch (error) {
+      console.error('Token verification error:', error)
       return false
     }
+  },
 
-    // Simply check if token exists and is not empty
-    // The actual API calls use the API_TOKEN from .env which has proper permissions
-    return token && token.length > 0
+  async getCurrentUser() {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error('Get user error:', error)
+        return null
+      }
+      return user
+    } catch (error) {
+      console.error('Get current user error:', error)
+      return null
+    }
+  },
+
+  // Listen for auth changes
+  onAuthStateChange(callback) {
+    return supabase.auth.onAuthStateChange(callback)
   }
 }
 

@@ -322,7 +322,7 @@ const Leads = () => {
                     <div className="flex items-center">
                       <div className="h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center">
                         <span className="text-primary-600 font-medium">
-                          {lead.firstName.charAt(0)}
+                          {lead.firstName?.charAt(0) || lead.first_name?.charAt(0) || 'L'}
                         </span>
                       </div>
                       <div className="ml-4">

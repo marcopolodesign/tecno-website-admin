@@ -281,7 +281,7 @@ const Users = () => {
                     <div className="flex items-center">
                       <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
                         <span className="text-green-600 font-medium">
-                          {user.firstName.charAt(0)}
+                          {user.firstName?.charAt(0) || user.first_name?.charAt(0) || 'U'}
                         </span>
                       </div>
                       <div className="ml-4">

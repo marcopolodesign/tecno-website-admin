@@ -1,21 +1,28 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:1337/api'
-const API_TOKEN = import.meta.env.VITE_STRAPI_API_TOKEN
-
-const getAuthHeaders = () => {
-  return {
-    Authorization: `Bearer ${API_TOKEN}`
-  }
-}
+import { supabase } from '../lib/supabase'
 
 export const usersService = {
   async getUsers() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/users?populate=lead`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          leads (
+            first_name,
+            last_name,
+            email,
+            training_goal
+          ),
+          profiles (
+            username,
+            first_name,
+            last_name
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error fetching users:', error)
       throw error
@@ -24,10 +31,27 @@ export const usersService = {
 
   async getUser(id) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/users/${id}?populate=lead`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          leads (
+            first_name,
+            last_name,
+            email,
+            training_goal
+          ),
+          profiles (
+            username,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+      return { data }
     } catch (error) {
       console.error('Error fetching user:', error)
       throw error
@@ -36,12 +60,15 @@ export const usersService = {
 
   async updateUser(id, data) {
     try {
-      const response = await axios.put(`${API_BASE_URL}/users/${id}`, {
-        data
-      }, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { data: result, error } = await supabase
+        .from('users')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data: result }
     } catch (error) {
       console.error('Error updating user:', error)
       throw error
@@ -50,12 +77,30 @@ export const usersService = {
 
   async deleteUser(id) {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/users/${id}`, {
-        headers: getAuthHeaders()
-      })
-      return response.data
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      return { success: true }
     } catch (error) {
       console.error('Error deleting user:', error)
+      throw error
+    }
+  },
+
+  async exportUsers() {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return { data }
+    } catch (error) {
+      console.error('Error exporting users:', error)
       throw error
     }
   }

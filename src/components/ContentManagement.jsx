@@ -33,14 +33,14 @@ const ContentManagement = () => {
       // Simulate API calls - replace with actual Strapi API calls
       setHomepageContent({
         heroTitle: 'Transforma tu cuerpo en TecnoFit',
-        heroSubtitle: 'El gimnasio más moderno de Palermo con 5 estaciones de entrenamiento',
+        heroSubtitle: 'El gimnasio más moderno de Palermo con 5 boxes de entrenamiento',
         heroDescription: 'TecnoFit combina tecnología de vanguardia con entrenamiento personalizado para ofrecerte la mejor experiencia fitness en Palermo, Buenos Aires.',
         aboutTitle: '¿Por qué elegir TecnoFit?',
         aboutContent: 'En TecnoFit, ubicado en el corazón de Palermo, Buenos Aires, combinamos tecnología de vanguardia con entrenamiento personalizado para ofrecerte la mejor experiencia fitness.',
         servicesTitle: 'Nuestros Servicios',
         servicesContent: 'Ofrecemos una experiencia completa de fitness con tecnología de vanguardia y atención personalizada en Palermo, Buenos Aires.',
         seoTitle: 'TecnoFit - Gimnasio en Palermo, Buenos Aires | Entrenamiento Personal',
-        seoDescription: 'TecnoFit es el mejor gimnasio en Palermo, Buenos Aires. 5 estaciones de entrenamiento, planes personalizados y entrenadores profesionales.',
+        seoDescription: 'TecnoFit es el mejor gimnasio en Palermo, Buenos Aires. 5 boxes de entrenamiento, planes personalizados y entrenadores profesionales.',
         seoKeywords: 'gimnasio palermo, gimnasio buenos aires, entrenamiento personal palermo, fitness palermo, musculación palermo'
       })
       
@@ -58,7 +58,7 @@ const ContentManagement = () => {
             name: 'Premium',
             price: '25000',
             description: 'El plan más popular para resultados óptimos',
-            features: ['Acceso a todas las 5 estaciones', 'Acceso 24/7', 'App móvil completa']
+            features: ['Acceso a todas las 5 boxes', 'Acceso 24/7', 'App móvil completa']
           },
           {
             name: 'VIP',
