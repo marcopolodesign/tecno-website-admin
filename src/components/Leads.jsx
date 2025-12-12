@@ -8,6 +8,7 @@ import {
   EyeIcon,
   CheckIcon
 } from '@heroicons/react/24/outline'
+import { DataGrid } from '@mui/x-data-grid'
 import { leadsService } from '../services/leadsService'
 
 const Leads = () => {
@@ -30,6 +31,12 @@ const Leads = () => {
     emergencyContact: '',
     emergencyPhone: '',
     medicalNotes: ''
+  })
+  const [showReasonModal, setShowReasonModal] = useState(false)
+  const [reasonData, setReasonData] = useState({
+    leadId: null,
+    newStatus: '',
+    reason: ''
   })
 
   useEffect(() => {
@@ -71,15 +78,54 @@ const Leads = () => {
   }
 
   const handleStatusChange = async (leadId, newStatus) => {
+    // If changing to "perdido", ask for reason
+    if (newStatus === 'perdido') {
+      setReasonData({
+        leadId,
+        newStatus,
+        reason: ''
+      })
+      setShowReasonModal(true)
+      return
+    }
+
+    // For other statuses, update directly
     try {
       await leadsService.updateLead(leadId, { status: newStatus })
       setLeads(leads.map(lead => 
         lead.id === leadId 
-          ? { ...lead, attributes: { ...lead.attributes, status: newStatus } }
+          ? { ...lead, status: newStatus }
           : lead
       ))
+      toast.success('Estado actualizado')
     } catch (error) {
       console.error('Error updating lead status:', error)
+      toast.error('Error al actualizar estado')
+    }
+  }
+
+  const handleConfirmStatusWithReason = async () => {
+    if (!reasonData.reason.trim()) {
+      toast.error('Por favor ingresa una razón')
+      return
+    }
+
+    try {
+      await leadsService.updateLead(reasonData.leadId, { 
+        status: reasonData.newStatus,
+        lostReason: reasonData.reason
+      })
+      setLeads(leads.map(lead => 
+        lead.id === reasonData.leadId 
+          ? { ...lead, status: reasonData.newStatus, lostReason: reasonData.reason }
+          : lead
+      ))
+      setShowReasonModal(false)
+      setReasonData({ leadId: null, newStatus: '', reason: '' })
+      toast.success('Estado actualizado')
+    } catch (error) {
+      console.error('Error updating lead status:', error)
+      toast.error('Error al actualizar estado')
     }
   }
 
@@ -290,115 +336,153 @@ const Leads = () => {
       </div>
 
       {/* Leads Table */}
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Lead
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contacto
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Objetivo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fecha
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredLeads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 bg-primary-100 rounded-full flex items-center justify-center">
-                        <span className="text-primary-600 font-medium">
-                          {lead.firstName?.charAt(0) || lead.first_name?.charAt(0) || 'L'}
-                        </span>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {lead.firstName} {lead.lastName}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.email}</div>
-                    <div className="text-sm text-gray-500">{lead.phone}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {getTrainingGoalLabel(lead.trainingGoal)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={lead.status}
-                      onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                      className={`status-badge ${getStatusColor(lead.status)} border-0 bg-transparent`}
+      <div className="card" style={{ height: 600, width: '100%' }}>
+        <DataGrid
+          rows={filteredLeads}
+          columns={[
+            {
+              field: 'fullName',
+              headerName: 'Lead',
+              width: 200,
+              valueGetter: (value, row) => `${row.firstName || ''} ${row.lastName || ''}`,
+              renderCell: (params) => (
+                <div className="flex items-center">
+                  <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-primary-600 font-medium text-sm">
+                      {params.row.firstName?.charAt(0) || 'L'}
+                    </span>
+                  </div>
+                  <span>{params.value}</span>
+                </div>
+              )
+            },
+            {
+              field: 'email',
+              headerName: 'Email',
+              width: 220,
+              editable: false
+            },
+            {
+              field: 'phone',
+              headerName: 'Teléfono',
+              width: 150,
+              editable: true
+            },
+            {
+              field: 'trainingGoal',
+              headerName: 'Objetivo',
+              width: 200,
+              valueGetter: (value) => getTrainingGoalLabel(value)
+            },
+            {
+              field: 'status',
+              headerName: 'Estado',
+              width: 150,
+              editable: true,
+              type: 'singleSelect',
+              valueOptions: ['nuevo', 'contactado', 'convertido', 'perdido'],
+              renderCell: (params) => (
+                <span className={`status-badge ${getStatusColor(params.value)}`}>
+                  {getStatusLabel(params.value)}
+                </span>
+              )
+            },
+            {
+              field: 'submittedAt',
+              headerName: 'Fecha',
+              width: 120,
+              valueFormatter: (value) => new Date(value).toLocaleDateString('es-AR')
+            },
+            {
+              field: 'actions',
+              headerName: 'Acciones',
+              width: 150,
+              sortable: false,
+              renderCell: (params) => (
+                <div className="flex space-x-2">
+                  {!params.row.convertedToUser && params.row.status !== 'convertido' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenConvertModal(params.row)
+                      }}
+                      className="text-green-600 hover:text-green-900"
+                      title="Marcar como convertido"
                     >
-                      <option value="nuevo">Nuevo</option>
-                      <option value="contactado">Contactado</option>
-                      <option value="convertido">Convertido</option>
-                      <option value="perdido">Perdido</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(lead.submittedAt).toLocaleDateString('es-AR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      {!lead.convertedToUser && lead.status !== 'convertido' && (
-                        <button
-                          onClick={() => handleOpenConvertModal(lead)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Marcar como convertido"
-                        >
-                          <CheckIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setSelectedLead(lead)
-                          setEditingStatus(lead.status)
-                          setEditFormData({
-                            firstName: lead.firstName || '',
-                            lastName: lead.lastName || '',
-                            phone: lead.phone || '',
-                            notes: lead.notes || ''
-                          })
-                          setHasChanges(false)
-                          setShowSidePanel(true)
-                        }}
-                        className="text-sky-600 hover:text-sky-900"
-                        title="Ver detalles y editar"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteLead(lead.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Eliminar"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      <CheckIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteLead(params.row.id)
+                    }}
+                    className="text-red-600 hover:text-red-900"
+                    title="Eliminar"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )
+            }
+          ]}
+          initialState={{
+            pagination: {
+              paginationModel: { page: 0, pageSize: 10 },
+            },
+          }}
+          pageSizeOptions={[10, 25, 50]}
+          onRowClick={(params) => {
+            setSelectedLead(params.row)
+            setEditingStatus(params.row.status)
+            setEditFormData({
+              firstName: params.row.firstName || '',
+              lastName: params.row.lastName || '',
+              phone: params.row.phone || '',
+              notes: params.row.notes || ''
+            })
+            setHasChanges(false)
+            setShowSidePanel(true)
+          }}
+          processRowUpdate={async (newRow, oldRow) => {
+            // Handle status change with reason if needed
+            if (newRow.status !== oldRow.status && newRow.status === 'perdido') {
+              setReasonData({
+                leadId: newRow.id,
+                newStatus: 'perdido',
+                reason: ''
+              })
+              setShowReasonModal(true)
+              return oldRow // Return old row, will update after reason is provided
+            }
+            
+            // Handle other edits
+            try {
+              await leadsService.updateLead(newRow.documentId, {
+                firstName: newRow.firstName,
+                lastName: newRow.lastName,
+                phone: newRow.phone,
+                status: newRow.status
+              })
+              setLeads(leads.map(l => l.id === newRow.id ? newRow : l))
+              toast.success('Lead actualizado')
+              return newRow
+            } catch (error) {
+              console.error('Error updating lead:', error)
+              toast.error('Error al actualizar lead')
+              return oldRow
+            }
+          }}
+          onProcessRowUpdateError={(error) => {
+            console.error('Error processing row update:', error)
+            toast.error('Error al actualizar')
+          }}
+          sx={{
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer'
+            }
+          }}
+        />
       </div>
 
       {/* Lead Detail Side Panel */}
@@ -678,6 +762,45 @@ const Leads = () => {
                 Convertir a Usuario
               </button>
             </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Reason Modal */}
+      {showReasonModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-[70]"
+            onClick={() => setShowReasonModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              ¿Por qué se marcó como perdido?
+            </h3>
+            <textarea
+              className="form-input w-full"
+              rows="4"
+              placeholder="Ingresa la razón..."
+              value={reasonData.reason}
+              onChange={(e) => setReasonData({...reasonData, reason: e.target.value})}
+            />
+            <div className="mt-4 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowReasonModal(false)
+                  setReasonData({ leadId: null, newStatus: '', reason: '' })
+                }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmStatusWithReason}
+                className="btn-primary"
+              >
+                Confirmar
+              </button>
             </div>
           </div>
         </>

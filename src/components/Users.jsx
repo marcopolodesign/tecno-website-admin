@@ -6,6 +6,7 @@ import {
   ArrowDownTrayIcon,
   EyeIcon
 } from '@heroicons/react/24/outline'
+import { DataGrid } from '@mui/x-data-grid'
 import { usersService } from '../services/usersService'
 
 const Users = () => {
@@ -19,6 +20,12 @@ const Users = () => {
   const [showSidePanel, setShowSidePanel] = useState(false)
   const [editFormData, setEditFormData] = useState({})
   const [hasChanges, setHasChanges] = useState(false)
+  const [showReasonModal, setShowReasonModal] = useState(false)
+  const [reasonData, setReasonData] = useState({
+    userId: null,
+    newStatus: '',
+    reason: ''
+  })
 
   useEffect(() => {
     fetchUsers()
@@ -102,6 +109,58 @@ const Users = () => {
     }
   }
 
+  const handleStatusChange = async (userId, newStatus) => {
+    // If changing to "no-renueva", ask for reason
+    if (newStatus === 'no-renueva') {
+      setReasonData({
+        userId,
+        newStatus,
+        reason: ''
+      })
+      setShowReasonModal(true)
+      return
+    }
+
+    // For other statuses, update directly
+    try {
+      await usersService.updateUser(userId, { membershipStatus: newStatus })
+      setUsers(users.map(user => 
+        user.id === userId 
+          ? { ...user, membershipStatus: newStatus }
+          : user
+      ))
+      toast.success('Estado actualizado')
+    } catch (error) {
+      console.error('Error updating user status:', error)
+      toast.error('Error al actualizar estado')
+    }
+  }
+
+  const handleConfirmStatusWithReason = async () => {
+    if (!reasonData.reason.trim()) {
+      toast.error('Por favor ingresa una razón')
+      return
+    }
+
+    try {
+      await usersService.updateUser(reasonData.userId, { 
+        membershipStatus: reasonData.newStatus,
+        nonRenewalReason: reasonData.reason
+      })
+      setUsers(users.map(user => 
+        user.id === reasonData.userId 
+          ? { ...user, membershipStatus: reasonData.newStatus, nonRenewalReason: reasonData.reason }
+          : user
+      ))
+      setShowReasonModal(false)
+      setReasonData({ userId: null, newStatus: '', reason: '' })
+      toast.success('Estado actualizado')
+    } catch (error) {
+      console.error('Error updating user status:', error)
+      toast.error('Error al actualizar estado')
+    }
+  }
+
   const handleExport = async () => {
     try {
       const response = await usersService.getUsers()
@@ -158,7 +217,8 @@ const Users = () => {
       'activo': 'Activo',
       'inactivo': 'Inactivo',
       'suspendido': 'Suspendido',
-      'vencido': 'Vencido'
+      'vencido': 'Vencido',
+      'no-renueva': 'No Renueva'
     }
     return statuses[status] || status
   }
@@ -249,100 +309,149 @@ const Users = () => {
       </div>
 
       {/* Users Table */}
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usuario
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contacto
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Membresía
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vigencia
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600 font-medium">
-                          {user.firstName?.charAt(0) || user.first_name?.charAt(0) || 'U'}
-                        </span>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {user.firstName} {user.lastName}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{user.email}</div>
-                    <div className="text-sm text-gray-500">{user.phone}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {getMembershipLabel(user.membershipType)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`status-badge ${getStatusColor(user.membershipStatus)}`}>
-                      {getStatusLabel(user.membershipStatus)}
+      <div className="card" style={{ height: 600, width: '100%' }}>
+        <DataGrid
+          rows={filteredUsers}
+          columns={[
+            {
+              field: 'fullName',
+              headerName: 'Usuario',
+              width: 200,
+              valueGetter: (value, row) => `${row.firstName || ''} ${row.lastName || ''}`,
+              renderCell: (params) => (
+                <div className="flex items-center">
+                  <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-green-600 font-medium text-sm">
+                      {params.row.firstName?.charAt(0) || 'U'}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>{new Date(user.startDate).toLocaleDateString('es-AR')}</div>
-                    <div className="text-xs">hasta {new Date(user.endDate).toLocaleDateString('es-AR')}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setEditFormData({
-                            firstName: user.firstName || '',
-                            lastName: user.lastName || '',
-                            phone: user.phone || '',
-                            emergencyContact: user.emergencyContact || '',
-                            emergencyPhone: user.emergencyPhone || '',
-                            medicalNotes: user.medicalNotes || '',
-                            notes: user.notes || ''
-                          })
-                          setHasChanges(false)
-                          setShowSidePanel(true)
-                        }}
-                        className="text-sky-600 hover:text-sky-900"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                  <span>{params.value}</span>
+                </div>
+              )
+            },
+            {
+              field: 'email',
+              headerName: 'Email',
+              width: 220,
+              editable: false
+            },
+            {
+              field: 'phone',
+              headerName: 'Teléfono',
+              width: 150,
+              editable: true
+            },
+            {
+              field: 'membershipType',
+              headerName: 'Membresía',
+              width: 150,
+              valueGetter: (value) => getMembershipLabel(value)
+            },
+            {
+              field: 'membershipStatus',
+              headerName: 'Estado',
+              width: 150,
+              editable: true,
+              type: 'singleSelect',
+              valueOptions: ['activo', 'inactivo', 'suspendido', 'vencido', 'no-renueva'],
+              renderCell: (params) => (
+                <span className={`status-badge ${getStatusColor(params.value)}`}>
+                  {getStatusLabel(params.value)}
+                </span>
+              )
+            },
+            {
+              field: 'startDate',
+              headerName: 'Inicio',
+              width: 120,
+              valueFormatter: (value) => new Date(value).toLocaleDateString('es-AR')
+            },
+            {
+              field: 'endDate',
+              headerName: 'Fin',
+              width: 120,
+              valueFormatter: (value) => new Date(value).toLocaleDateString('es-AR')
+            },
+            {
+              field: 'actions',
+              headerName: 'Acciones',
+              width: 100,
+              sortable: false,
+              renderCell: (params) => (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteUser(params.row.id)
+                    }}
+                    className="text-red-600 hover:text-red-900"
+                    title="Eliminar"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )
+            }
+          ]}
+          initialState={{
+            pagination: {
+              paginationModel: { page: 0, pageSize: 10 },
+            },
+          }}
+          pageSizeOptions={[10, 25, 50]}
+          onRowClick={(params) => {
+            setSelectedUser(params.row)
+            setEditFormData({
+              firstName: params.row.firstName || '',
+              lastName: params.row.lastName || '',
+              phone: params.row.phone || '',
+              emergencyContact: params.row.emergencyContact || '',
+              emergencyPhone: params.row.emergencyPhone || '',
+              medicalNotes: params.row.medicalNotes || '',
+              notes: params.row.notes || ''
+            })
+            setHasChanges(false)
+            setShowSidePanel(true)
+          }}
+          processRowUpdate={async (newRow, oldRow) => {
+            // Handle status change with reason if needed
+            if (newRow.membershipStatus !== oldRow.membershipStatus && newRow.membershipStatus === 'no-renueva') {
+              setReasonData({
+                userId: newRow.id,
+                newStatus: 'no-renueva',
+                reason: ''
+              })
+              setShowReasonModal(true)
+              return oldRow // Return old row, will update after reason is provided
+            }
+            
+            // Handle other edits
+            try {
+              await usersService.updateUser(newRow.documentId, {
+                firstName: newRow.firstName,
+                lastName: newRow.lastName,
+                phone: newRow.phone,
+                membershipStatus: newRow.membershipStatus
+              })
+              setUsers(users.map(u => u.id === newRow.id ? newRow : u))
+              toast.success('Usuario actualizado')
+              return newRow
+            } catch (error) {
+              console.error('Error updating user:', error)
+              toast.error('Error al actualizar usuario')
+              return oldRow
+            }
+          }}
+          onProcessRowUpdateError={(error) => {
+            console.error('Error processing row update:', error)
+            toast.error('Error al actualizar')
+          }}
+          sx={{
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer'
+            }
+          }}
+        />
       </div>
 
       {/* User Detail Side Panel */}
@@ -501,6 +610,45 @@ const Users = () => {
                   Cerrar
                 </button>
               </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Reason Modal */}
+      {showReasonModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-[70]"
+            onClick={() => setShowReasonModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              ¿Por qué no renueva?
+            </h3>
+            <textarea
+              className="form-input w-full"
+              rows="4"
+              placeholder="Ingresa la razón..."
+              value={reasonData.reason}
+              onChange={(e) => setReasonData({...reasonData, reason: e.target.value})}
+            />
+            <div className="mt-4 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowReasonModal(false)
+                  setReasonData({ userId: null, newStatus: '', reason: '' })
+                }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmStatusWithReason}
+                className="btn-primary"
+              >
+                Confirmar
+              </button>
             </div>
           </div>
         </>
