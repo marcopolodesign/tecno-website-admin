@@ -62,6 +62,3 @@ port = 54324
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
-
-[edge_functions]
-enabled = true

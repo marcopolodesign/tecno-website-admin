@@ -13,11 +13,18 @@ serve(async (req) => {
   }
 
   try {
-    const { leadId } = await req.json()
+    console.log('🚀 Function called with method:', req.method)
+
+    const body = await req.json()
+    console.log('📦 Request body:', body)
+
+    const { leadId } = body
 
     if (!leadId) {
       throw new Error('Lead ID is required')
     }
+
+    console.log('🆔 Processing lead ID:', leadId)
 
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -47,11 +54,17 @@ serve(async (req) => {
       )
     }
 
+    console.log('📧 Lead data:', { id: lead.id, email: lead.email, name: lead.first_name })
+
     // Send welcome email to lead
+    console.log('🚀 Sending welcome email...')
     const leadEmailResponse = await sendWelcomeEmail(lead)
+    console.log('✅ Welcome email sent')
 
     // Send internal notification
+    console.log('🚀 Sending internal notification...')
     const internalEmailResponse = await sendInternalNotification(lead)
+    console.log('✅ Internal notification sent')
 
     // Update lead record to mark email as sent
     const { error: updateError } = await supabaseClient
@@ -88,12 +101,32 @@ serve(async (req) => {
 })
 
 async function sendWelcomeEmail(lead: any) {
+  console.log('📧 Preparing to send welcome email to:', lead.email)
+
   const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+  console.log('🔑 RESEND_API_KEY exists:', !!RESEND_API_KEY)
+  console.log('🔑 RESEND_API_KEY length:', RESEND_API_KEY?.length || 0)
+
   if (!RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY not configured')
+    throw new Error('RESEND_API_KEY not configured - check Edge Function environment variables')
   }
 
   const emailHtml = generateWelcomeEmailHtml(lead)
+  console.log('📝 Email HTML length:', emailHtml.length)
+
+  const emailPayload = {
+    from: 'TecnoFit <onboarding@resend.dev>',
+    to: [lead.email],
+    subject: '¡Bienvenido a TecnoFit! - Tu viaje fitness comienza aquí',
+    html: emailHtml,
+  }
+
+  console.log('📤 Sending email payload:', {
+    from: emailPayload.from,
+    to: emailPayload.to,
+    subject: emailPayload.subject,
+    htmlLength: emailPayload.html.length
+  })
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -101,20 +134,20 @@ async function sendWelcomeEmail(lead: any) {
       'Authorization': `Bearer ${RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: 'TecnoFit <hola@somostecnofit.com>',
-      to: [lead.email],
-      subject: '¡Bienvenido a TecnoFit! - Tu viaje fitness comienza aquí',
-      html: emailHtml,
-    }),
+    body: JSON.stringify(emailPayload),
   })
+
+  console.log('📡 Resend API response status:', response.status)
 
   if (!response.ok) {
     const error = await response.text()
+    console.error('❌ Resend API error:', error)
     throw new Error(`Failed to send welcome email: ${error}`)
   }
 
-  return await response.json()
+  const result = await response.json()
+  console.log('✅ Welcome email sent successfully:', result.id)
+  return result
 }
 
 async function sendInternalNotification(lead: any) {
@@ -132,7 +165,7 @@ async function sendInternalNotification(lead: any) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'TecnoFit System <system@somostecnofit.com>',
+      from: 'TecnoFit System <onboarding@resend.dev>',
       to: ['barralf.lucas@gmail.com'],
       subject: `Nuevo lead: ${lead.first_name} ${lead.last_name}`,
       html: emailHtml,

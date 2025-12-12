@@ -195,13 +195,12 @@ export const leadsService = {
 
       await membershipsService.createMembership(membershipInfo, payment)
 
-      // Update lead to mark as converted
+      // Update lead to mark as converted (don't update user_id as it references profiles, not users)
       const { error: leadError } = await supabase
         .from('leads')
         .update({
           status: 'convertido',
           converted_to_user: true,
-          user_id: customer.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId)
