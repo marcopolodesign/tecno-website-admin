@@ -17,7 +17,9 @@ const Coaches = () => {
     certifications: '',
     bio: '',
     is_active: true,
-    hire_date: ''
+    hire_date: '',
+    location: '',
+    age: ''
   })
 
   useEffect(() => {
@@ -28,7 +30,7 @@ const Coaches = () => {
     try {
       const { data, error } = await supabase
         .from('coaches')
-        .select('*')
+        .select('*, users(count)')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -50,21 +52,25 @@ const Coaches = () => {
         ? formData.certifications.split(',').map(cert => cert.trim()).filter(cert => cert)
         : []
 
+      const coachData = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        phone: formData.phone,
+        specialization: formData.specialization,
+        certifications: certificationsArray,
+        bio: formData.bio,
+        is_active: formData.is_active,
+        hire_date: formData.hire_date || null,
+        location: formData.location,
+        age: formData.age || null
+      }
+
       if (editingCoach) {
         // Update existing coach
         const { error } = await supabase
           .from('coaches')
-          .update({
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            email: formData.email,
-            phone: formData.phone,
-            specialization: formData.specialization,
-            certifications: certificationsArray,
-            bio: formData.bio,
-            is_active: formData.is_active,
-            hire_date: formData.hire_date || null
-          })
+          .update(coachData)
           .eq('id', editingCoach.id)
 
         if (error) throw error
@@ -96,15 +102,7 @@ const Coaches = () => {
           .from('coaches')
           .insert([{
             auth_user_id: authData.user.id,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            email: formData.email,
-            phone: formData.phone,
-            specialization: formData.specialization,
-            certifications: certificationsArray,
-            bio: formData.bio,
-            is_active: formData.is_active,
-            hire_date: formData.hire_date || null
+            ...coachData
           }])
 
         if (coachError) throw coachError
@@ -160,7 +158,9 @@ const Coaches = () => {
       certifications: coach.certifications ? coach.certifications.join(', ') : '',
       bio: coach.bio || '',
       is_active: coach.is_active,
-      hire_date: coach.hire_date || ''
+      hire_date: coach.hire_date || '',
+      location: coach.location || '',
+      age: coach.age || ''
     })
     setShowModal(true)
   }
@@ -176,7 +176,9 @@ const Coaches = () => {
       certifications: '',
       bio: '',
       is_active: true,
-      hire_date: ''
+      hire_date: '',
+      location: '',
+      age: ''
     })
     setEditingCoach(null)
   }
@@ -248,6 +250,23 @@ const Coaches = () => {
                 {coach.phone && (
                   <p className="text-sm text-gray-500">{coach.phone}</p>
                 )}
+                <div className="flex gap-4 text-sm text-gray-600">
+                  {coach.location && (
+                    <span className="flex items-center">
+                      <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {coach.location}
+                    </span>
+                  )}
+                  {coach.age && (
+                    <span>{coach.age} años</span>
+                  )}
+                </div>
+                <div className="text-sm font-medium text-sky-700">
+                  {coach.users && coach.users[0] ? `${coach.users[0].count} Usuarios asignados` : '0 Usuarios asignados'}
+                </div>
               </div>
 
               {coach.certifications && coach.certifications.length > 0 && (
@@ -348,6 +367,27 @@ const Coaches = () => {
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
                       />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Sede (Location)</label>
+                        <input
+                          type="text"
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Edad</label>
+                        <input
+                          type="number"
+                          value={formData.age}
+                          onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                        />
+                      </div>
                     </div>
 
                     <div>
