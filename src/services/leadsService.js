@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase, toCamelCase, toSnakeCase } from '../lib/supabase'
 
 export const leadsService = {
   async getLeads() {
@@ -16,7 +16,7 @@ export const leadsService = {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return { data }
+      return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching leads:', error)
       throw error
@@ -39,7 +39,7 @@ export const leadsService = {
         .single()
 
       if (error) throw error
-      return { data }
+      return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching lead:', error)
       throw error
@@ -48,15 +48,16 @@ export const leadsService = {
 
   async updateLead(id, data) {
     try {
+      const snakeData = toSnakeCase(data)
       const { data: result, error } = await supabase
         .from('leads')
-        .update(data)
+        .update(snakeData)
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
-      return { data: result }
+      return { data: toCamelCase(result) }
     } catch (error) {
       console.error('Error updating lead:', error)
       throw error
@@ -86,7 +87,7 @@ export const leadsService = {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return { data }
+      return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error exporting leads:', error)
       throw error
@@ -103,11 +104,11 @@ export const leadsService = {
       const userData = {
         profile_id: user.id,
         lead_id: leadId,
-        first_name: leadData.first_name,
-        last_name: leadData.last_name,
+        first_name: leadData.firstName,
+        last_name: leadData.lastName,
         email: leadData.email,
         phone: leadData.phone,
-        training_goal: leadData.training_goal,
+        training_goal: leadData.trainingGoal,
         membership_type: membershipData.membershipType,
         membership_status: 'activo',
         start_date: membershipData.startDate,
@@ -140,7 +141,7 @@ export const leadsService = {
 
       if (leadError) throw leadError
 
-      return { data: customer }
+      return { data: toCamelCase(customer) }
     } catch (error) {
       console.error('Error converting lead to user:', error)
       throw error

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase, toCamelCase, toSnakeCase } from '../lib/supabase'
 
 export const usersService = {
   async getUsers() {
@@ -22,7 +22,7 @@ export const usersService = {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return { data }
+      return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching users:', error)
       throw error
@@ -51,7 +51,7 @@ export const usersService = {
         .single()
 
       if (error) throw error
-      return { data }
+      return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching user:', error)
       throw error
@@ -60,15 +60,16 @@ export const usersService = {
 
   async updateUser(id, data) {
     try {
+      const snakeData = toSnakeCase(data)
       const { data: result, error } = await supabase
         .from('users')
-        .update(data)
+        .update(snakeData)
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
-      return { data: result }
+      return { data: toCamelCase(result) }
     } catch (error) {
       console.error('Error updating user:', error)
       throw error
@@ -98,7 +99,7 @@ export const usersService = {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return { data }
+      return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error exporting users:', error)
       throw error

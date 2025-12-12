@@ -372,189 +372,134 @@ const Users = () => {
                 </button>
               </div>
 
-              {/* User Info */}
-              {!isEditing ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Email</label>
-                    <p className="text-lg font-medium text-gray-900">{selectedUser.email}</p>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <label className="text-sm font-medium text-gray-500">Nombre completo</label>
-                    <p className="text-gray-900">
-                      {selectedUser.firstName} {selectedUser.lastName}
-                    </p>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <label className="text-sm font-medium text-gray-500">Teléfono</label>
-                    <p className="text-gray-600">{selectedUser.phone}</p>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <label className="text-sm font-medium text-gray-500">Objetivo de entrenamiento</label>
-                    <p className="text-gray-900">
-                      {getTrainingGoalLabel(selectedUser.trainingGoal)}
-                    </p>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <label className="text-sm font-medium text-gray-500">Membresía</label>
-                    <p className="text-lg font-medium text-gray-900">
-                      {getMembershipLabel(selectedUser.membershipType)}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Estado: {getStatusLabel(selectedUser.membershipStatus)}
-                    </p>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <label className="text-sm font-medium text-gray-500">Período de membresía</label>
-                    <p className="text-gray-900">
-                      {new Date(selectedUser.startDate).toLocaleDateString('es-AR')}
-                    </p>
-                    <p className="text-gray-600 text-sm">
-                      hasta {new Date(selectedUser.endDate).toLocaleDateString('es-AR')}
-                    </p>
-                  </div>
-
-                  {(selectedUser.emergencyContact || selectedUser.emergencyPhone) && (
-                    <div className="border-t pt-4">
-                      <label className="text-sm font-medium text-gray-500">Contacto de emergencia</label>
-                      <p className="text-gray-900">{selectedUser.emergencyContact || 'No especificado'}</p>
-                      <p className="text-gray-600">{selectedUser.emergencyPhone || 'No especificado'}</p>
-                    </div>
-                  )}
-
-                  {selectedUser.medicalNotes && (
-                    <div className="border-t pt-4">
-                      <label className="text-sm font-medium text-gray-500">Notas médicas</label>
-                      <p className="text-gray-900 whitespace-pre-wrap">{selectedUser.medicalNotes}</p>
-                    </div>
-                  )}
-
-                  {selectedUser.notes && (
-                    <div className="border-t pt-4">
-                      <label className="text-sm font-medium text-gray-500">Notas</label>
-                      <p className="text-gray-900 whitespace-pre-wrap">{selectedUser.notes}</p>
-                    </div>
-                  )}
-
-                  <div className="border-t pt-4">
-                    <label className="text-sm font-medium text-gray-500">Fecha de conversión</label>
-                    <p className="text-gray-900">
-                      {new Date(selectedUser.convertedAt).toLocaleString('es-AR')}
-                    </p>
-                  </div>
+              {/* User Info - Editable Fields */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Email</label>
+                  <p className="text-lg font-medium text-gray-900">{selectedUser.email}</p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="form-label">Nombre</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.firstName}
-                      onChange={(e) => setEditFormData({...editFormData, firstName: e.target.value})}
-                    />
-                  </div>
 
-                  <div>
-                    <label className="form-label">Apellido</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.lastName}
-                      onChange={(e) => setEditFormData({...editFormData, lastName: e.target.value})}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">Teléfono</label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      value={editFormData.phone}
-                      onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">Contacto de Emergencia</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.emergencyContact}
-                      onChange={(e) => setEditFormData({...editFormData, emergencyContact: e.target.value})}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">Teléfono de Emergencia</label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      value={editFormData.emergencyPhone}
-                      onChange={(e) => setEditFormData({...editFormData, emergencyPhone: e.target.value})}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">Notas Médicas</label>
-                    <textarea
-                      className="form-input"
-                      rows="3"
-                      value={editFormData.medicalNotes}
-                      onChange={(e) => setEditFormData({...editFormData, medicalNotes: e.target.value})}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">Notas</label>
-                    <textarea
-                      className="form-input"
-                      rows="3"
-                      value={editFormData.notes}
-                      onChange={(e) => setEditFormData({...editFormData, notes: e.target.value})}
-                    />
-                  </div>
+                <div className="border-t border-[#edeaea] pt-4">
+                  <label className="form-label">Nombre</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editFormData.firstName}
+                    onChange={(e) => handleFormChange('firstName', e.target.value)}
+                  />
                 </div>
-              )}
+
+                <div>
+                  <label className="form-label">Apellido</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editFormData.lastName}
+                    onChange={(e) => handleFormChange('lastName', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Teléfono</label>
+                  <input
+                    type="tel"
+                    className="form-input"
+                    value={editFormData.phone}
+                    onChange={(e) => handleFormChange('phone', e.target.value)}
+                  />
+                </div>
+
+                <div className="border-t border-[#edeaea] pt-4">
+                  <label className="text-sm font-medium text-gray-500">Objetivo de entrenamiento</label>
+                  <p className="text-gray-900">
+                    {getTrainingGoalLabel(selectedUser.trainingGoal)}
+                  </p>
+                </div>
+
+                <div className="border-t border-[#edeaea] pt-4">
+                  <label className="text-sm font-medium text-gray-500">Membresía</label>
+                  <p className="text-lg font-medium text-gray-900">
+                    {getMembershipLabel(selectedUser.membershipType)}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Estado: {getStatusLabel(selectedUser.membershipStatus)}
+                  </p>
+                </div>
+
+                <div className="border-t border-[#edeaea] pt-4">
+                  <label className="text-sm font-medium text-gray-500">Período de membresía</label>
+                  <p className="text-gray-900">
+                    {new Date(selectedUser.startDate).toLocaleDateString('es-AR')}
+                  </p>
+                  <p className="text-gray-600 text-sm">
+                    hasta {new Date(selectedUser.endDate).toLocaleDateString('es-AR')}
+                  </p>
+                </div>
+
+                <div className="border-t border-[#edeaea] pt-4">
+                  <label className="form-label">Contacto de Emergencia</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editFormData.emergencyContact}
+                    onChange={(e) => handleFormChange('emergencyContact', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Teléfono de Emergencia</label>
+                  <input
+                    type="tel"
+                    className="form-input"
+                    value={editFormData.emergencyPhone}
+                    onChange={(e) => handleFormChange('emergencyPhone', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Notas Médicas</label>
+                  <textarea
+                    className="form-input"
+                    rows="3"
+                    value={editFormData.medicalNotes}
+                    onChange={(e) => handleFormChange('medicalNotes', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Notas</label>
+                  <textarea
+                    className="form-input"
+                    rows="3"
+                    value={editFormData.notes}
+                    onChange={(e) => handleFormChange('notes', e.target.value)}
+                  />
+                </div>
+
+                <div className="border-t border-[#edeaea] pt-4">
+                  <label className="text-sm font-medium text-gray-500">Fecha de conversión</label>
+                  <p className="text-gray-900">
+                    {new Date(selectedUser.convertedAt).toLocaleString('es-AR')}
+                  </p>
+                </div>
+              </div>
 
               {/* Actions */}
               <div className="mt-6 space-y-3 border-t pt-6">
-                {!isEditing ? (
-                  <>
-                    <button
-                      onClick={handleEditClick}
-                      className="btn-primary w-full"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => setShowSidePanel(false)}
-                      className="btn-secondary w-full"
-                    >
-                      Cerrar
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleSaveEdit}
-                      className="btn-primary w-full"
-                    >
-                      Guardar Cambios
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="btn-secondary w-full"
-                    >
-                      Cancelar
-                    </button>
-                  </>
+                {hasChanges && (
+                  <button
+                    onClick={handleSaveEdit}
+                    className="btn-primary w-full"
+                  >
+                    Confirmar edición
+                  </button>
                 )}
+                <button
+                  onClick={() => setShowSidePanel(false)}
+                  className="btn-secondary w-full"
+                >
+                  Cerrar
+                </button>
               </div>
             </div>
           </div>

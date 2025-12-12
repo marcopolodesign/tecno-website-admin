@@ -67,15 +67,14 @@ const Sellers = () => {
           if (authError) console.error('Error updating password:', authError)
         }
       } else {
-        // Create new seller with auth user
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // Create new seller with auth user using admin API
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
           email: formData.email,
           password: formData.password,
-          options: {
-            data: {
-              first_name: formData.first_name,
-              last_name: formData.last_name
-            }
+          email_confirm: true, // Auto-confirm email
+          user_metadata: {
+            first_name: formData.first_name,
+            last_name: formData.last_name
           }
         })
 
@@ -235,7 +234,7 @@ const Sellers = () => {
               <tr key={seller.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10 bg-sky-100 rounded-full flex items-center justify-center">
+                    <div className="shrink-0 h-10 w-10 bg-sky-100 rounded-full flex items-center justify-center">
                       <span className="text-sky-600 font-medium">
                         {seller.first_name?.charAt(0)}{seller.last_name?.charAt(0)}
                       </span>
