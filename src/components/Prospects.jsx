@@ -108,10 +108,12 @@ const Prospects = () => {
   const handleDeleteProspect = async (prospect) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este prospect?')) {
       try {
-        await prospectsService.deleteProspect(prospect.documentId)
+        await prospectsService.deleteProspect(prospect.id)
         setProspects(prospects.filter(p => p.id !== prospect.id))
+        toast.success('Prospect eliminado exitosamente')
       } catch (error) {
         console.error('Error deleting prospect:', error)
+        toast.error('Error al eliminar prospect')
       }
     }
   }
