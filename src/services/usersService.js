@@ -1,4 +1,6 @@
 import { supabase, toCamelCase, toSnakeCase } from '../lib/supabase'
+import membershipsService from './membershipsService'
+import membershipPlansService from './membershipPlansService'
 
 export const usersService = {
   async getUsers() {
@@ -58,11 +60,16 @@ export const usersService = {
     }
   },
 
-  async createUser(data) {
+  async createUser(data, paymentData = null) {
     try {
       // Get current authenticated user for profile association
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
+
+      // Get membership plan to get price
+      const { data: plans } = await membershipPlansService.getPlans()
+      const selectedPlan = plans.find(p => p.name === data.membershipType)
+      if (!selectedPlan) throw new Error('Invalid membership type')
 
       const userData = {
         profile_id: user.id,
@@ -94,6 +101,29 @@ export const usersService = {
         .single()
 
       if (error) throw error
+
+      // Create membership and payment if payment data provided
+      if (paymentData && paymentData.createPayment) {
+        const membershipInfo = {
+          userId: result.id,
+          membershipPlanId: selectedPlan.id,
+          membershipType: data.membershipType,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          isRenewal: false
+        }
+
+        const payment = {
+          amount: paymentData.amount || selectedPlan.price,
+          paymentMethod: paymentData.paymentMethod || 'efectivo',
+          paymentStatus: 'completed',
+          paymentDate: paymentData.paymentDate || new Date().toISOString(),
+          notes: paymentData.notes || ''
+        }
+
+        await membershipsService.createMembership(membershipInfo, payment)
+      }
+
       return { data: toCamelCase(result) }
     } catch (error) {
       console.error('Error creating user:', error)

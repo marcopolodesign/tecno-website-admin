@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, isServiceRole } from '../lib/supabase'
 import { locationsService } from '../services/locationsService'
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 
 const Sellers = () => {
   const [sellers, setSellers] = useState([])
@@ -201,6 +201,23 @@ const Sellers = () => {
 
   return (
     <div className="p-6">
+      {!isServiceRole && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                Advertencia: No se detectó la clave de servicio (Service Role Key). No podrás crear nuevos vendedores.
+                <br />
+                Asegúrate de configurar <code className="font-mono font-bold">VITE_SUPABASE_SERVICE_ROLE_KEY</code> en tu archivo .env (local) o en Vercel.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="sm:flex sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Vendedores</h1>

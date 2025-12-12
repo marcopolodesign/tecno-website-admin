@@ -31,7 +31,10 @@ const Leads = () => {
     endDate: '',
     emergencyContact: '',
     emergencyPhone: '',
-    medicalNotes: ''
+    medicalNotes: '',
+    paymentMethod: 'efectivo',
+    paymentAmount: '',
+    paymentNotes: ''
   })
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [reasonData, setReasonData] = useState({
@@ -197,7 +200,14 @@ const Leads = () => {
 
   const handleConvertToUser = async () => {
     try {
-      await leadsService.convertToUser(leadToConvert.id, leadToConvert, convertFormData)
+      const paymentData = {
+        amount: convertFormData.paymentAmount,
+        paymentMethod: convertFormData.paymentMethod,
+        paymentDate: new Date().toISOString(),
+        notes: convertFormData.paymentNotes
+      }
+      
+      await leadsService.convertToUser(leadToConvert.id, leadToConvert, convertFormData, paymentData)
       setShowConvertModal(false)
       fetchLeads()
       alert('¡Lead convertido a Usuario exitosamente!')
@@ -434,6 +444,24 @@ const Leads = () => {
                 <span className={`status-badge ${getStatusColor(params.value)}`}>
                   {getStatusLabel(params.value)}
                 </span>
+              )
+            },
+            {
+              field: 'emailSent',
+              headerName: 'Email',
+              width: 80,
+              renderCell: (params) => (
+                <div className="flex items-center justify-center">
+                  {params.value ? (
+                    <div className="flex items-center text-green-600">
+                      <CheckIcon className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-gray-400">
+                      <div className="h-4 w-4 border border-gray-300 rounded-full"></div>
+                    </div>
+                  )}
+                </div>
               )
             },
             {
@@ -833,6 +861,47 @@ const Leads = () => {
                   rows="3"
                   placeholder="Alergias, lesiones, condiciones médicas..."
                 />
+              </div>
+
+              {/* Payment Info */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Información de Pago</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="form-label">Método de Pago *</label>
+                    <select
+                      className="form-input"
+                      value={convertFormData.paymentMethod}
+                      onChange={(e) => setConvertFormData({...convertFormData, paymentMethod: e.target.value})}
+                    >
+                      <option value="efectivo">Efectivo</option>
+                      <option value="tarjeta">Tarjeta</option>
+                      <option value="transferencia">Transferencia</option>
+                      <option value="mercadopago">Mercado Pago</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Monto (opcional)</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={convertFormData.paymentAmount}
+                      onChange={(e) => setConvertFormData({...convertFormData, paymentAmount: e.target.value})}
+                      placeholder="Dejar vacío para usar precio de plan"
+                      step="0.01"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Notas de Pago</label>
+                    <textarea
+                      className="form-input"
+                      rows="2"
+                      value={convertFormData.paymentNotes}
+                      onChange={(e) => setConvertFormData({...convertFormData, paymentNotes: e.target.value})}
+                      placeholder="Información adicional sobre el pago..."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             <div className="mt-6 flex justify-end space-x-3">

@@ -15,3 +15,4 @@ WHERE table_name = 'leads' AND column_name = 'lost_reason';
 SELECT column_name, data_type 
 FROM information_schema.columns 
 WHERE table_name = 'users' AND column_name = 'non_renewal_reason';
+

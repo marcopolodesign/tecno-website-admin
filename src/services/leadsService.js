@@ -1,4 +1,6 @@
 import { supabase, toCamelCase, toSnakeCase } from '../lib/supabase'
+import membershipsService from './membershipsService'
+import membershipPlansService from './membershipPlansService'
 
 export const leadsService = {
   async getLeads() {
@@ -128,11 +130,16 @@ export const leadsService = {
     }
   },
 
-  async convertToUser(leadId, leadData, membershipData) {
+  async convertToUser(leadId, leadData, membershipData, paymentData = null) {
     try {
       // Get current user for profile association
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
+
+      // Get membership plan to get price
+      const { data: plans } = await membershipPlansService.getPlans()
+      const selectedPlan = plans.find(p => p.name === membershipData.membershipType)
+      if (!selectedPlan) throw new Error('Invalid membership type')
 
       // Create user (customer) with lead data
       const userData = {
@@ -167,6 +174,26 @@ export const leadsService = {
         .single()
 
       if (userError) throw userError
+
+      // Create membership and payment
+      const membershipInfo = {
+        userId: customer.id,
+        membershipPlanId: selectedPlan.id,
+        membershipType: membershipData.membershipType,
+        startDate: membershipData.startDate,
+        endDate: membershipData.endDate,
+        isRenewal: false
+      }
+
+      const payment = {
+        amount: paymentData?.amount || selectedPlan.price,
+        paymentMethod: paymentData?.paymentMethod || 'efectivo',
+        paymentStatus: 'completed',
+        paymentDate: paymentData?.paymentDate || new Date().toISOString(),
+        notes: paymentData?.notes || 'Conversión de lead a usuario'
+      }
+
+      await membershipsService.createMembership(membershipInfo, payment)
 
       // Update lead to mark as converted
       const { error: leadError } = await supabase

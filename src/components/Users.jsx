@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { DataGrid } from '@mui/x-data-grid'
 import { usersService } from '../services/usersService'
+import membershipsService from '../services/membershipsService'
 
 const Users = () => {
   const [users, setUsers] = useState([])
@@ -40,7 +41,20 @@ const Users = () => {
     emergencyContact: '',
     emergencyPhone: '',
     medicalNotes: '',
-    notes: ''
+    notes: '',
+    createPayment: true,
+    paymentMethod: 'efectivo',
+    paymentAmount: '',
+    paymentNotes: ''
+  })
+  const [showRenewalModal, setShowRenewalModal] = useState(false)
+  const [renewalFormData, setRenewalFormData] = useState({
+    membershipType: 'mensual',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
+    paymentMethod: 'efectivo',
+    paymentAmount: '',
+    paymentNotes: ''
   })
 
   useEffect(() => {
@@ -108,7 +122,15 @@ const Users = () => {
     }
 
     try {
-      const response = await usersService.createUser(createFormData)
+      const paymentData = createFormData.createPayment ? {
+        createPayment: true,
+        amount: createFormData.paymentAmount,
+        paymentMethod: createFormData.paymentMethod,
+        paymentDate: new Date().toISOString(),
+        notes: createFormData.paymentNotes
+      } : null
+
+      const response = await usersService.createUser(createFormData, paymentData)
       setUsers([response.data, ...users])
       setShowCreateModal(false)
       // Reset form
@@ -126,7 +148,11 @@ const Users = () => {
         emergencyContact: '',
         emergencyPhone: '',
         medicalNotes: '',
-        notes: ''
+        notes: '',
+        createPayment: true,
+        paymentMethod: 'efectivo',
+        paymentAmount: '',
+        paymentNotes: ''
       })
       toast.success('Usuario creado exitosamente')
     } catch (error) {
@@ -276,6 +302,45 @@ const Users = () => {
       'no-renueva': 'No Renueva'
     }
     return statuses[status] || status
+  }
+
+  const handleRenewMembership = async () => {
+    // Validate required fields
+    if (!renewalFormData.membershipType || !renewalFormData.startDate || !renewalFormData.endDate) {
+      toast.error('Por favor completa todos los campos requeridos')
+      return
+    }
+
+    try {
+      const paymentData = {
+        amount: renewalFormData.paymentAmount,
+        paymentMethod: renewalFormData.paymentMethod,
+        paymentDate: new Date().toISOString(),
+        notes: renewalFormData.paymentNotes || 'Renovación de membresía'
+      }
+
+      await membershipsService.renewMembership(
+        selectedUser.id,
+        selectedUser.currentMembershipId,
+        renewalFormData,
+        paymentData
+      )
+
+      setShowRenewalModal(false)
+      setRenewalFormData({
+        membershipType: 'mensual',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        paymentMethod: 'efectivo',
+        paymentAmount: '',
+        paymentNotes: ''
+      })
+      fetchUsers()
+      toast.success('Membresía renovada exitosamente')
+    } catch (error) {
+      console.error('Error renewing membership:', error)
+      toast.error('Error al renovar membresía')
+    }
   }
 
   const getTrainingGoalLabel = (goal) => {
@@ -707,6 +772,15 @@ const Users = () => {
                   </button>
                 )}
                 <button
+                  onClick={() => {
+                    setShowRenewalModal(true)
+                    setShowSidePanel(false)
+                  }}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Renovar Membresía
+                </button>
+                <button
                   onClick={() => setShowSidePanel(false)}
                   className="btn-secondary w-full"
                 >
@@ -928,6 +1002,63 @@ const Users = () => {
                   />
                 </div>
               </div>
+
+              {/* Payment Info */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Información de Pago</h4>
+                <div className="mb-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={createFormData.createPayment}
+                      onChange={(e) => setCreateFormData({...createFormData, createPayment: e.target.checked})}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Registrar pago</span>
+                  </label>
+                </div>
+
+                {createFormData.createPayment && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="form-label">Método de Pago *</label>
+                        <select
+                          className="form-input"
+                          value={createFormData.paymentMethod}
+                          onChange={(e) => setCreateFormData({...createFormData, paymentMethod: e.target.value})}
+                        >
+                          <option value="efectivo">Efectivo</option>
+                          <option value="tarjeta">Tarjeta</option>
+                          <option value="transferencia">Transferencia</option>
+                          <option value="mercadopago">Mercado Pago</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="form-label">Monto (opcional)</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={createFormData.paymentAmount}
+                          onChange={(e) => setCreateFormData({...createFormData, paymentAmount: e.target.value})}
+                          placeholder="Dejar vacío para usar precio de plan"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label">Notas de Pago</label>
+                      <textarea
+                        className="form-input"
+                        rows="2"
+                        value={createFormData.paymentNotes}
+                        onChange={(e) => setCreateFormData({...createFormData, paymentNotes: e.target.value})}
+                        placeholder="Información adicional sobre el pago..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end space-x-3">
@@ -948,7 +1079,11 @@ const Users = () => {
                     emergencyContact: '',
                     emergencyPhone: '',
                     medicalNotes: '',
-                    notes: ''
+                    notes: '',
+                    createPayment: true,
+                    paymentMethod: 'efectivo',
+                    paymentAmount: '',
+                    paymentNotes: ''
                   })
                 }}
                 className="btn-secondary"
@@ -960,6 +1095,129 @@ const Users = () => {
                 className="btn-primary"
               >
                 Crear Usuario
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Renewal Modal */}
+      {showRenewalModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-[70]"
+            onClick={() => setShowRenewalModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">
+              Renovar Membresía
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Membership Info */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Nueva Membresía</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="form-label">Tipo de Membresía *</label>
+                    <select
+                      className="form-input"
+                      value={renewalFormData.membershipType}
+                      onChange={(e) => setRenewalFormData({...renewalFormData, membershipType: e.target.value})}
+                    >
+                      <option value="mensual">Mensual</option>
+                      <option value="trimestral">Trimestral</option>
+                      <option value="semestral">Semestral</option>
+                      <option value="anual">Anual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Fecha de Inicio *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={renewalFormData.startDate}
+                      onChange={(e) => setRenewalFormData({...renewalFormData, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Fecha de Fin *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={renewalFormData.endDate}
+                      onChange={(e) => setRenewalFormData({...renewalFormData, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Info */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Información de Pago</h4>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">Método de Pago *</label>
+                      <select
+                        className="form-input"
+                        value={renewalFormData.paymentMethod}
+                        onChange={(e) => setRenewalFormData({...renewalFormData, paymentMethod: e.target.value})}
+                      >
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="mercadopago">Mercado Pago</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Monto (opcional)</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={renewalFormData.paymentAmount}
+                        onChange={(e) => setRenewalFormData({...renewalFormData, paymentAmount: e.target.value})}
+                        placeholder="Dejar vacío para usar precio de plan"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label">Notas de Pago</label>
+                    <textarea
+                      className="form-input"
+                      rows="2"
+                      value={renewalFormData.paymentNotes}
+                      onChange={(e) => setRenewalFormData({...renewalFormData, paymentNotes: e.target.value})}
+                      placeholder="Información adicional sobre el pago..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowRenewalModal(false)
+                  setRenewalFormData({
+                    membershipType: 'mensual',
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: '',
+                    paymentMethod: 'efectivo',
+                    paymentAmount: '',
+                    paymentNotes: ''
+                  })
+                }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRenewMembership}
+                className="btn-primary"
+              >
+                Renovar Membresía
               </button>
             </div>
           </div>

@@ -9,7 +9,8 @@ import {
   FunnelIcon,
   UsersIcon,
   AcademicCapIcon,
-  MapPinIcon
+  MapPinIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline'
 
 const Sidebar = ({ userRole }) => {
@@ -20,6 +21,7 @@ const Sidebar = ({ userRole }) => {
     { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
     { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
     { name: 'Usuarios', href: '/users', icon: UserCircleIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
+    { name: 'Membresías', href: '/membership-plans', icon: CreditCardIcon, roles: ['super_admin', 'admin'] },
     { name: 'Vendedores', href: '/sellers', icon: UsersIcon, roles: ['super_admin', 'admin'] },
     { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
     { name: 'Sedes', href: '/locations', icon: MapPinIcon, roles: ['super_admin', 'admin'] },

@@ -9,6 +9,7 @@ import Sellers from './components/Sellers'
 import Coaches from './components/Coaches'
 import Locations from './components/Locations'
 import ContentManagement from './components/ContentManagement'
+import MembershipPlans from './components/MembershipPlans'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { authService } from './services/authService'
@@ -72,7 +73,7 @@ function App() {
     if (role === 'super_admin' || role === 'admin') return true
 
     // Common restrictions for non-admins
-    if (['/sellers', '/coaches', '/locations'].includes(route)) return false
+    if (['/sellers', '/coaches', '/locations', '/membership-plans'].includes(route)) return false
 
     // Seller (Front Desk)
     if (role === 'front_desk') {
@@ -120,6 +121,7 @@ function App() {
                 {canAccess('/prospects') && <Route path="/prospects" element={<Prospects />} />}
                 {canAccess('/leads') && <Route path="/leads" element={<Leads />} />}
                 {canAccess('/users') && <Route path="/users" element={<Users />} />}
+                {canAccess('/membership-plans') && <Route path="/membership-plans" element={<MembershipPlans />} />}
                 {canAccess('/sellers') && <Route path="/sellers" element={<Sellers />} />}
                 {canAccess('/coaches') && <Route path="/coaches" element={<Coaches />} />}
                 {canAccess('/locations') && <Route path="/locations" element={<Locations />} />}

@@ -2,7 +2,20 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
 // Use service role key for admin operations (creating users, etc.)
-const supabaseKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-key'
+const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseKey = serviceRoleKey || anonKey || 'your-key'
+
+// Debug log to check if service key is loaded
+if (import.meta.env.DEV) {
+  console.log('Supabase Init:', {
+    hasServiceKey: !!serviceRoleKey,
+    hasAnonKey: !!anonKey,
+    usingKey: serviceRoleKey ? 'Service Role (Admin)' : 'Anon (Public)'
+  })
+}
+
+export const isServiceRole = !!serviceRoleKey
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
