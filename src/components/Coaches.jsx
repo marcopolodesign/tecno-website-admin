@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { locationsService } from '../services/locationsService'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 
 const Coaches = () => {
   const [coaches, setCoaches] = useState([])
+  const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingCoach, setEditingCoach] = useState(null)
@@ -18,19 +20,33 @@ const Coaches = () => {
     bio: '',
     is_active: true,
     hire_date: '',
-    location: '',
+    location_id: '',
     age: ''
   })
 
   useEffect(() => {
     fetchCoaches()
+    fetchLocations()
   }, [])
+
+  const fetchLocations = async () => {
+    try {
+      const { data } = await locationsService.getLocations()
+      setLocations(data || [])
+    } catch (error) {
+      console.error('Error fetching locations:', error)
+    }
+  }
 
   const fetchCoaches = async () => {
     try {
       const { data, error } = await supabase
         .from('coaches')
-        .select('*, users(count)')
+        .select(`
+          *,
+          users(count),
+          locations(name)
+        `)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -62,7 +78,7 @@ const Coaches = () => {
         bio: formData.bio,
         is_active: formData.is_active,
         hire_date: formData.hire_date || null,
-        location: formData.location,
+        location_id: formData.location_id || null,
         age: formData.age || null
       }
 
@@ -159,7 +175,7 @@ const Coaches = () => {
       bio: coach.bio || '',
       is_active: coach.is_active,
       hire_date: coach.hire_date || '',
-      location: coach.location || '',
+      location_id: coach.location_id || '',
       age: coach.age || ''
     })
     setShowModal(true)
@@ -177,7 +193,7 @@ const Coaches = () => {
       bio: '',
       is_active: true,
       hire_date: '',
-      location: '',
+      location_id: '',
       age: ''
     })
     setEditingCoach(null)
@@ -251,13 +267,13 @@ const Coaches = () => {
                   <p className="text-sm text-gray-500">{coach.phone}</p>
                 )}
                 <div className="flex gap-4 text-sm text-gray-600">
-                  {coach.location && (
+                  {(coach.locations?.name || coach.location) && (
                     <span className="flex items-center">
                       <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      {coach.location}
+                      {coach.locations?.name || coach.location}
                     </span>
                   )}
                   {coach.age && (
@@ -372,12 +388,16 @@ const Coaches = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Sede (Location)</label>
-                        <input
-                          type="text"
-                          value={formData.location}
-                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
-                        />
+                        <select
+                          value={formData.location_id}
+                          onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white"
+                        >
+                          <option value="">Seleccionar Sede</option>
+                          {locations.map(loc => (
+                            <option key={loc.id} value={loc.id}>{loc.name}</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Edad</label>

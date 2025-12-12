@@ -8,7 +8,8 @@ import {
   UserCircleIcon,
   FunnelIcon,
   UsersIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  MapPinIcon
 } from '@heroicons/react/24/outline'
 
 const Sidebar = () => {
@@ -21,11 +22,12 @@ const Sidebar = () => {
     { name: 'Usuarios', href: '/users', icon: UserCircleIcon },
     { name: 'Vendedores', href: '/sellers', icon: UsersIcon },
     { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon },
+    { name: 'Sedes', href: '/locations', icon: MapPinIcon },
     { name: 'Contenido', href: '/content', icon: DocumentTextIcon },
   ]
 
   return (
-    <div className="hidden lg:flex lg:flex-shrink-0">
+    <div className="hidden lg:flex lg:flex-shrink-0 sticky top-0 h-screen">
       <div className="flex flex-col w-64">
         <div className="flex flex-col h-0 flex-1 bg-white border-r border-gray-200">
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">

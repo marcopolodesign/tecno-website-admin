@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { locationsService } from '../services/locationsService'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 
 const Sellers = () => {
   const [sellers, setSellers] = useState([])
+  const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingSeller, setEditingSeller] = useState(null)
@@ -14,18 +16,32 @@ const Sellers = () => {
     phone: '',
     password: '',
     role: 'front_desk',
-    active: true
+    active: true,
+    location_id: ''
   })
 
   useEffect(() => {
     fetchSellers()
+    fetchLocations()
   }, [])
+
+  const fetchLocations = async () => {
+    try {
+      const { data } = await locationsService.getLocations()
+      setLocations(data || [])
+    } catch (error) {
+      console.error('Error fetching locations:', error)
+    }
+  }
 
   const fetchSellers = async () => {
     try {
       const { data, error } = await supabase
         .from('sellers')
-        .select('*')
+        .select(`
+          *,
+          locations(name)
+        `)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -42,18 +58,21 @@ const Sellers = () => {
     setLoading(true)
 
     try {
+      const sellerData = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        active: formData.active,
+        location_id: formData.location_id || null
+      }
+
       if (editingSeller) {
         // Update existing seller
         const { error } = await supabase
           .from('sellers')
-          .update({
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            email: formData.email,
-            phone: formData.phone,
-            role: formData.role,
-            active: formData.active
-          })
+          .update(sellerData)
           .eq('id', editingSeller.id)
 
         if (error) throw error
@@ -85,12 +104,7 @@ const Sellers = () => {
           .from('sellers')
           .insert([{
             auth_user_id: authData.user.id,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            email: formData.email,
-            phone: formData.phone,
-            role: formData.role,
-            active: formData.active
+            ...sellerData
           }])
 
         if (sellerError) throw sellerError
@@ -143,7 +157,8 @@ const Sellers = () => {
       phone: seller.phone || '',
       password: '',
       role: seller.role,
-      active: seller.active
+      active: seller.active,
+      location_id: seller.location_id || ''
     })
     setShowModal(true)
   }
@@ -156,7 +171,8 @@ const Sellers = () => {
       phone: '',
       password: '',
       role: 'front_desk',
-      active: true
+      active: true,
+      location_id: ''
     })
     setEditingSeller(null)
   }
@@ -219,6 +235,9 @@ const Sellers = () => {
                 Teléfono
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Sede
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Rol
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -251,6 +270,9 @@ const Sellers = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {seller.phone || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {seller.locations?.name || '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {getRoleBadge(seller.role)}
@@ -341,6 +363,20 @@ const Sellers = () => {
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Sede</label>
+                      <select
+                        value={formData.location_id}
+                        onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white"
+                      >
+                        <option value="">Seleccionar Sede</option>
+                        {locations.map(loc => (
+                          <option key={loc.id} value={loc.id}>{loc.name}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>

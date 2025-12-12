@@ -7,6 +7,7 @@ import Leads from './components/Leads'
 import Users from './components/Users'
 import Sellers from './components/Sellers'
 import Coaches from './components/Coaches'
+import Locations from './components/Locations'
 import ContentManagement from './components/ContentManagement'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -70,7 +71,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 flex overflow-hidden">
+      <div className="min-h-screen bg-gray-50 flex">
         <Sidebar />
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
           <Header onLogout={handleLogout} />
@@ -84,6 +85,7 @@ function App() {
                 <Route path="/users" element={<Users />} />
                 <Route path="/sellers" element={<Sellers />} />
                 <Route path="/coaches" element={<Coaches />} />
+                <Route path="/locations" element={<Locations />} />
                 <Route path="/content" element={<ContentManagement />} />
               </Routes>
             </div>
