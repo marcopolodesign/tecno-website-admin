@@ -547,12 +547,12 @@ const Prospects = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-white/70 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 bg-white/70 backdrop-blur-sm z-[60] animate-[fadeIn_0.3s_ease-in-out]"
             onClick={() => setShowConvertModal(false)}
           />
           
           {/* Side Panel */}
-          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[60] overflow-y-auto transform transition-transform duration-300 ease-in-out">
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[60] overflow-y-auto animate-[slideInRight_0.3s_ease-out]">
             <div className="p-6">
               {/* Header with Close Button */}
               <div className="flex items-center justify-between mb-4">
