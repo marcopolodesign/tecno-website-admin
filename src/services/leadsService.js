@@ -117,6 +117,12 @@ export const leadsService = {
         emergency_phone: membershipData.emergencyPhone || '',
         medical_notes: membershipData.medicalNotes || '',
         notes: leadData.notes || '',
+        // Inherit UTM parameters from lead
+        utm_source: leadData.utmSource || null,
+        utm_medium: leadData.utmMedium || null,
+        utm_campaign: leadData.utmCampaign || null,
+        utm_term: leadData.utmTerm || null,
+        utm_content: leadData.utmContent || null,
         converted_at: new Date().toISOString()
       }
 
