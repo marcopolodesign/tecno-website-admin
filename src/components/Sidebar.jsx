@@ -12,19 +12,24 @@ import {
   MapPinIcon
 } from '@heroicons/react/24/outline'
 
-const Sidebar = () => {
+const Sidebar = ({ userRole }) => {
   const location = useLocation()
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon },
-    { name: 'Leads', href: '/leads', icon: FunnelIcon },
-    { name: 'Usuarios', href: '/users', icon: UserCircleIcon },
-    { name: 'Vendedores', href: '/sellers', icon: UsersIcon },
-    { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon },
-    { name: 'Sedes', href: '/locations', icon: MapPinIcon },
-    { name: 'Contenido', href: '/content', icon: DocumentTextIcon },
+  const allNavigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, roles: ['super_admin', 'admin'] },
+    { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+    { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+    { name: 'Usuarios', href: '/users', icon: UserCircleIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
+    { name: 'Vendedores', href: '/sellers', icon: UsersIcon, roles: ['super_admin', 'admin'] },
+    { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
+    { name: 'Sedes', href: '/locations', icon: MapPinIcon, roles: ['super_admin', 'admin'] },
+    { name: 'Contenido', href: '/content', icon: DocumentTextIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
   ]
+
+  const navigation = allNavigation.filter(item => {
+    if (!userRole) return false
+    return item.roles.includes(userRole)
+  })
 
   return (
     <div className="hidden lg:flex lg:flex-shrink-0 sticky top-0 h-screen">
