@@ -591,6 +591,45 @@ const Users = () => {
                     {new Date(selectedUser.convertedAt).toLocaleString('es-AR')}
                   </p>
                 </div>
+
+                {/* UTM Parameters */}
+                {(selectedUser.utmSource || selectedUser.utmMedium || selectedUser.utmCampaign || selectedUser.utmTerm || selectedUser.utmContent) && (
+                  <div className="border-t border-[#edeaea] pt-4">
+                    <label className="text-sm font-medium text-gray-500 mb-2 block">Parámetros UTM</label>
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+                      {selectedUser.utmSource && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Source:</span>
+                          <span className="font-medium text-gray-900">{selectedUser.utmSource}</span>
+                        </div>
+                      )}
+                      {selectedUser.utmMedium && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Medium:</span>
+                          <span className="font-medium text-gray-900">{selectedUser.utmMedium}</span>
+                        </div>
+                      )}
+                      {selectedUser.utmCampaign && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Campaign:</span>
+                          <span className="font-medium text-gray-900">{selectedUser.utmCampaign}</span>
+                        </div>
+                      )}
+                      {selectedUser.utmTerm && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Term:</span>
+                          <span className="font-medium text-gray-900">{selectedUser.utmTerm}</span>
+                        </div>
+                      )}
+                      {selectedUser.utmContent && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Content:</span>
+                          <span className="font-medium text-gray-900">{selectedUser.utmContent}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
