@@ -6,7 +6,8 @@ import {
   TrashIcon,
   ArrowDownTrayIcon,
   EyeIcon,
-  CheckIcon
+  CheckIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline'
 import { DataGrid } from '@mui/x-data-grid'
 import { leadsService } from '../services/leadsService'
@@ -37,6 +38,16 @@ const Leads = () => {
     leadId: null,
     newStatus: '',
     reason: ''
+  })
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createFormData, setCreateFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    trainingGoal: '',
+    notes: '',
+    source: 'manual'
   })
 
   useEffect(() => {
@@ -134,9 +145,38 @@ const Leads = () => {
       try {
         await leadsService.deleteLead(leadId)
         setLeads(leads.filter(lead => lead.id !== leadId))
+        toast.success('Lead eliminado exitosamente')
       } catch (error) {
         console.error('Error deleting lead:', error)
+        toast.error('Error al eliminar lead')
       }
+    }
+  }
+
+  const handleCreateLead = async () => {
+    // Validate required fields
+    if (!createFormData.firstName || !createFormData.email || !createFormData.phone || !createFormData.trainingGoal) {
+      toast.error('Por favor completa todos los campos requeridos')
+      return
+    }
+
+    try {
+      const response = await leadsService.createLead(createFormData)
+      setLeads([response.data, ...leads])
+      setShowCreateModal(false)
+      setCreateFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        trainingGoal: '',
+        notes: '',
+        source: 'manual'
+      })
+      toast.success('Lead creado exitosamente')
+    } catch (error) {
+      console.error('Error creating lead:', error)
+      toast.error('Error al crear lead')
     }
   }
 
@@ -293,13 +333,22 @@ const Leads = () => {
           <h1 className="text-2xl font-bold text-gray-900">Gestión de Leads</h1>
           <p className="text-gray-600">Administra y sigue el progreso de tus leads</p>
         </div>
-        <button
-          onClick={handleExport}
-          className="btn-secondary flex items-center"
-        >
-          <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-          Exportar CSV
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn-primary flex items-center"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Crear Lead
+          </button>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -839,6 +888,124 @@ const Leads = () => {
                 className="btn-primary"
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Create Lead Modal */}
+      {showCreateModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-[70]"
+            onClick={() => setShowCreateModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">
+              Crear Nuevo Lead
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Nombre *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={createFormData.firstName}
+                    onChange={(e) => setCreateFormData({...createFormData, firstName: e.target.value})}
+                    placeholder="Juan"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Apellido</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={createFormData.lastName}
+                    onChange={(e) => setCreateFormData({...createFormData, lastName: e.target.value})}
+                    placeholder="Pérez"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Email *</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={createFormData.email}
+                  onChange={(e) => setCreateFormData({...createFormData, email: e.target.value})}
+                  placeholder="juan@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Teléfono *</label>
+                <input
+                  type="tel"
+                  className="form-input"
+                  value={createFormData.phone}
+                  onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
+                  placeholder="+54 9 11 1234-5678"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Objetivo de entrenamiento *</label>
+                <select
+                  className="form-input"
+                  value={createFormData.trainingGoal}
+                  onChange={(e) => setCreateFormData({...createFormData, trainingGoal: e.target.value})}
+                >
+                  <option value="">Seleccionar...</option>
+                  <option value="perdida-peso">Pérdida de peso</option>
+                  <option value="aumento-masa-muscular">Aumento de masa muscular</option>
+                  <option value="mejora-resistencia">Mejora de resistencia</option>
+                  <option value="tonificacion">Tonificación</option>
+                  <option value="entrenamiento-funcional">Entrenamiento funcional</option>
+                  <option value="preparacion-competencias">Preparación para competencias</option>
+                  <option value="rehabilitacion-fisica">Rehabilitación física</option>
+                  <option value="reduccion-estres">Reducción del estrés</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Notas</label>
+                <textarea
+                  className="form-input"
+                  rows="3"
+                  value={createFormData.notes}
+                  onChange={(e) => setCreateFormData({...createFormData, notes: e.target.value})}
+                  placeholder="Información adicional..."
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false)
+                  setCreateFormData({
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    phone: '',
+                    trainingGoal: '',
+                    notes: '',
+                    source: 'manual'
+                  })
+                }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateLead}
+                className="btn-primary"
+              >
+                Crear Lead
               </button>
             </div>
           </div>

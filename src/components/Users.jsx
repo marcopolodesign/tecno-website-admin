@@ -4,7 +4,8 @@ import {
   MagnifyingGlassIcon,
   TrashIcon,
   ArrowDownTrayIcon,
-  EyeIcon
+  EyeIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline'
 import { DataGrid } from '@mui/x-data-grid'
 import { usersService } from '../services/usersService'
@@ -25,6 +26,21 @@ const Users = () => {
     userId: null,
     newStatus: '',
     reason: ''
+  })
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createFormData, setCreateFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    trainingGoal: '',
+    membershipType: 'mensual',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
+    emergencyContact: '',
+    emergencyPhone: '',
+    medicalNotes: '',
+    notes: ''
   })
 
   useEffect(() => {
@@ -74,9 +90,48 @@ const Users = () => {
       try {
         await usersService.deleteUser(userId)
         setUsers(users.filter(user => user.id !== userId))
+        toast.success('Usuario eliminado exitosamente')
       } catch (error) {
         console.error('Error deleting user:', error)
+        toast.error('Error al eliminar usuario')
       }
+    }
+  }
+
+  const handleCreateUser = async () => {
+    // Validate required fields
+    if (!createFormData.firstName || !createFormData.email || !createFormData.phone || 
+        !createFormData.trainingGoal || !createFormData.membershipType || 
+        !createFormData.startDate || !createFormData.endDate) {
+      toast.error('Por favor completa todos los campos requeridos')
+      return
+    }
+
+    try {
+      const response = await usersService.createUser(createFormData)
+      setUsers([response.data, ...users])
+      setShowCreateModal(false)
+      // Reset form
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      setCreateFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        trainingGoal: '',
+        membershipType: 'mensual',
+        startDate: tomorrow.toISOString().split('T')[0],
+        endDate: '',
+        emergencyContact: '',
+        emergencyPhone: '',
+        medicalNotes: '',
+        notes: ''
+      })
+      toast.success('Usuario creado exitosamente')
+    } catch (error) {
+      console.error('Error creating user:', error)
+      toast.error('Error al crear usuario')
     }
   }
 
@@ -252,13 +307,22 @@ const Users = () => {
           <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
           <p className="text-gray-600">Administra tus clientes activos y sus membresías</p>
         </div>
-        <button
-          onClick={handleExport}
-          className="btn-secondary flex items-center"
-        >
-          <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-          Exportar CSV
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn-primary flex items-center"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Crear Usuario
+          </button>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -687,6 +751,215 @@ const Users = () => {
                 className="btn-primary"
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-[70]"
+            onClick={() => setShowCreateModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">
+              Crear Nuevo Usuario
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Personal Info */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Información Personal</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Nombre *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={createFormData.firstName}
+                      onChange={(e) => setCreateFormData({...createFormData, firstName: e.target.value})}
+                      placeholder="Juan"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Apellido</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={createFormData.lastName}
+                      onChange={(e) => setCreateFormData({...createFormData, lastName: e.target.value})}
+                      placeholder="Pérez"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="form-label">Email *</label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      value={createFormData.email}
+                      onChange={(e) => setCreateFormData({...createFormData, email: e.target.value})}
+                      placeholder="juan@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Teléfono *</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={createFormData.phone}
+                      onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
+                      placeholder="+54 9 11 1234-5678"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="form-label">Objetivo de entrenamiento *</label>
+                  <select
+                    className="form-input"
+                    value={createFormData.trainingGoal}
+                    onChange={(e) => setCreateFormData({...createFormData, trainingGoal: e.target.value})}
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="perdida-peso">Pérdida de peso</option>
+                    <option value="aumento-masa-muscular">Aumento de masa muscular</option>
+                    <option value="mejora-resistencia">Mejora de resistencia</option>
+                    <option value="tonificacion">Tonificación</option>
+                    <option value="entrenamiento-funcional">Entrenamiento funcional</option>
+                    <option value="preparacion-competencias">Preparación para competencias</option>
+                    <option value="rehabilitacion-fisica">Rehabilitación física</option>
+                    <option value="reduccion-estres">Reducción del estrés</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Membership Info */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Información de Membresía</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="form-label">Tipo de Membresía *</label>
+                    <select
+                      className="form-input"
+                      value={createFormData.membershipType}
+                      onChange={(e) => setCreateFormData({...createFormData, membershipType: e.target.value})}
+                    >
+                      <option value="mensual">Mensual</option>
+                      <option value="trimestral">Trimestral</option>
+                      <option value="semestral">Semestral</option>
+                      <option value="anual">Anual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Fecha de Inicio *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={createFormData.startDate}
+                      onChange={(e) => setCreateFormData({...createFormData, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Fecha de Fin *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={createFormData.endDate}
+                      onChange={(e) => setCreateFormData({...createFormData, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Contacto de Emergencia</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Nombre del Contacto</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={createFormData.emergencyContact}
+                      onChange={(e) => setCreateFormData({...createFormData, emergencyContact: e.target.value})}
+                      placeholder="María Pérez"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Teléfono de Emergencia</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={createFormData.emergencyPhone}
+                      onChange={(e) => setCreateFormData({...createFormData, emergencyPhone: e.target.value})}
+                      placeholder="+54 9 11 9876-5432"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Notas</h4>
+                <div>
+                  <label className="form-label">Notas Médicas</label>
+                  <textarea
+                    className="form-input"
+                    rows="2"
+                    value={createFormData.medicalNotes}
+                    onChange={(e) => setCreateFormData({...createFormData, medicalNotes: e.target.value})}
+                    placeholder="Condiciones médicas, lesiones, etc..."
+                  />
+                </div>
+                <div className="mt-4">
+                  <label className="form-label">Notas Generales</label>
+                  <textarea
+                    className="form-input"
+                    rows="2"
+                    value={createFormData.notes}
+                    onChange={(e) => setCreateFormData({...createFormData, notes: e.target.value})}
+                    placeholder="Información adicional..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false)
+                  const tomorrow = new Date()
+                  tomorrow.setDate(tomorrow.getDate() + 1)
+                  setCreateFormData({
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    phone: '',
+                    trainingGoal: '',
+                    membershipType: 'mensual',
+                    startDate: tomorrow.toISOString().split('T')[0],
+                    endDate: '',
+                    emergencyContact: '',
+                    emergencyPhone: '',
+                    medicalNotes: '',
+                    notes: ''
+                  })
+                }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateUser}
+                className="btn-primary"
+              >
+                Crear Usuario
               </button>
             </div>
           </div>

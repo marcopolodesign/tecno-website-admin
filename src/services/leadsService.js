@@ -25,7 +25,7 @@ export const leadsService = {
 
   async getLead(id) {
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('leads')
         .select(`
           *,
@@ -42,6 +42,40 @@ export const leadsService = {
       return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching lead:', error)
+      throw error
+    }
+  },
+
+  async createLead(data) {
+    try {
+      const leadData = {
+        first_name: data.firstName,
+        last_name: data.lastName || '',
+        email: data.email,
+        phone: data.phone,
+        training_goal: data.trainingGoal,
+        status: 'nuevo',
+        notes: data.notes || '',
+        source: data.source || 'manual',
+        submitted_at: new Date().toISOString(),
+        converted_to_user: false,
+        utm_source: data.utmSource || null,
+        utm_medium: data.utmMedium || null,
+        utm_campaign: data.utmCampaign || null,
+        utm_term: data.utmTerm || null,
+        utm_content: data.utmContent || null
+      }
+
+      const { data: result, error } = await supabase
+        .from('leads')
+        .insert([leadData])
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data: toCamelCase(result) }
+    } catch (error) {
+      console.error('Error creating lead:', error)
       throw error
     }
   },
