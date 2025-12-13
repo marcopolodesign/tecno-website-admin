@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { DataGrid } from '@mui/x-data-grid'
 import { leadsService } from '../services/leadsService'
+import { dataGridStyles, toastOptions } from '../lib/themeStyles'
 
 const Leads = () => {
   const [leads, setLeads] = useState([])
@@ -300,7 +301,7 @@ const Leads = () => {
       case 'contactado': return 'status-contactado'
       case 'convertido': return 'status-convertido'
       case 'perdido': return 'status-perdido'
-      default: return 'bg-gray-100 text-gray-800'
+      default: return 'bg-bg-surface text-text-secondary'
     }
   }
 
@@ -331,7 +332,7 @@ const Leads = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -340,22 +341,22 @@ const Leads = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Leads</h1>
-          <p className="text-gray-600">Administra y sigue el progreso de tus leads</p>
+          <h1 className="text-xl font-semibold text-text-primary">Leads</h1>
+          <p className="text-sm text-text-secondary mt-1">Administra y sigue el progreso de tus leads</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="btn-primary flex items-center"
+            className="btn-primary flex items-center gap-2"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
+            <PlusIcon className="h-4 w-4" />
             Crear Lead
           </button>
           <button
             onClick={handleExport}
-            className="btn-secondary flex items-center"
+            className="btn-secondary flex items-center gap-2"
           >
-            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            <ArrowDownTrayIcon className="h-4 w-4" />
             Exportar CSV
           </button>
         </div>
@@ -367,10 +368,10 @@ const Leads = () => {
           <div>
             <label className="form-label">Buscar</label>
             <div className="relative">
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary" />
               <input
                 type="text"
-                className="form-input pl-10"
+                className="form-input pl-9"
                 placeholder="Buscar por nombre, email o teléfono..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -380,7 +381,7 @@ const Leads = () => {
           <div>
             <label className="form-label">Filtrar por estado</label>
             <select
-              className="form-input"
+              className="form-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -395,7 +396,7 @@ const Leads = () => {
       </div>
 
       {/* Leads Table */}
-      <div className="card" style={{ height: 600, width: '100%' }}>
+      <div className="card p-0 overflow-hidden" style={{ height: 600, width: '100%' }}>
         <DataGrid
           rows={filteredLeads}
           columns={[
@@ -405,13 +406,13 @@ const Leads = () => {
               width: 200,
               valueGetter: (value, row) => `${row.firstName || ''} ${row.lastName || ''}`,
               renderCell: (params) => (
-                <div className="flex items-center">
-                  <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-primary-600 font-medium text-sm">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 bg-warning/10 rounded-full flex items-center justify-center">
+                    <span className="text-warning font-medium text-sm">
                       {params.row.firstName?.charAt(0) || 'L'}
                     </span>
                   </div>
-                  <span>{params.value}</span>
+                  <span className="text-text-primary">{params.value}</span>
                 </div>
               )
             },
@@ -453,12 +454,12 @@ const Leads = () => {
               renderCell: (params) => (
                 <div className="flex items-center justify-center">
                   {params.value ? (
-                    <div className="flex items-center text-green-600">
+                    <div className="flex items-center text-brand">
                       <CheckIcon className="h-4 w-4" />
                     </div>
                   ) : (
-                    <div className="flex items-center text-gray-400">
-                      <div className="h-4 w-4 border border-gray-300 rounded-full"></div>
+                    <div className="flex items-center text-text-tertiary">
+                      <div className="h-4 w-4 border border-border-default rounded-full"></div>
                     </div>
                   )}
                 </div>
@@ -476,14 +477,14 @@ const Leads = () => {
               width: 150,
               sortable: false,
               renderCell: (params) => (
-                <div className="flex space-x-2">
+                <div className="flex gap-2">
                   {!params.row.convertedToUser && params.row.status !== 'convertido' && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         handleOpenConvertModal(params.row)
                       }}
-                      className="text-green-600 hover:text-green-900"
+                      className="p-1.5 text-brand hover:bg-brand/10 rounded transition-colors"
                       title="Marcar como convertido"
                     >
                       <CheckIcon className="h-4 w-4" />
@@ -494,7 +495,7 @@ const Leads = () => {
                       e.stopPropagation()
                       handleDeleteLead(params.row.id)
                     }}
-                    className="text-red-600 hover:text-red-900"
+                    className="p-1.5 text-error hover:bg-error/10 rounded transition-colors"
                     title="Eliminar"
                   >
                     <TrashIcon className="h-4 w-4" />
@@ -554,51 +555,41 @@ const Leads = () => {
             console.error('Error processing row update:', error)
             toast.error('Error al actualizar')
           }}
-          sx={{
-            '& .MuiDataGrid-row': {
-              cursor: 'pointer'
-            }
-          }}
+          sx={dataGridStyles}
         />
       </div>
 
       {/* Lead Detail Side Panel */}
       {showSidePanel && selectedLead && (
         <>
-          {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-white/70 backdrop-blur-sm z-40 transition-opacity"
+            className="fixed inset-0 bg-black/30 z-40 animate-fade-in"
             onClick={() => setShowSidePanel(false)}
           />
           
-          {/* Side Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white border-l border-[#edeaea] z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <h3 className="text-xl font-bold text-gray-900">
+          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-bg-secondary border-l border-border-default z-50 flex flex-col animate-slide-in-right">
+            <div className="flex items-center justify-between p-5 border-b border-border-default">
+              <h3 className="text-lg font-semibold text-text-primary">
                 Detalles del Lead
               </h3>
               <button
                 onClick={() => setShowSidePanel(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-surface rounded transition-colors"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-5">
               <div className="space-y-4">
-                {/* Email (Read-only) */}
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Email</label>
-                  <p className="text-lg font-medium text-gray-900">{selectedLead.email}</p>
+                  <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Email</label>
+                  <p className="text-sm font-medium text-text-primary mt-1">{selectedLead.email}</p>
                 </div>
 
-                {/* Editable Fields */}
-                <div className="border-t border-[#edeaea] pt-4">
+                <div className="border-t border-border-default pt-4">
                   <label className="form-label">Nombre</label>
                   <input
                     type="text"
@@ -628,21 +619,19 @@ const Leads = () => {
                   />
                 </div>
 
-                {/* Read-only Objetivo de entrenamiento */}
-                <div className="border-t border-[#edeaea] pt-4">
-                  <label className="text-sm font-medium text-gray-500">Objetivo de entrenamiento</label>
-                  <p className="text-gray-900">
+                <div className="border-t border-border-default pt-4">
+                  <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Objetivo de entrenamiento</label>
+                  <p className="text-sm text-text-primary mt-1">
                     {getTrainingGoalLabel(selectedLead.trainingGoal)}
                   </p>
                 </div>
 
-                {/* Status Editor */}
-                <div className="border-t border-[#edeaea] pt-4">
-                  <label className="text-sm font-medium text-gray-500 block mb-2">Estado del Lead</label>
+                <div className="border-t border-border-default pt-4">
+                  <label className="form-label">Estado del Lead</label>
                   <select
                     value={editingStatus}
                     onChange={(e) => setEditingStatus(e.target.value)}
-                    className="form-input w-full"
+                    className="form-select w-full"
                   >
                     <option value="nuevo">Nuevo</option>
                     <option value="contactado">Contactado</option>
@@ -671,17 +660,17 @@ const Leads = () => {
                 </div>
 
                 {/* Read-only info */}
-                <div className="border-t border-[#edeaea] pt-4">
-                  <label className="text-sm font-medium text-gray-500">Fecha de envío</label>
-                  <p className="text-gray-900">
+                <div className="border-t border-border-default pt-4">
+                  <label className="text-sm font-medium text-text-tertiary">Fecha de envío</label>
+                  <p className="text-text-primary">
                     {new Date(selectedLead.submittedAt).toLocaleString('es-AR')}
                   </p>
                 </div>
 
                 {selectedLead.lastContactedAt && (
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Último contacto</label>
-                    <p className="text-gray-900">
+                    <label className="text-sm font-medium text-text-tertiary">Último contacto</label>
+                    <p className="text-text-primary">
                       {new Date(selectedLead.lastContactedAt).toLocaleString('es-AR')}
                     </p>
                   </div>
@@ -689,37 +678,37 @@ const Leads = () => {
 
                 {/* UTM Parameters */}
                 {(selectedLead.utmSource || selectedLead.utmMedium || selectedLead.utmCampaign || selectedLead.utmTerm || selectedLead.utmContent) && (
-                  <div className="border-t border-[#edeaea] pt-4">
-                    <label className="text-sm font-medium text-gray-500 mb-2 block">Parámetros UTM</label>
-                    <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+                  <div className="border-t border-border-default pt-4">
+                    <label className="text-sm font-medium text-text-tertiary mb-2 block">Parámetros UTM</label>
+                    <div className="bg-bg-surface rounded-lg p-3 space-y-2 text-sm">
                       {selectedLead.utmSource && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Source:</span>
-                          <span className="font-medium text-gray-900">{selectedLead.utmSource}</span>
+                          <span className="text-text-secondary">Source:</span>
+                          <span className="font-medium text-text-primary">{selectedLead.utmSource}</span>
                         </div>
                       )}
                       {selectedLead.utmMedium && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Medium:</span>
-                          <span className="font-medium text-gray-900">{selectedLead.utmMedium}</span>
+                          <span className="text-text-secondary">Medium:</span>
+                          <span className="font-medium text-text-primary">{selectedLead.utmMedium}</span>
                         </div>
                       )}
                       {selectedLead.utmCampaign && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Campaign:</span>
-                          <span className="font-medium text-gray-900">{selectedLead.utmCampaign}</span>
+                          <span className="text-text-secondary">Campaign:</span>
+                          <span className="font-medium text-text-primary">{selectedLead.utmCampaign}</span>
                         </div>
                       )}
                       {selectedLead.utmTerm && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Term:</span>
-                          <span className="font-medium text-gray-900">{selectedLead.utmTerm}</span>
+                          <span className="text-text-secondary">Term:</span>
+                          <span className="font-medium text-text-primary">{selectedLead.utmTerm}</span>
                         </div>
                       )}
                       {selectedLead.utmContent && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Content:</span>
-                          <span className="font-medium text-gray-900">{selectedLead.utmContent}</span>
+                          <span className="text-text-secondary">Content:</span>
+                          <span className="font-medium text-text-primary">{selectedLead.utmContent}</span>
                         </div>
                       )}
                     </div>
@@ -729,7 +718,7 @@ const Leads = () => {
             </div>
 
             {/* Fixed Actions at Bottom */}
-            <div className="border-t border-[#edeaea] bg-white p-6 space-y-3">
+            <div className="border-t border-border-default bg-bg-secondary p-6 space-y-3">
               {hasChanges && (
                 <button
                   onClick={handleSaveEdit}
@@ -766,21 +755,21 @@ const Leads = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-white/70 backdrop-blur-sm z-[60] animate-[fadeIn_0.3s_ease-in-out]"
+            className="fixed inset-0 bg-bg-secondary/70 backdrop-blur-sm z-[60] animate-[fadeIn_0.3s_ease-in-out]"
             onClick={() => setShowConvertModal(false)}
           />
           
           {/* Side Panel */}
-          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[60] overflow-y-auto animate-[slideInRight_0.3s_ease-out]">
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-bg-secondary shadow-2xl z-[60] overflow-y-auto animate-[slideInRight_0.3s_ease-out]">
             <div className="p-6">
               {/* Header with Close Button */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-xl font-bold text-text-primary">
                   Convertir a Usuario
                 </h3>
                 <button
                   onClick={() => setShowConvertModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-text-tertiary hover:text-text-secondary"
                 >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -794,7 +783,7 @@ const Leads = () => {
               <p className="text-lg font-semibold text-green-900 mt-1">{leadToConvert.email}</p>
             </div>
             
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-text-secondary mb-4">
               Completa los datos de membresía para convertir este lead en cliente
             </p>
             <div className="space-y-3">
@@ -864,8 +853,8 @@ const Leads = () => {
               </div>
 
               {/* Payment Info */}
-              <div className="border-t border-gray-200 pt-4 mt-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Información de Pago</h4>
+              <div className="border-t border-border-default pt-4 mt-4">
+                <h4 className="font-semibold text-text-primary mb-3">Información de Pago</h4>
                 <div className="space-y-3">
                   <div>
                     <label className="form-label">Método de Pago *</label>
@@ -931,8 +920,8 @@ const Leads = () => {
             className="fixed inset-0 bg-black/50 z-[70]"
             onClick={() => setShowReasonModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-text-primary mb-4">
               ¿Por qué se marcó como perdido?
             </h3>
             <textarea
@@ -970,8 +959,8 @@ const Leads = () => {
             className="fixed inset-0 bg-black/50 z-[70]"
             onClick={() => setShowCreateModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-text-primary mb-6">
               Crear Nuevo Lead
             </h3>
             
@@ -1081,7 +1070,7 @@ const Leads = () => {
         </>
       )}
 
-      <Toaster position="top-right" />
+      <Toaster position="top-right" toastOptions={toastOptions} />
     </div>
   )
 }

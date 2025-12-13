@@ -90,14 +90,13 @@ function App() {
     return false
   }
 
-  const ProtectedRoute = ({ path, element }) => {
-    return canAccess(path) ? element : <Navigate to="/users" replace />
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          <span className="text-text-secondary text-sm">Cargando...</span>
+        </div>
       </div>
     )
   }
@@ -108,12 +107,12 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-bg-primary flex">
         <Sidebar userRole={userRole} />
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
           <Header onLogout={handleLogout} />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               <Routes>
                 <Route path="/" element={<Navigate to={canAccess('/dashboard') ? "/dashboard" : "/users"} replace />} />
                 

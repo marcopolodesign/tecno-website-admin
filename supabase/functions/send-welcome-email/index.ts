@@ -61,10 +61,16 @@ serve(async (req) => {
     const leadEmailResponse = await sendWelcomeEmail(lead)
     console.log('✅ Welcome email sent')
 
-    // Send internal notification
+    // Send internal notification (skip for now if not same domain)
     console.log('🚀 Sending internal notification...')
-    const internalEmailResponse = await sendInternalNotification(lead)
-    console.log('✅ Internal notification sent')
+    let internalEmailResponse = null
+    try {
+      internalEmailResponse = await sendInternalNotification(lead)
+      console.log('✅ Internal notification sent')
+    } catch (internalError) {
+      console.log('⚠️ Internal notification failed (domain verification needed):', internalError.message)
+      // Continue anyway - welcome email was sent successfully
+    }
 
     // Update lead record to mark email as sent
     const { error: updateError } = await supabaseClient

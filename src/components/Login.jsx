@@ -34,18 +34,24 @@ const Login = ({ onLogin }) => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-bg-primary py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-sm w-full">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-brand rounded-lg mb-4">
+            <span className="text-white font-bold text-xl">T</span>
+          </div>
+          <h2 className="text-2xl font-semibold text-text-primary">
             TecnoFit Admin
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Inicia sesión para acceder al panel de administración
+          <p className="mt-2 text-sm text-text-secondary">
+            Inicia sesión para acceder al panel
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+
+        {/* Login Card */}
+        <div className="card shadow-sm">
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="email" className="form-label">
                 Email
@@ -62,6 +68,7 @@ const Login = ({ onLogin }) => {
                 onChange={handleChange}
               />
             </div>
+
             <div>
               <label htmlFor="password" className="form-label">
                 Contraseña
@@ -74,41 +81,54 @@ const Login = ({ onLogin }) => {
                   autoComplete="current-password"
                   required
                   className="form-input pr-10"
-                  placeholder="Tu contraseña"
+                  placeholder="••••••••"
                   value={formData.password}
                   onChange={handleChange}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-tertiary hover:text-text-secondary transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                    <EyeSlashIcon className="h-4 w-4" />
                   ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
+                    <EyeIcon className="h-4 w-4" />
                   )}
                 </button>
               </div>
             </div>
-          </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
+            {error && (
+              <div className="bg-error/10 border border-error/20 rounded-md p-3">
+                <p className="text-sm text-error">{error}</p>
+              </div>
+            )}
 
-          <div>
             <button
               type="submit"
               disabled={isLoading}
               className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Iniciando sesión...
+                </span>
+              ) : (
+                'Iniciar sesión'
+              )}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-xs text-text-tertiary">
+          © {new Date().getFullYear()} TecnoFit. Todos los derechos reservados.
+        </p>
       </div>
     </div>
   )

@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { DataGrid } from '@mui/x-data-grid'
 import { usersService } from '../services/usersService'
+import { dataGridStyles, toastOptions } from '../lib/themeStyles'
 import membershipsService from '../services/membershipsService'
 
 const Users = () => {
@@ -285,11 +286,11 @@ const Users = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'activo': return 'bg-green-100 text-green-800'
-      case 'inactivo': return 'bg-gray-100 text-gray-800'
-      case 'suspendido': return 'bg-red-100 text-red-800'
-      case 'vencido': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'activo': return 'status-convertido'
+      case 'inactivo': return 'bg-bg-surface text-text-secondary border border-border-default'
+      case 'suspendido': return 'status-perdido'
+      case 'vencido': return 'status-contactado'
+      default: return 'bg-bg-surface text-text-secondary border border-border-default'
     }
   }
 
@@ -360,7 +361,7 @@ const Users = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-sky-600"></div>
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -369,22 +370,22 @@ const Users = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
-          <p className="text-gray-600">Administra tus clientes activos y sus membresías</p>
+          <h1 className="text-xl font-semibold text-text-primary">Usuarios</h1>
+          <p className="text-sm text-text-secondary mt-1">Administra tus clientes activos y sus membresías</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="btn-primary flex items-center"
+            className="btn-primary flex items-center gap-2"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
+            <PlusIcon className="h-4 w-4" />
             Crear Usuario
           </button>
           <button
             onClick={handleExport}
-            className="btn-secondary flex items-center"
+            className="btn-secondary flex items-center gap-2"
           >
-            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            <ArrowDownTrayIcon className="h-4 w-4" />
             Exportar CSV
           </button>
         </div>
@@ -396,7 +397,7 @@ const Users = () => {
           <div>
             <label className="form-label">Buscar</label>
             <div className="relative">
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary" />
               <input
                 type="text"
                 className="form-input pl-10"
@@ -449,8 +450,8 @@ const Users = () => {
               valueGetter: (value, row) => `${row.firstName || ''} ${row.lastName || ''}`,
               renderCell: (params) => (
                 <div className="flex items-center">
-                  <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-green-600 font-medium text-sm">
+                  <div className="h-8 w-8 bg-brand/10 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-brand font-medium text-sm">
                       {params.row.firstName?.charAt(0) || 'U'}
                     </span>
                   </div>
@@ -513,7 +514,7 @@ const Users = () => {
                       e.stopPropagation()
                       handleDeleteUser(params.row.id)
                     }}
-                    className="text-red-600 hover:text-red-900"
+                    className="p-1.5 text-error hover:bg-error/10 rounded transition-colors"
                     title="Eliminar"
                   >
                     <TrashIcon className="h-4 w-4" />
@@ -575,11 +576,7 @@ const Users = () => {
             console.error('Error processing row update:', error)
             toast.error('Error al actualizar')
           }}
-          sx={{
-            '& .MuiDataGrid-row': {
-              cursor: 'pointer'
-            }
-          }}
+          sx={dataGridStyles}
         />
       </div>
 
@@ -588,21 +585,21 @@ const Users = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-white/70 backdrop-blur-sm z-40 transition-opacity"
+            className="fixed inset-0 bg-black/30 z-40 animate-fade-in"
             onClick={() => setShowSidePanel(false)}
           />
           
           {/* Side Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white border-l border-[#edeaea] z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
+          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-bg-secondary border-l border-border-default z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
             <div className="p-6">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-xl font-bold text-text-primary">
                   Detalles del Usuario
                 </h3>
                 <button
                   onClick={() => setShowSidePanel(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-text-tertiary hover:text-text-secondary"
                 >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -613,11 +610,11 @@ const Users = () => {
               {/* User Info - Editable Fields */}
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Email</label>
-                  <p className="text-lg font-medium text-gray-900">{selectedUser.email}</p>
+                  <label className="text-sm font-medium text-text-tertiary">Email</label>
+                  <p className="text-lg font-medium text-text-primary">{selectedUser.email}</p>
                 </div>
 
-                <div className="border-t border-[#edeaea] pt-4">
+                <div className="border-t border-border-default pt-4">
                   <label className="form-label">Nombre</label>
                   <input
                     type="text"
@@ -647,34 +644,34 @@ const Users = () => {
                   />
                 </div>
 
-                <div className="border-t border-[#edeaea] pt-4">
-                  <label className="text-sm font-medium text-gray-500">Objetivo de entrenamiento</label>
-                  <p className="text-gray-900">
+                <div className="border-t border-border-default pt-4">
+                  <label className="text-sm font-medium text-text-tertiary">Objetivo de entrenamiento</label>
+                  <p className="text-text-primary">
                     {getTrainingGoalLabel(selectedUser.trainingGoal)}
                   </p>
                 </div>
 
-                <div className="border-t border-[#edeaea] pt-4">
-                  <label className="text-sm font-medium text-gray-500">Membresía</label>
-                  <p className="text-lg font-medium text-gray-900">
+                <div className="border-t border-border-default pt-4">
+                  <label className="text-sm font-medium text-text-tertiary">Membresía</label>
+                  <p className="text-lg font-medium text-text-primary">
                     {getMembershipLabel(selectedUser.membershipType)}
                   </p>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-text-secondary mt-1">
                     Estado: {getStatusLabel(selectedUser.membershipStatus)}
                   </p>
                 </div>
 
-                <div className="border-t border-[#edeaea] pt-4">
-                  <label className="text-sm font-medium text-gray-500">Período de membresía</label>
-                  <p className="text-gray-900">
+                <div className="border-t border-border-default pt-4">
+                  <label className="text-sm font-medium text-text-tertiary">Período de membresía</label>
+                  <p className="text-text-primary">
                     {new Date(selectedUser.startDate).toLocaleDateString('es-AR')}
                   </p>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-text-secondary text-sm">
                     hasta {new Date(selectedUser.endDate).toLocaleDateString('es-AR')}
                   </p>
                 </div>
 
-                <div className="border-t border-[#edeaea] pt-4">
+                <div className="border-t border-border-default pt-4">
                   <label className="form-label">Contacto de Emergencia</label>
                   <input
                     type="text"
@@ -714,46 +711,46 @@ const Users = () => {
                   />
                 </div>
 
-                <div className="border-t border-[#edeaea] pt-4">
-                  <label className="text-sm font-medium text-gray-500">Fecha de conversión</label>
-                  <p className="text-gray-900">
+                <div className="border-t border-border-default pt-4">
+                  <label className="text-sm font-medium text-text-tertiary">Fecha de conversión</label>
+                  <p className="text-text-primary">
                     {new Date(selectedUser.convertedAt).toLocaleString('es-AR')}
                   </p>
                 </div>
 
                 {/* UTM Parameters */}
                 {(selectedUser.utmSource || selectedUser.utmMedium || selectedUser.utmCampaign || selectedUser.utmTerm || selectedUser.utmContent) && (
-                  <div className="border-t border-[#edeaea] pt-4">
-                    <label className="text-sm font-medium text-gray-500 mb-2 block">Parámetros UTM</label>
-                    <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+                  <div className="border-t border-border-default pt-4">
+                    <label className="text-sm font-medium text-text-tertiary mb-2 block">Parámetros UTM</label>
+                    <div className="bg-bg-surface rounded-lg p-3 space-y-2 text-sm">
                       {selectedUser.utmSource && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Source:</span>
-                          <span className="font-medium text-gray-900">{selectedUser.utmSource}</span>
+                          <span className="text-text-secondary">Source:</span>
+                          <span className="font-medium text-text-primary">{selectedUser.utmSource}</span>
                         </div>
                       )}
                       {selectedUser.utmMedium && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Medium:</span>
-                          <span className="font-medium text-gray-900">{selectedUser.utmMedium}</span>
+                          <span className="text-text-secondary">Medium:</span>
+                          <span className="font-medium text-text-primary">{selectedUser.utmMedium}</span>
                         </div>
                       )}
                       {selectedUser.utmCampaign && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Campaign:</span>
-                          <span className="font-medium text-gray-900">{selectedUser.utmCampaign}</span>
+                          <span className="text-text-secondary">Campaign:</span>
+                          <span className="font-medium text-text-primary">{selectedUser.utmCampaign}</span>
                         </div>
                       )}
                       {selectedUser.utmTerm && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Term:</span>
-                          <span className="font-medium text-gray-900">{selectedUser.utmTerm}</span>
+                          <span className="text-text-secondary">Term:</span>
+                          <span className="font-medium text-text-primary">{selectedUser.utmTerm}</span>
                         </div>
                       )}
                       {selectedUser.utmContent && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Content:</span>
-                          <span className="font-medium text-gray-900">{selectedUser.utmContent}</span>
+                          <span className="text-text-secondary">Content:</span>
+                          <span className="font-medium text-text-primary">{selectedUser.utmContent}</span>
                         </div>
                       )}
                     </div>
@@ -799,8 +796,8 @@ const Users = () => {
             className="fixed inset-0 bg-black/50 z-[70]"
             onClick={() => setShowReasonModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-text-primary mb-4">
               ¿Por qué no renueva?
             </h3>
             <textarea
@@ -838,15 +835,15 @@ const Users = () => {
             className="fixed inset-0 bg-black/50 z-[70]"
             onClick={() => setShowCreateModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-text-primary mb-6">
               Crear Nuevo Usuario
             </h3>
             
             <div className="space-y-4">
               {/* Personal Info */}
-              <div className="border-b border-gray-200 pb-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Información Personal</h4>
+              <div className="border-b border-border-default pb-4">
+                <h4 className="font-semibold text-text-primary mb-3">Información Personal</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="form-label">Nombre *</label>
@@ -914,8 +911,8 @@ const Users = () => {
               </div>
 
               {/* Membership Info */}
-              <div className="border-b border-gray-200 pb-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Información de Membresía</h4>
+              <div className="border-b border-border-default pb-4">
+                <h4 className="font-semibold text-text-primary mb-3">Información de Membresía</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="form-label">Tipo de Membresía *</label>
@@ -952,8 +949,8 @@ const Users = () => {
               </div>
 
               {/* Emergency Contact */}
-              <div className="border-b border-gray-200 pb-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Contacto de Emergencia</h4>
+              <div className="border-b border-border-default pb-4">
+                <h4 className="font-semibold text-text-primary mb-3">Contacto de Emergencia</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="form-label">Nombre del Contacto</label>
@@ -980,7 +977,7 @@ const Users = () => {
 
               {/* Notes */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Notas</h4>
+                <h4 className="font-semibold text-text-primary mb-3">Notas</h4>
                 <div>
                   <label className="form-label">Notas Médicas</label>
                   <textarea
@@ -1004,8 +1001,8 @@ const Users = () => {
               </div>
 
               {/* Payment Info */}
-              <div className="border-b border-gray-200 pb-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Información de Pago</h4>
+              <div className="border-b border-border-default pb-4">
+                <h4 className="font-semibold text-text-primary mb-3">Información de Pago</h4>
                 <div className="mb-4">
                   <label className="flex items-center">
                     <input
@@ -1108,15 +1105,15 @@ const Users = () => {
             className="fixed inset-0 bg-black/50 z-[70]"
             onClick={() => setShowRenewalModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-text-primary mb-6">
               Renovar Membresía
             </h3>
             
             <div className="space-y-4">
               {/* Membership Info */}
-              <div className="border-b border-gray-200 pb-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Nueva Membresía</h4>
+              <div className="border-b border-border-default pb-4">
+                <h4 className="font-semibold text-text-primary mb-3">Nueva Membresía</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="form-label">Tipo de Membresía *</label>
@@ -1153,8 +1150,8 @@ const Users = () => {
               </div>
 
               {/* Payment Info */}
-              <div className="border-b border-gray-200 pb-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Información de Pago</h4>
+              <div className="border-b border-border-default pb-4">
+                <h4 className="font-semibold text-text-primary mb-3">Información de Pago</h4>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -1224,7 +1221,7 @@ const Users = () => {
         </>
       )}
 
-      <Toaster position="top-right" />
+      <Toaster position="top-right" toastOptions={toastOptions} />
     </div>
   )
 }
