@@ -5,9 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:staging": "vite --mode staging",
+    "dev:production": "vite --mode production",
     "build": "vite build",
+    "build:staging": "vite build --mode staging",
+    "build:production": "vite build --mode production",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "env:staging": "cp .env.staging .env && echo '✅ Switched to STAGING environment'",
+    "env:production": "cp .env.production .env && echo '✅ Switched to PRODUCTION environment'"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
