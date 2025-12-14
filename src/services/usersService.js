@@ -7,20 +7,7 @@ export const usersService = {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select(`
-          *,
-          leads (
-            first_name,
-            last_name,
-            email,
-            training_goal
-          ),
-          profiles (
-            username,
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -35,20 +22,7 @@ export const usersService = {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select(`
-          *,
-          leads (
-            first_name,
-            last_name,
-            email,
-            training_goal
-          ),
-          profiles (
-            username,
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .eq('id', id)
         .single()
 
