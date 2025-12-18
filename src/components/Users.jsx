@@ -9,6 +9,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { DataGrid } from '@mui/x-data-grid'
 import { usersService } from '../services/usersService'
+import { sellersService } from '../services/sellersService'
+import membershipPlansService from '../services/membershipPlansService'
 import { dataGridStyles, toastOptions } from '../lib/themeStyles'
 import membershipsService from '../services/membershipsService'
 
@@ -23,6 +25,8 @@ const Users = () => {
   const [showSidePanel, setShowSidePanel] = useState(false)
   const [editFormData, setEditFormData] = useState({})
   const [hasChanges, setHasChanges] = useState(false)
+  const [sellers, setSellers] = useState([])
+  const [membershipPlans, setMembershipPlans] = useState([])
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [reasonData, setReasonData] = useState({
     userId: null,
@@ -36,7 +40,7 @@ const Users = () => {
     email: '',
     phone: '',
     trainingGoal: '',
-    membershipType: 'mensual',
+    membershipType: 'Socio_Basic',
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     emergencyContact: '',
@@ -45,21 +49,30 @@ const Users = () => {
     notes: '',
     createPayment: true,
     paymentMethod: 'efectivo',
-    paymentAmount: '',
+    paymentAmount: 60000,
     paymentNotes: ''
   })
   const [showRenewalModal, setShowRenewalModal] = useState(false)
   const [renewalFormData, setRenewalFormData] = useState({
-    membershipType: 'mensual',
+    membershipType: 'Socio',
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     paymentMethod: 'efectivo',
-    paymentAmount: '',
+    paymentAmount: 55000,
     paymentNotes: ''
+  })
+  const [showChangeMembershipModal, setShowChangeMembershipModal] = useState(false)
+  const [changeMembershipFormData, setChangeMembershipFormData] = useState({
+    membershipType: '',
+    startDate: '',
+    endDate: '',
+    status: 'active'
   })
 
   useEffect(() => {
     fetchUsers()
+    fetchSellers()
+    fetchMembershipPlans()
   }, [])
 
   useEffect(() => {
@@ -75,6 +88,67 @@ const Users = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchSellers = async () => {
+    try {
+      const response = await sellersService.getSellers()
+      setSellers(response.data || [])
+    } catch (error) {
+      console.error('Error fetching sellers:', error)
+    }
+  }
+
+  const getSellerName = (sellerId) => {
+    if (!sellerId) return 'Sin asignar'
+    const seller = sellers.find(s => s.id === sellerId)
+    return seller ? `${seller.first_name} ${seller.last_name}` : 'Sin asignar'
+  }
+
+  const fetchMembershipPlans = async () => {
+    try {
+      const response = await membershipPlansService.getPlans()
+      setMembershipPlans(response.data || [])
+    } catch (error) {
+      console.error('Error fetching membership plans:', error)
+    }
+  }
+
+  // Get price based on selected plan and payment method
+  const getCalculatedPrice = (planName, paymentMethod) => {
+    const plan = membershipPlans.find(p => p.name === planName)
+    if (!plan) return ''
+    return membershipPlansService.getPriceForPaymentMethod(plan, paymentMethod)
+  }
+
+  // Handle create form change with auto-price
+  const handleCreateFormChange = (field, value) => {
+    const newFormData = { ...createFormData, [field]: value }
+    
+    // Auto-calculate price when membership type or payment method changes
+    if (field === 'membershipType' || field === 'paymentMethod') {
+      const planName = field === 'membershipType' ? value : createFormData.membershipType
+      const method = field === 'paymentMethod' ? value : createFormData.paymentMethod
+      const calculatedPrice = getCalculatedPrice(planName, method)
+      newFormData.paymentAmount = calculatedPrice
+    }
+    
+    setCreateFormData(newFormData)
+  }
+
+  // Handle renewal form change with auto-price
+  const handleRenewalFormChange = (field, value) => {
+    const newFormData = { ...renewalFormData, [field]: value }
+    
+    // Auto-calculate price when membership type or payment method changes
+    if (field === 'membershipType' || field === 'paymentMethod') {
+      const planName = field === 'membershipType' ? value : renewalFormData.membershipType
+      const method = field === 'paymentMethod' ? value : renewalFormData.paymentMethod
+      const calculatedPrice = getCalculatedPrice(planName, method)
+      newFormData.paymentAmount = calculatedPrice
+    }
+    
+    setRenewalFormData(newFormData)
   }
 
   const filterUsers = () => {
@@ -344,6 +418,50 @@ const Users = () => {
     }
   }
 
+  const handleChangeMembership = async () => {
+    // Validate required fields
+    if (!changeMembershipFormData.membershipType || !changeMembershipFormData.startDate || !changeMembershipFormData.endDate) {
+      toast.error('Por favor completa todos los campos requeridos')
+      return
+    }
+
+    try {
+      // Update the user's membership directly
+      await usersService.updateUser(selectedUser.id, {
+        membershipType: changeMembershipFormData.membershipType,
+        membershipStartDate: changeMembershipFormData.startDate,
+        membershipEndDate: changeMembershipFormData.endDate,
+        membershipStatus: changeMembershipFormData.status === 'active' ? 'activo' : 
+                         changeMembershipFormData.status === 'expired' ? 'vencido' : 'cancelado'
+      })
+
+      // If there's a current membership, update it as well
+      if (selectedUser.currentMembershipId) {
+        await membershipsService.updateMembership(selectedUser.currentMembershipId, {
+          membershipType: changeMembershipFormData.membershipType,
+          startDate: changeMembershipFormData.startDate,
+          endDate: changeMembershipFormData.endDate,
+          status: changeMembershipFormData.status,
+          updateUser: true
+        })
+      }
+
+      setShowChangeMembershipModal(false)
+      setChangeMembershipFormData({
+        membershipType: '',
+        startDate: '',
+        endDate: '',
+        status: 'active'
+      })
+
+      toast.success('Membresía actualizada exitosamente')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error changing membership:', error)
+      toast.error('Error al cambiar la membresía')
+    }
+  }
+
   const getTrainingGoalLabel = (goal) => {
     const goals = {
       'perdida-peso': 'Pérdida de peso',
@@ -491,6 +609,16 @@ const Users = () => {
               )
             },
             {
+              field: 'assignedSellerId',
+              headerName: 'Vendedor',
+              width: 150,
+              renderCell: (params) => (
+                <span className="text-text-secondary text-sm">
+                  {getSellerName(params.value)}
+                </span>
+              )
+            },
+            {
               field: 'startDate',
               headerName: 'Inicio',
               width: 120,
@@ -538,7 +666,8 @@ const Users = () => {
               emergencyContact: params.row.emergencyContact || '',
               emergencyPhone: params.row.emergencyPhone || '',
               medicalNotes: params.row.medicalNotes || '',
-              notes: params.row.notes || ''
+              notes: params.row.notes || '',
+              assignedSellerId: params.row.assignedSellerId || null
             })
             setHasChanges(false)
             setShowSidePanel(true)
@@ -642,6 +771,22 @@ const Users = () => {
                     value={editFormData.phone}
                     onChange={(e) => handleFormChange('phone', e.target.value)}
                   />
+                </div>
+
+                <div className="border-t border-border-default pt-4">
+                  <label className="form-label">Vendedor Asignado</label>
+                  <select
+                    value={editFormData.assignedSellerId || ''}
+                    onChange={(e) => handleFormChange('assignedSellerId', e.target.value || null)}
+                    className="form-select w-full"
+                  >
+                    <option value="">Sin asignar</option>
+                    {sellers.map(seller => (
+                      <option key={seller.id} value={seller.id}>
+                        {seller.first_name} {seller.last_name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="border-t border-border-default pt-4">
@@ -768,6 +913,22 @@ const Users = () => {
                     Confirmar edición
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    setChangeMembershipFormData({
+                      membershipType: selectedUser.membershipType || '',
+                      startDate: selectedUser.membershipStartDate || '',
+                      endDate: selectedUser.membershipEndDate || '',
+                      status: selectedUser.membershipStatus === 'activo' ? 'active' : 
+                              selectedUser.membershipStatus === 'vencido' ? 'expired' : 'cancelled'
+                    })
+                    setShowChangeMembershipModal(true)
+                    setShowSidePanel(false)
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Cambiar Membresía
+                </button>
                 <button
                   onClick={() => {
                     setShowRenewalModal(true)
@@ -919,12 +1080,13 @@ const Users = () => {
                     <select
                       className="form-input"
                       value={createFormData.membershipType}
-                      onChange={(e) => setCreateFormData({...createFormData, membershipType: e.target.value})}
+                      onChange={(e) => handleCreateFormChange('membershipType', e.target.value)}
                     >
-                      <option value="mensual">Mensual</option>
-                      <option value="trimestral">Trimestral</option>
-                      <option value="semestral">Semestral</option>
-                      <option value="anual">Anual</option>
+                      {membershipPlans.map(plan => (
+                        <option key={plan.id} value={plan.name}>
+                          {plan.name} ({plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'})
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -1023,24 +1185,29 @@ const Users = () => {
                         <select
                           className="form-input"
                           value={createFormData.paymentMethod}
-                          onChange={(e) => setCreateFormData({...createFormData, paymentMethod: e.target.value})}
+                          onChange={(e) => handleCreateFormChange('paymentMethod', e.target.value)}
                         >
-                          <option value="efectivo">Efectivo</option>
-                          <option value="tarjeta">Tarjeta</option>
-                          <option value="transferencia">Transferencia</option>
-                          <option value="mercadopago">Mercado Pago</option>
+                          <option value="efectivo">Efectivo (Promo)</option>
+                          <option value="debito_automatico">Débito Automático</option>
+                          <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
                         </select>
                       </div>
                       <div>
-                        <label className="form-label">Monto (opcional)</label>
-                        <input
-                          type="number"
-                          className="form-input"
-                          value={createFormData.paymentAmount}
-                          onChange={(e) => setCreateFormData({...createFormData, paymentAmount: e.target.value})}
-                          placeholder="Dejar vacío para usar precio de plan"
-                          step="0.01"
-                        />
+                        <label className="form-label">Monto *</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
+                          <input
+                            type="number"
+                            className="form-input pl-7"
+                            value={createFormData.paymentAmount}
+                            onChange={(e) => setCreateFormData({...createFormData, paymentAmount: e.target.value})}
+                            placeholder="0"
+                            step="1"
+                          />
+                        </div>
+                        <p className="text-xs text-text-tertiary mt-1">
+                          Precio sugerido. Editar para casos especiales.
+                        </p>
                       </div>
                     </div>
                     <div>
@@ -1070,7 +1237,7 @@ const Users = () => {
                     email: '',
                     phone: '',
                     trainingGoal: '',
-                    membershipType: 'mensual',
+                    membershipType: 'Socio_Basic',
                     startDate: tomorrow.toISOString().split('T')[0],
                     endDate: '',
                     emergencyContact: '',
@@ -1079,7 +1246,7 @@ const Users = () => {
                     notes: '',
                     createPayment: true,
                     paymentMethod: 'efectivo',
-                    paymentAmount: '',
+                    paymentAmount: 60000,
                     paymentNotes: ''
                   })
                 }}
@@ -1120,12 +1287,13 @@ const Users = () => {
                     <select
                       className="form-input"
                       value={renewalFormData.membershipType}
-                      onChange={(e) => setRenewalFormData({...renewalFormData, membershipType: e.target.value})}
+                      onChange={(e) => handleRenewalFormChange('membershipType', e.target.value)}
                     >
-                      <option value="mensual">Mensual</option>
-                      <option value="trimestral">Trimestral</option>
-                      <option value="semestral">Semestral</option>
-                      <option value="anual">Anual</option>
+                      {membershipPlans.map(plan => (
+                        <option key={plan.id} value={plan.name}>
+                          {plan.name} ({plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'})
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -1159,24 +1327,29 @@ const Users = () => {
                       <select
                         className="form-input"
                         value={renewalFormData.paymentMethod}
-                        onChange={(e) => setRenewalFormData({...renewalFormData, paymentMethod: e.target.value})}
+                        onChange={(e) => handleRenewalFormChange('paymentMethod', e.target.value)}
                       >
-                        <option value="efectivo">Efectivo</option>
-                        <option value="tarjeta">Tarjeta</option>
-                        <option value="transferencia">Transferencia</option>
-                        <option value="mercadopago">Mercado Pago</option>
+                        <option value="efectivo">Efectivo (Promo)</option>
+                        <option value="debito_automatico">Débito Automático</option>
+                        <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
                       </select>
                     </div>
                     <div>
-                      <label className="form-label">Monto (opcional)</label>
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={renewalFormData.paymentAmount}
-                        onChange={(e) => setRenewalFormData({...renewalFormData, paymentAmount: e.target.value})}
-                        placeholder="Dejar vacío para usar precio de plan"
-                        step="0.01"
-                      />
+                      <label className="form-label">Monto *</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
+                        <input
+                          type="number"
+                          className="form-input pl-7"
+                          value={renewalFormData.paymentAmount}
+                          onChange={(e) => setRenewalFormData({...renewalFormData, paymentAmount: e.target.value})}
+                          placeholder="0"
+                          step="1"
+                        />
+                      </div>
+                      <p className="text-xs text-text-tertiary mt-1">
+                        Precio sugerido. Editar para casos especiales.
+                      </p>
                     </div>
                   </div>
                   <div>
@@ -1198,11 +1371,11 @@ const Users = () => {
                 onClick={() => {
                   setShowRenewalModal(false)
                   setRenewalFormData({
-                    membershipType: 'mensual',
+                    membershipType: 'Socio',
                     startDate: new Date().toISOString().split('T')[0],
                     endDate: '',
                     paymentMethod: 'efectivo',
-                    paymentAmount: '',
+                    paymentAmount: 55000,
                     paymentNotes: ''
                   })
                 }}
@@ -1215,6 +1388,132 @@ const Users = () => {
                 className="btn-primary"
               >
                 Renovar Membresía
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Change Membership Modal */}
+      {showChangeMembershipModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-70"
+            onClick={() => setShowChangeMembershipModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-70 p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-text-primary mb-6">
+              Cambiar Membresía
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Current User Info */}
+              <div className="border-b border-border-default pb-4">
+                <p className="text-sm text-text-secondary">
+                  Usuario: <span className="font-semibold text-text-primary">{selectedUser?.firstName} {selectedUser?.lastName}</span>
+                </p>
+                <p className="text-sm text-text-secondary mt-1">
+                  Membresía actual: <span className="font-semibold text-text-primary capitalize">{selectedUser?.membershipType}</span>
+                </p>
+                <p className="text-sm text-text-secondary mt-1">
+                  Vence: <span className="font-semibold text-text-primary">
+                    {selectedUser?.membershipEndDate ? new Date(selectedUser.membershipEndDate).toLocaleDateString('es-AR') : 'N/A'}
+                  </span>
+                </p>
+              </div>
+
+              {/* Membership Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="form-label">Tipo de Membresía *</label>
+                  <select
+                    className="form-select"
+                    value={changeMembershipFormData.membershipType}
+                    onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, membershipType: e.target.value})}
+                  >
+                    <option value="">Seleccionar tipo</option>
+                    <option value="free">Free</option>
+                    <option value="basic">Basic</option>
+                    <option value="mensual">Mensual</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="semestral">Semestral</option>
+                    <option value="anual">Anual</option>
+                    <option value="socio_fundador">Socio Fundador</option>
+                    <option value="sportclub">SportClub</option>
+                    <option value="wellhub">Wellhub</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Fecha de Inicio *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={changeMembershipFormData.startDate}
+                      onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Fecha de Fin *</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={changeMembershipFormData.endDate}
+                      onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label">Estado de Membresía *</label>
+                  <select
+                    className="form-select"
+                    value={changeMembershipFormData.status}
+                    onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, status: e.target.value})}
+                  >
+                    <option value="active">Activo</option>
+                    <option value="expired">Vencido</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+
+                <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <svg className="h-5 w-5 text-warning shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-warning">Nota Importante</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        Esta acción modificará la membresía actual del usuario. Si necesitas crear una renovación con historial de pago, usa el botón "Renovar Membresía".
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowChangeMembershipModal(false)
+                  setChangeMembershipFormData({
+                    membershipType: '',
+                    startDate: '',
+                    endDate: '',
+                    status: 'active'
+                  })
+                }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleChangeMembership}
+                className="btn-primary"
+              >
+                Guardar Cambios
               </button>
             </div>
           </div>
