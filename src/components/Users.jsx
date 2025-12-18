@@ -720,9 +720,9 @@ const Users = () => {
           
           {/* Side Panel */}
           <div className="fixed inset-y-0 right-0 w-full max-w-md bg-bg-secondary border-l border-border-default z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
-            <div className="p-6">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
+            {/* Header - Fixed */}
+            <div className="p-6 border-b border-border-default shrink-0">
+              <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-text-primary">
                   Detalles del Usuario
                 </h3>
@@ -735,6 +735,10 @@ const Users = () => {
                   </svg>
                 </button>
               </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6">
 
               {/* User Info - Editable Fields */}
               <div className="space-y-4">
@@ -903,8 +907,11 @@ const Users = () => {
                 )}
               </div>
 
-              {/* Actions */}
-              <div className="mt-6 space-y-3 border-t pt-6">
+            </div>
+
+            {/* Actions - Fixed Footer */}
+            <div className="p-6 border-t border-border-default bg-bg-secondary shrink-0">
+              <div className="space-y-3">
                 {hasChanges && (
                   <button
                     onClick={handleSaveEdit}
@@ -937,12 +944,6 @@ const Users = () => {
                   className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   Renovar Membresía
-                </button>
-                <button
-                  onClick={() => setShowSidePanel(false)}
-                  className="btn-secondary w-full"
-                >
-                  Cerrar
                 </button>
               </div>
             </div>
