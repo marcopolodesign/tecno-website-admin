@@ -29,18 +29,52 @@ const toSnakeCase = (obj) => {
 }
 
 const membershipPlansService = {
-  async getPlans() {
+  async getPlans(includeInactive = false) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('membership_plans')
         .select('*')
-        .eq('is_active', true)
         .order('duration_months')
+      
+      if (!includeInactive) {
+        query = query.eq('is_active', true)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching membership plans:', error)
+      throw error
+    }
+  },
+
+  async createPlan(planData) {
+    try {
+      const insertData = {
+        name: planData.name,
+        duration_months: planData.durationMonths,
+        price: planData.price,
+        price_efectivo: planData.priceEfectivo || planData.price,
+        price_debito_automatico: planData.priceDebitoAutomatico || planData.price,
+        price_tarjeta_transferencia: planData.priceTarjetaTransferencia || planData.price,
+        description: planData.description,
+        is_active: planData.isActive ?? true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      const { data, error } = await supabase
+        .from('membership_plans')
+        .insert(insertData)
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error creating membership plan:', error)
       throw error
     }
   },
