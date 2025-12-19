@@ -768,3 +768,4 @@ const Dashboard = () => {
 }
 
 export default Dashboard
+// Example: Add new dashboard feature
