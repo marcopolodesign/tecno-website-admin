@@ -66,6 +66,12 @@ const membershipsService = {
 
   async getMembership(id) {
     try {
+      // Guard: don't try to fetch if id is null/undefined
+      if (!id) {
+        console.warn('getMembership called with null/undefined id')
+        return { data: null }
+      }
+
       const { data, error } = await supabase
         .from('memberships')
         .select(`
@@ -261,6 +267,12 @@ const membershipsService = {
 
   async updateMembership(id, membershipData) {
     try {
+      // Guard: don't try to update if id is null/undefined
+      if (!id) {
+        console.warn('updateMembership called with null/undefined id, skipping')
+        return { data: null }
+      }
+
       // Get current membership data before update (for logging)
       const { data: oldMembership, error: fetchError } = await supabase
         .from('memberships')
