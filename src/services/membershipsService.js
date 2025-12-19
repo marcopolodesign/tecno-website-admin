@@ -233,9 +233,12 @@ const membershipsService = {
   },
 
   async renewMembership(userId, currentMembershipId, renewalData, paymentData) {
+    console.log('renewMembership called with:', { userId, currentMembershipId, renewalData: renewalData?.membershipType })
+    
     try {
-      // 1. Mark current membership as expired (only if it exists)
-      if (currentMembershipId) {
+      // 1. Mark current membership as expired (only if it exists and is valid)
+      if (currentMembershipId && currentMembershipId !== 'null' && currentMembershipId !== 'undefined') {
+        console.log('Expiring current membership:', currentMembershipId)
         const { error: expireError } = await supabase
           .from('memberships')
           .update({ status: 'expired' })
@@ -245,19 +248,22 @@ const membershipsService = {
           console.error('Error expiring current membership:', expireError)
           // Don't throw - continue with renewal even if expire fails
         }
+      } else {
+        console.log('No current membership to expire, creating new membership directly')
       }
 
-      // 2. Create new membership with is_renewal = true (if there was a previous membership)
+      // 2. Create new membership
       const newMembership = {
         userId,
-        membershipPlanId: renewalData.membershipPlanId,
+        membershipPlanId: renewalData.membershipPlanId || null,
         membershipType: renewalData.membershipType,
         startDate: renewalData.startDate,
         endDate: renewalData.endDate,
-        isRenewal: !!currentMembershipId,
-        previousMembershipId: currentMembershipId || null
+        isRenewal: !!(currentMembershipId && currentMembershipId !== 'null'),
+        previousMembershipId: (currentMembershipId && currentMembershipId !== 'null') ? currentMembershipId : null
       }
 
+      console.log('Creating new membership:', newMembership)
       return await this.createMembership(newMembership, paymentData)
     } catch (error) {
       console.error('Error renewing membership:', error)
