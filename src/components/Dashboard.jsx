@@ -18,15 +18,12 @@ import { CurrencyDollarIcon, ArrowTrendingUpIcon, UsersIcon as UsersIconSolid } 
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
-    totalProspects: 0,
-    totalLeads: 0,
     totalUsers: 0,
-    newLeads: 0,
-    contactedLeads: 0,
-    convertedLeads: 0,
     activeUsers: 0,
-    prospectToLeadRate: 0,
-    leadToUserRate: 0
+    wellhubUsers: 0,
+    sportclubUsers: 0,
+    foundingMembers: 0,
+    freeUsers: 0
   })
   const [revenueStats, setRevenueStats] = useState({
     totalRevenue: 0,
@@ -56,46 +53,31 @@ const Dashboard = () => {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
 
-      const [prospectsData, leadsData, usersData, revenueData, expiringData] = await Promise.allSettled([
-        prospectsService.getProspects(),
-        leadsService.getLeads(),
+      const [usersData, revenueData, expiringData] = await Promise.allSettled([
         usersService.getUsers(),
         paymentsService.getRevenueStats(startOfMonth, endOfMonth),
         membershipsService.getExpiringMemberships(30)
       ])
       
-      const prospects = prospectsData.status === 'fulfilled' ? (prospectsData.value.data || []) : []
-      const leads = leadsData.status === 'fulfilled' ? (leadsData.value.data || []) : []
       const users = usersData.status === 'fulfilled' ? (usersData.value.data || []) : []
       const revenue = revenueData.status === 'fulfilled' ? (revenueData.value.data || {}) : {}
       const expiring = expiringData.status === 'fulfilled' ? (expiringData.value.data || []) : []
       
-      const prospectToLeadRate = prospects.length > 0 
-        ? Math.round((leads.length / prospects.length) * 100) 
-        : 0
-      
-      const leadToUserRate = leads.length > 0 
-        ? Math.round((users.length / leads.length) * 100) 
-        : 0
-      
       const newStats = {
-        totalProspects: prospects.length,
-        totalLeads: leads.length,
         totalUsers: users.length,
-        newLeads: leads.filter(lead => lead.status === 'nuevo').length,
-        contactedLeads: leads.filter(lead => lead.status === 'contactado').length,
-        convertedLeads: leads.filter(lead => lead.status === 'convertido').length,
-        activeUsers: users.filter(user => user.membershipStatus === 'activo').length,
-        prospectToLeadRate,
-        leadToUserRate
+        activeUsers: users.filter(user => user.membershipStatus === 'active').length,
+        wellhubUsers: users.filter(user => user.membershipType === 'wellhub').length,
+        sportclubUsers: users.filter(user => user.membershipType === 'sportclub').length,
+        foundingMembers: users.filter(user => user.membershipType === 'socio_fundador').length,
+        freeUsers: users.filter(user => user.membershipType === 'free').length
       }
       
       setStats(newStats)
       setRevenueStats(revenue)
       setExpiringMemberships(expiring)
       setRecentItems({
-        prospects: prospects.slice(0, 3),
-        leads: leads.slice(0, 3),
+        prospects: [],
+        leads: [],
         users: users.slice(0, 3)
       })
     } catch (error) {
@@ -125,10 +107,11 @@ const Dashboard = () => {
     }
   }
 
-  const funnelData = [
-    { name: 'Prospects', value: stats.totalProspects, color: '#3B82F6' },
-    { name: 'Leads', value: stats.totalLeads, color: '#F59E0B' },
-    { name: 'Users', value: stats.totalUsers, color: '#dc2626' },
+  const membershipTypeData = [
+    { name: 'Wellhub', value: stats.wellhubUsers, color: '#10B981' },
+    { name: 'SportClub', value: stats.sportclubUsers, color: '#3B82F6' },
+    { name: 'Socios Fundadores', value: stats.foundingMembers, color: '#F59E0B' },
+    { name: 'Free', value: stats.freeUsers, color: '#6B7280' },
   ]
 
   // Custom tooltip for light theme
@@ -157,20 +140,46 @@ const Dashboard = () => {
       {/* Header */}
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Dashboard</h1>
-        <p className="text-sm text-text-secondary mt-1">Resumen del embudo de conversión</p>
+        <p className="text-sm text-text-secondary mt-1">Resumen de clientes y membresías</p>
       </div>
 
-      {/* Funnel Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* User Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card border-l-2 border-brand">
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-brand/10 rounded-lg">
+              <UserGroupIcon className="h-5 w-5 text-brand" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Total Clientes</p>
+              <p className="text-2xl font-semibold text-text-primary">{stats.totalUsers}</p>
+              <p className="text-xs text-text-tertiary mt-0.5">{stats.activeUsers} activos</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card border-l-2 border-green-500">
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-green-500/10 rounded-lg">
+              <UserCircleIcon className="h-5 w-5 text-green-500" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Wellhub</p>
+              <p className="text-2xl font-semibold text-text-primary">{stats.wellhubUsers}</p>
+              <p className="text-xs text-text-tertiary mt-0.5">Gympass</p>
+            </div>
+          </div>
+        </div>
+
         <div className="card border-l-2 border-info">
           <div className="flex items-center gap-4">
             <div className="p-2 bg-info/10 rounded-lg">
-              <FunnelIcon className="h-5 w-5 text-info" />
+              <UserCircleIcon className="h-5 w-5 text-info" />
             </div>
             <div>
-              <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Prospects</p>
-              <p className="text-2xl font-semibold text-text-primary">{stats.totalProspects}</p>
-              <p className="text-xs text-text-tertiary mt-0.5">Email capturado</p>
+              <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">SportClub</p>
+              <p className="text-2xl font-semibold text-text-primary">{stats.sportclubUsers}</p>
+              <p className="text-xs text-text-tertiary mt-0.5">Socios</p>
             </div>
           </div>
         </div>
@@ -178,25 +187,12 @@ const Dashboard = () => {
         <div className="card border-l-2 border-warning">
           <div className="flex items-center gap-4">
             <div className="p-2 bg-warning/10 rounded-lg">
-              <UserGroupIcon className="h-5 w-5 text-warning" />
+              <UserCircleIcon className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Leads</p>
-              <p className="text-2xl font-semibold text-text-primary">{stats.totalLeads}</p>
-              <p className="text-xs text-text-tertiary mt-0.5">{stats.prospectToLeadRate}% de conversión</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card border-l-2 border-brand">
-          <div className="flex items-center gap-4">
-            <div className="p-2 bg-brand/10 rounded-lg">
-              <UserCircleIcon className="h-5 w-5 text-brand" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Clientes</p>
-              <p className="text-2xl font-semibold text-text-primary">{stats.totalUsers}</p>
-              <p className="text-xs text-text-tertiary mt-0.5">{stats.activeUsers} activos · {stats.leadToUserRate}% conversión</p>
+              <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Fundadores</p>
+              <p className="text-2xl font-semibold text-text-primary">{stats.foundingMembers}</p>
+              <p className="text-xs text-text-tertiary mt-0.5">Socios fundadores</p>
             </div>
           </div>
         </div>
