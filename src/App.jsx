@@ -18,6 +18,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -64,6 +65,14 @@ function App() {
     setUserRole(null)
   }
 
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen)
+  }
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false)
+  }
+
   // Permission Logic
   const canAccess = (route) => {
     if (!userRole) return false
@@ -108,9 +117,13 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-bg-primary flex">
-        <Sidebar userRole={userRole} />
+        <Sidebar 
+          userRole={userRole} 
+          mobileMenuOpen={mobileMenuOpen} 
+          onCloseMobileMenu={closeMobileMenu} 
+        />
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-          <Header onLogout={handleLogout} />
+          <Header onLogout={handleLogout} onMenuToggle={toggleMobileMenu} />
           <main className="flex-1 overflow-y-auto overflow-x-hidden">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               <Routes>

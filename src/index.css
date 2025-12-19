@@ -330,6 +330,17 @@
   }
 }
 
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -341,6 +352,10 @@
 
 @utility animate-slide-in-right {
   animation: slideInRight 0.2s ease-out;
+}
+
+@utility animate-slide-in-left {
+  animation: slideInLeft 0.2s ease-out;
 }
 
 @utility animate-fade-in {
