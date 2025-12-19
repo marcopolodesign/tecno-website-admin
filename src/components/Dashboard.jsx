@@ -25,6 +25,7 @@ const Dashboard = () => {
     foundingMembers: 0,
     freeUsers: 0
   })
+  const [allUsers, setAllUsers] = useState([])
   const [revenueStats, setRevenueStats] = useState({
     totalRevenue: 0,
     newCustomersRevenue: 0,
@@ -35,6 +36,8 @@ const Dashboard = () => {
   })
   const [expiringMemberships, setExpiringMemberships] = useState([])
   const [showExpiringSidecart, setShowExpiringSidecart] = useState(false)
+  const [showMembershipTypeSidecart, setShowMembershipTypeSidecart] = useState(false)
+  const [selectedMembershipType, setSelectedMembershipType] = useState(null)
   const [recentItems, setRecentItems] = useState({
     prospects: [],
     leads: [],
@@ -85,6 +88,7 @@ const Dashboard = () => {
       ]
 
       setStats(newStats)
+      setAllUsers(users)
       setFunnelData(funnelStats)
       setRevenueStats(revenue)
       setExpiringMemberships(expiring)
@@ -120,6 +124,65 @@ const Dashboard = () => {
     }
   }
 
+  const getMembershipStatusColor = (status) => {
+    switch (status) {
+      case 'active': return 'status-convertido'
+      case 'expired': return 'status-contactado'
+      case 'cancelled': return 'status-perdido'
+      default: return 'bg-bg-surface text-text-secondary'
+    }
+  }
+
+  const getMembershipStatusLabel = (status) => {
+    switch (status) {
+      case 'active': return 'Activo'
+      case 'expired': return 'Vencido'
+      case 'cancelled': return 'Cancelado'
+      default: return status || 'N/A'
+    }
+  }
+
+  const membershipTypeConfig = {
+    wellhub: { 
+      label: 'Wellhub', 
+      color: 'green-500', 
+      bgColor: 'bg-green-500/10',
+      textColor: 'text-green-500',
+      borderColor: 'border-green-500'
+    },
+    sportclub: { 
+      label: 'SportClub', 
+      color: 'info', 
+      bgColor: 'bg-info/10',
+      textColor: 'text-info',
+      borderColor: 'border-info'
+    },
+    socio_fundador: { 
+      label: 'Socios Fundadores', 
+      color: 'warning', 
+      bgColor: 'bg-warning/10',
+      textColor: 'text-warning',
+      borderColor: 'border-warning'
+    },
+    free: { 
+      label: 'Free', 
+      color: 'gray-500', 
+      bgColor: 'bg-gray-500/10',
+      textColor: 'text-gray-500',
+      borderColor: 'border-gray-500'
+    }
+  }
+
+  const handleMembershipTypeClick = (type) => {
+    setSelectedMembershipType(type)
+    setShowMembershipTypeSidecart(true)
+  }
+
+  const getFilteredUsersByMembershipType = () => {
+    if (!selectedMembershipType) return []
+    return allUsers.filter(user => user.membershipType === selectedMembershipType)
+  }
+
   const membershipTypeData = [
     { name: 'Wellhub', value: stats.wellhubUsers, color: '#10B981' },
     { name: 'SportClub', value: stats.sportclubUsers, color: '#3B82F6' },
@@ -148,6 +211,9 @@ const Dashboard = () => {
     )
   }
 
+  const filteredUsers = getFilteredUsersByMembershipType()
+  const selectedTypeConfig = selectedMembershipType ? membershipTypeConfig[selectedMembershipType] : null
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -158,6 +224,7 @@ const Dashboard = () => {
 
       {/* User Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Total Clients - not clickable */}
         <div className="card border-l-2 border-brand">
           <div className="flex items-center gap-4">
             <div className="p-2 bg-brand/10 rounded-lg">
@@ -171,42 +238,63 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="card border-l-2 border-green-500">
+        {/* Wellhub - clickable */}
+        <div 
+          className="card border-l-2 border-green-500 cursor-pointer hover:bg-bg-surface transition-colors"
+          onClick={() => handleMembershipTypeClick('wellhub')}
+        >
           <div className="flex items-center gap-4">
             <div className="p-2 bg-green-500/10 rounded-lg">
               <UserCircleIcon className="h-5 w-5 text-green-500" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Wellhub</p>
               <p className="text-2xl font-semibold text-text-primary">{stats.wellhubUsers}</p>
               <p className="text-xs text-text-tertiary mt-0.5">Gympass</p>
             </div>
+            <svg className="h-5 w-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </div>
         </div>
 
-        <div className="card border-l-2 border-info">
+        {/* SportClub - clickable */}
+        <div 
+          className="card border-l-2 border-info cursor-pointer hover:bg-bg-surface transition-colors"
+          onClick={() => handleMembershipTypeClick('sportclub')}
+        >
           <div className="flex items-center gap-4">
             <div className="p-2 bg-info/10 rounded-lg">
               <UserCircleIcon className="h-5 w-5 text-info" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">SportClub</p>
               <p className="text-2xl font-semibold text-text-primary">{stats.sportclubUsers}</p>
               <p className="text-xs text-text-tertiary mt-0.5">Socios</p>
             </div>
+            <svg className="h-5 w-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </div>
         </div>
 
-        <div className="card border-l-2 border-warning">
+        {/* Fundadores - clickable */}
+        <div 
+          className="card border-l-2 border-warning cursor-pointer hover:bg-bg-surface transition-colors"
+          onClick={() => handleMembershipTypeClick('socio_fundador')}
+        >
           <div className="flex items-center gap-4">
             <div className="p-2 bg-warning/10 rounded-lg">
               <UserCircleIcon className="h-5 w-5 text-warning" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Fundadores</p>
               <p className="text-2xl font-semibold text-text-primary">{stats.foundingMembers}</p>
               <p className="text-xs text-text-tertiary mt-0.5">Socios fundadores</p>
             </div>
+            <svg className="h-5 w-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </div>
         </div>
       </div>
@@ -421,7 +509,7 @@ const Dashboard = () => {
           />
           
           {/* Sidecart Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-bg-primary shadow-xl z-50 overflow-hidden flex flex-col">
+          <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-bg-primary shadow-xl z-50 overflow-hidden flex flex-col animate-slide-in-right">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-default">
               <div>
@@ -543,6 +631,129 @@ const Dashboard = () => {
                 </div>
                 <button
                   onClick={() => setShowExpiringSidecart(false)}
+                  className="btn-secondary"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Membership Type Sidecart */}
+      {showMembershipTypeSidecart && selectedTypeConfig && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+            onClick={() => setShowMembershipTypeSidecart(false)}
+          />
+          
+          {/* Sidecart Panel */}
+          <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-bg-primary shadow-xl z-50 overflow-hidden flex flex-col animate-slide-in-right">
+            {/* Header */}
+            <div className={`flex items-center justify-between p-6 border-b border-border-default`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 ${selectedTypeConfig.bgColor} rounded-lg`}>
+                  <UserCircleIcon className={`h-6 w-6 ${selectedTypeConfig.textColor}`} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-text-primary">{selectedTypeConfig.label}</h2>
+                  <p className="text-sm text-text-secondary mt-1">
+                    {filteredUsers.length} usuario{filteredUsers.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMembershipTypeSidecart(false)}
+                className="p-2 hover:bg-bg-surface rounded-lg transition-colors"
+              >
+                <XMarkIcon className="h-6 w-6 text-text-secondary" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-3">
+                {filteredUsers.map((user) => (
+                  <div 
+                    key={user.id} 
+                    className="card hover:border-border-hover transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        {/* Avatar */}
+                        <div className={`h-10 w-10 rounded-full ${selectedTypeConfig.bgColor} flex items-center justify-center shrink-0`}>
+                          <span className={`text-sm font-semibold ${selectedTypeConfig.textColor}`}>
+                            {user.firstName?.charAt(0) || 'U'}
+                            {user.lastName?.charAt(0) || ''}
+                          </span>
+                        </div>
+
+                        {/* User Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-semibold text-text-primary truncate">
+                            {user.firstName} {user.lastName}
+                          </h3>
+                          <p className="text-xs text-text-secondary truncate">
+                            {user.email}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-text-muted">
+                              {user.phone}
+                            </p>
+                            {user.phone && (
+                              <a
+                                href={`https://wa.me/${user.phone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center w-5 h-5 rounded hover:bg-success/10 transition-colors"
+                                title="Abrir WhatsApp"
+                              >
+                                <svg className="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                                </svg>
+                              </a>
+                            )}
+                          </div>
+                          
+                          {/* Membership Details */}
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            <span className={`status-badge ${getMembershipStatusColor(user.membershipStatus)}`}>
+                              {getMembershipStatusLabel(user.membershipStatus)}
+                            </span>
+                            {user.membershipEndDate && (
+                              <span className="text-xs text-text-muted">
+                                Vence: {new Date(user.membershipEndDate).toLocaleDateString('es-AR')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {filteredUsers.length === 0 && (
+                <div className="text-center py-12">
+                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${selectedTypeConfig.bgColor} mb-4`}>
+                    <UserCircleIcon className={`h-8 w-8 ${selectedTypeConfig.textColor}`} />
+                  </div>
+                  <p className="text-text-secondary">No hay usuarios con este tipo de membresía</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-border-default bg-bg-surface">
+              <div className="flex items-center justify-between text-sm">
+                <p className="text-text-secondary">
+                  {filteredUsers.filter(u => u.membershipStatus === 'active').length} activos de {filteredUsers.length} usuarios
+                </p>
+                <button
+                  onClick={() => setShowMembershipTypeSidecart(false)}
                   className="btn-secondary"
                 >
                   Cerrar

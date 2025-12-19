@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase'
+import logsService from './logsService'
+import { getCurrentUserForLogging } from '../utils/logHelpers'
 
 const toCamelCase = (obj) => {
   if (Array.isArray(obj)) {
@@ -114,6 +116,15 @@ const membershipPlansService = {
 
   async updatePlan(id, planData) {
     try {
+      // Get current plan data before update (for logging)
+      const { data: oldPlan, error: fetchError } = await supabase
+        .from('membership_plans')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (fetchError) throw fetchError
+
       const updateData = {
         price: planData.price,
         description: planData.description,
@@ -129,6 +140,38 @@ const membershipPlansService = {
         .single()
 
       if (error) throw error
+
+      // Log membership plan changes
+      try {
+        const performedBy = await getCurrentUserForLogging()
+
+        await logsService.createLog({
+          actionType: 'membership_plan_changed',
+          actionDescription: `Plan "${oldPlan.name}" modificado`,
+          performedById: performedBy.id,
+          performedByType: performedBy.type,
+          performedByName: performedBy.name,
+          entityType: 'membership_plan',
+          entityId: id,
+          entityName: oldPlan.name,
+          changes: {
+            old_price: oldPlan.price,
+            new_price: planData.price,
+            old_description: oldPlan.description,
+            new_description: planData.description,
+            old_is_active: oldPlan.is_active,
+            new_is_active: planData.isActive
+          },
+          metadata: {
+            plan_name: oldPlan.name,
+            timestamp: new Date().toISOString()
+          }
+        })
+      } catch (logError) {
+        console.error('Error logging membership plan change:', logError)
+        // Don't fail the operation if logging fails
+      }
+
       return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error updating membership plan:', error)

@@ -363,6 +363,11 @@ const Users = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
+      // English values from database
+      case 'active': return 'status-convertido'
+      case 'expired': return 'status-contactado'
+      case 'cancelled': return 'status-perdido'
+      // Legacy Spanish values
       case 'activo': return 'status-convertido'
       case 'inactivo': return 'bg-bg-surface text-text-secondary border border-border-default'
       case 'suspendido': return 'status-perdido'
@@ -373,6 +378,11 @@ const Users = () => {
 
   const getStatusLabel = (status) => {
     const statuses = {
+      // English values from database
+      'active': 'Activo',
+      'expired': 'Vencido',
+      'cancelled': 'Cancelado',
+      // Legacy Spanish values (just in case)
       'activo': 'Activo',
       'inactivo': 'Inactivo',
       'suspendido': 'Suspendido',
@@ -645,7 +655,11 @@ const Users = () => {
               width: 150,
               editable: true,
               type: 'singleSelect',
-              valueOptions: ['activo', 'inactivo', 'suspendido', 'vencido', 'no-renueva'],
+              valueOptions: [
+                { value: 'active', label: 'Activo' },
+                { value: 'expired', label: 'Vencido' },
+                { value: 'cancelled', label: 'Cancelado' }
+              ],
               renderCell: (params) => (
                 <span className={`status-badge ${getStatusColor(params.value)}`}>
                   {getStatusLabel(params.value)}
@@ -971,12 +985,13 @@ const Users = () => {
                 )}
                 <button
                   onClick={() => {
+                    // Status is already in English in the database ('active', 'expired', 'cancelled')
+                    const status = selectedUser.membershipStatus || 'active'
                     setChangeMembershipFormData({
                       membershipType: selectedUser.membershipType || '',
                       startDate: selectedUser.membershipStartDate || '',
                       endDate: selectedUser.membershipEndDate || '',
-                      status: selectedUser.membershipStatus === 'activo' ? 'active' : 
-                              selectedUser.membershipStatus === 'vencido' ? 'expired' : 'cancelled'
+                      status: status
                     })
                     setShowChangeMembershipModal(true)
                     setShowSidePanel(false)

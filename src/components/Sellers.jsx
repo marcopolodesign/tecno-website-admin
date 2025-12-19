@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase, isServiceRole } from '../lib/supabase'
 import { locationsService } from '../services/locationsService'
+import logsService from '../services/logsService'
+import { getCurrentUserForLogging } from '../utils/logHelpers'
 import { PlusIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 
 const Sellers = () => {
@@ -100,14 +102,36 @@ const Sellers = () => {
         if (authError) throw authError
 
         // Create seller record
-        const { error: sellerError } = await supabase
+        const { data: newSeller, error: sellerError } = await supabase
           .from('sellers')
           .insert([{
             auth_user_id: authData.user.id,
             ...sellerData
           }])
+          .select()
+          .single()
 
         if (sellerError) throw sellerError
+
+        // Log seller creation
+        try {
+          const performedBy = await getCurrentUserForLogging()
+          const sellerName = `${formData.first_name} ${formData.last_name}`.trim()
+
+          await logsService.logSellerCreated(
+            newSeller.id,
+            sellerName,
+            {
+              email: formData.email,
+              role: formData.role,
+              phone: formData.phone
+            },
+            performedBy
+          )
+        } catch (logError) {
+          console.error('Error logging seller creation:', logError)
+          // Don't fail the operation if logging fails
+        }
       }
 
       await fetchSellers()

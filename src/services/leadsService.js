@@ -99,6 +99,41 @@ export const leadsService = {
         .single()
 
       if (error) throw error
+
+      // Log manual lead creation
+      try {
+        const performedBy = await getCurrentUserForLogging()
+        const leadName = `${data.firstName} ${data.lastName || ''}`.trim()
+
+        await logsService.createLog({
+          actionType: 'lead_created_manually',
+          actionDescription: `Lead creado manualmente desde admin: ${leadName}`,
+          performedById: performedBy.id,
+          performedByType: performedBy.type,
+          performedByName: performedBy.name,
+          entityType: 'lead',
+          entityId: result.id,
+          entityName: leadName,
+          changes: {
+            email: data.email,
+            phone: data.phone,
+            training_goal: data.trainingGoal,
+            notes: data.notes,
+            source: data.source,
+            utm_source: data.utmSource,
+            utm_medium: data.utmMedium,
+            utm_campaign: data.utmCampaign
+          },
+          metadata: {
+            created_via: 'admin_panel',
+            timestamp: new Date().toISOString()
+          }
+        })
+      } catch (logError) {
+        console.error('Error logging lead creation:', logError)
+        // Don't fail the operation if logging fails
+      }
+
       return { data: toCamelCase(result) }
     } catch (error) {
       console.error('Error creating lead:', error)

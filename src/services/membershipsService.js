@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase'
+import logsService from './logsService'
+import { getCurrentUserForLogging } from '../utils/logHelpers'
 
 const toCamelCase = (obj) => {
   if (Array.isArray(obj)) {
@@ -103,6 +105,17 @@ const membershipsService = {
 
   async createMembership(membershipData, paymentData) {
     try {
+      // Get user info for logging
+      const { data: userInfo, error: userFetchError } = await supabase
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', membershipData.userId)
+        .single()
+
+      if (userFetchError) throw userFetchError
+
+      const userName = `${userInfo.first_name} ${userInfo.last_name}`
+
       // 1. Create membership
       const membership = {
         user_id: membershipData.userId,
@@ -157,6 +170,55 @@ const membershipsService = {
 
       if (userError) throw userError
 
+      // Log membership creation
+      try {
+        const performedBy = await getCurrentUserForLogging()
+
+        await logsService.logMembershipCreated(
+          membershipResult.id,
+          membershipData.userId,
+          userName,
+          {
+            type: membershipData.membershipType,
+            startDate: membershipData.startDate,
+            endDate: membershipData.endDate,
+            paymentMethod: paymentData?.paymentMethod || 'efectivo',
+            paymentAmount: paymentData?.amount || 0
+          },
+          performedBy
+        )
+
+        // Log payment if payment data was provided
+        if (paymentData) {
+          await logsService.createLog({
+            actionType: 'payment_created',
+            actionDescription: `Pago creado: $${paymentData.amount} por ${paymentData.paymentMethod} para ${userName}`,
+            performedById: performedBy.id,
+            performedByType: performedBy.type,
+            performedByName: performedBy.name,
+            entityType: 'payment',
+            entityId: membershipResult.id, // Using membership ID as reference
+            entityName: `Pago - ${userName}`,
+            relatedUserId: membershipData.userId,
+            relatedMembershipId: membershipResult.id,
+            changes: {
+              amount: paymentData.amount,
+              payment_method: paymentData.paymentMethod,
+              payment_status: paymentData.paymentStatus || 'completed',
+              payment_date: paymentData.paymentDate || new Date().toISOString(),
+              notes: paymentData.notes || ''
+            },
+            metadata: {
+              created_via: 'membership_creation',
+              timestamp: new Date().toISOString()
+            }
+          })
+        }
+      } catch (logError) {
+        console.error('Error logging membership/payment creation:', logError)
+        // Don't fail the operation if logging fails
+      }
+
       return { data: toCamelCase(membershipResult) }
     } catch (error) {
       console.error('Error creating membership:', error)
@@ -194,6 +256,23 @@ const membershipsService = {
 
   async updateMembership(id, membershipData) {
     try {
+      // Get current membership data before update (for logging)
+      const { data: oldMembership, error: fetchError } = await supabase
+        .from('memberships')
+        .select(`
+          *,
+          users:user_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('id', id)
+        .single()
+
+      if (fetchError) throw fetchError
+
       const updateData = {
         status: membershipData.status,
         end_date: membershipData.endDate,
@@ -221,6 +300,31 @@ const membershipsService = {
 
         if (userError) throw userError
       }
+
+      // Log the membership change
+      const performedBy = await getCurrentUserForLogging()
+      const userName = oldMembership.users ?
+        `${oldMembership.users.first_name} ${oldMembership.users.last_name}` :
+        'Unknown User'
+
+      await logsService.logMembershipChanged(
+        id,
+        oldMembership.user_id,
+        userName,
+        {
+          type: oldMembership.membership_type,
+          startDate: oldMembership.start_date,
+          endDate: oldMembership.end_date,
+          status: oldMembership.status
+        },
+        {
+          type: data.membership_type,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          status: data.status
+        },
+        performedBy
+      )
 
       return { data: toCamelCase(data) }
     } catch (error) {
