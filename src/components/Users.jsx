@@ -1022,6 +1022,23 @@ const Users = () => {
                 </button>
                 <button
                   onClick={() => {
+                    // Calculate dates: start = today, end = 1 month from today
+                    const today = new Date()
+                    const endDate = new Date(today)
+                    endDate.setMonth(endDate.getMonth() + 1)
+                    
+                    // Get price for current membership type
+                    const currentType = selectedUser.membershipType || 'mensual'
+                    const calculatedPrice = getCalculatedPrice(currentType, 'efectivo')
+                    
+                    setRenewalFormData({
+                      membershipType: currentType,
+                      startDate: today.toISOString().split('T')[0],
+                      endDate: endDate.toISOString().split('T')[0],
+                      paymentMethod: 'efectivo',
+                      paymentAmount: calculatedPrice || '',
+                      paymentNotes: ''
+                    })
                     setShowRenewalModal(true)
                     setShowSidePanel(false)
                   }}
@@ -1365,29 +1382,31 @@ const Users = () => {
             <div className="space-y-4">
               {/* Membership Info */}
               <div className="border-b border-border-default pb-4">
-                <h4 className="font-semibold text-text-primary mb-3">Nueva Membresía</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="form-label">Tipo de Membresía *</label>
-                    <select
-                      className="form-input"
-                      value={renewalFormData.membershipType}
-                      onChange={(e) => handleRenewalFormChange('membershipType', e.target.value)}
-                    >
-                      {membershipPlans.map(plan => (
-                        <option key={plan.id} value={plan.name}>
-                          {plan.name} ({plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <h4 className="font-semibold text-text-primary mb-3">Renovación de Membresía</h4>
+                
+                {/* Show current membership type as read-only */}
+                <div className="mb-4 p-3 bg-bg-surface rounded-lg border border-border-default">
+                  <p className="text-sm text-text-secondary">Tipo de Membresía</p>
+                  <p className="text-lg font-semibold text-text-primary capitalize">{renewalFormData.membershipType}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="form-label">Fecha de Inicio *</label>
                     <input
                       type="date"
                       className="form-input"
                       value={renewalFormData.startDate}
-                      onChange={(e) => setRenewalFormData({...renewalFormData, startDate: e.target.value})}
+                      onChange={(e) => {
+                        const startDate = new Date(e.target.value)
+                        const endDate = new Date(startDate)
+                        endDate.setMonth(endDate.getMonth() + 1)
+                        setRenewalFormData({
+                          ...renewalFormData, 
+                          startDate: e.target.value,
+                          endDate: endDate.toISOString().split('T')[0]
+                        })
+                      }}
                     />
                   </div>
                   <div>
@@ -1398,6 +1417,9 @@ const Users = () => {
                       value={renewalFormData.endDate}
                       onChange={(e) => setRenewalFormData({...renewalFormData, endDate: e.target.value})}
                     />
+                    <p className="text-xs text-text-tertiary mt-1">
+                      Por defecto: 1 mes desde inicio
+                    </p>
                   </div>
                 </div>
               </div>
