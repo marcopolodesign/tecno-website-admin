@@ -7,8 +7,10 @@ import { toastOptions } from '../lib/themeStyles'
 export default function MembershipPlans({ userRole }) {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editingId, setEditingId] = useState(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingPlan, setEditingPlan] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [saving, setSaving] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -43,32 +45,48 @@ export default function MembershipPlans({ userRole }) {
   }
 
   const startEdit = (plan) => {
-    setEditingId(plan.id)
+    setEditingPlan(plan)
     setEditForm({
-      price: plan.price,
-      priceEfectivo: plan.priceEfectivo || plan.price,
-      priceDebitoAutomatico: plan.priceDebitoAutomatico || plan.price,
-      priceTarjetaTransferencia: plan.priceTarjetaTransferencia || plan.price,
-      description: plan.description,
+      price: plan.price || '',
+      priceEfectivo: plan.priceEfectivo || plan.price || '',
+      priceDebitoAutomatico: plan.priceDebitoAutomatico || plan.price || '',
+      priceTarjetaTransferencia: plan.priceTarjetaTransferencia || plan.price || '',
+      description: plan.description || '',
       isActive: plan.isActive
     })
+    setShowEditModal(true)
   }
 
   const cancelEdit = () => {
-    setEditingId(null)
+    setShowEditModal(false)
+    setEditingPlan(null)
     setEditForm({})
   }
 
-  const saveEdit = async (planId) => {
+  const saveEdit = async (e) => {
+    e.preventDefault()
+    if (!editingPlan) return
+
     try {
-      await membershipPlansService.updatePlan(planId, editForm)
+      setSaving(true)
+      await membershipPlansService.updatePlan(editingPlan.id, {
+        price: parseFloat(editForm.price),
+        priceEfectivo: parseFloat(editForm.priceEfectivo) || parseFloat(editForm.price),
+        priceDebitoAutomatico: parseFloat(editForm.priceDebitoAutomatico) || parseFloat(editForm.price),
+        priceTarjetaTransferencia: parseFloat(editForm.priceTarjetaTransferencia) || parseFloat(editForm.price),
+        description: editForm.description,
+        isActive: editForm.isActive
+      })
       toast.success('Plan actualizado correctamente', toastOptions)
-      setEditingId(null)
+      setShowEditModal(false)
+      setEditingPlan(null)
       setEditForm({})
       fetchPlans()
     } catch (error) {
       console.error('Error updating plan:', error)
       toast.error('Error al actualizar el plan', toastOptions)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -112,6 +130,7 @@ export default function MembershipPlans({ userRole }) {
   }
 
   const formatCurrency = (amount) => {
+    if (!amount && amount !== 0) return '-'
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
       currency: 'ARS',
@@ -151,106 +170,74 @@ export default function MembershipPlans({ userRole }) {
         )}
       </div>
 
-      {/* Plans Table */}
-      <div className="card overflow-hidden p-0">
-        <table className="min-w-full divide-y divide-border-default">
-          <thead>
-            <tr className="bg-bg-surface">
-              <th className="table-header">Plan</th>
-              <th className="table-header">Duración</th>
-              <th className="table-header">Precio Base</th>
-              <th className="table-header">Descripción</th>
-              <th className="table-header">Estado</th>
-              <th className="table-header text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-default">
-            {plans.map((plan) => (
-              <tr key={plan.id} className="table-row">
-                <td className="table-cell">
-                  <div className="font-medium capitalize">
-                    {plan.name}
-                  </div>
-                </td>
-                <td className="table-cell">
+      {/* Plans Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {plans.map((plan) => (
+          <div key={plan.id} className={`card ${!plan.isActive ? 'opacity-60' : ''}`}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary capitalize">{plan.name}</h3>
+                <p className="text-sm text-text-secondary">
                   {plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'}
-                </td>
-                <td className="table-cell">
-                  {editingId === plan.id ? (
-                    <input
-                      type="number"
-                      value={editForm.price}
-                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                      className="form-input w-32"
-                      step="0.01"
-                    />
-                  ) : (
-                    <span className="font-semibold text-brand">
-                      {formatCurrency(plan.price)}
-                    </span>
-                  )}
-                </td>
-                <td className="table-cell max-w-xs">
-                  {editingId === plan.id ? (
-                    <input
-                      type="text"
-                      value={editForm.description}
-                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      className="form-input w-full"
-                    />
-                  ) : (
-                    <span className="text-text-secondary truncate block">
-                      {plan.description}
-                    </span>
-                  )}
-                </td>
-                <td className="table-cell">
-                  {editingId === plan.id ? (
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={editForm.isActive}
-                        onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                        className="h-4 w-4 text-brand rounded border-border-default focus:ring-brand"
-                      />
-                      <span className="text-sm text-text-secondary">Activo</span>
-                    </label>
-                  ) : (
-                    <span className={plan.isActive ? 'status-convertido' : 'status-perdido'}>
-                      {plan.isActive ? 'Activo' : 'Inactivo'}
-                    </span>
-                  )}
-                </td>
-                <td className="table-cell text-right">
-                  {editingId === plan.id ? (
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => saveEdit(plan.id)}
-                        className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
-                      >
-                        <CheckIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className="p-1.5 text-error hover:bg-error/10 rounded transition-colors"
-                      >
-                        <XMarkIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => startEdit(plan)}
-                      className="p-1.5 text-text-secondary hover:text-brand hover:bg-brand/10 rounded transition-colors"
-                    >
-                      <PencilIcon className="h-5 w-5" />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`status-badge ${plan.isActive ? 'status-convertido' : 'status-perdido'}`}>
+                  {plan.isActive ? 'Activo' : 'Inactivo'}
+                </span>
+                <button
+                  onClick={() => startEdit(plan)}
+                  className="p-1.5 text-text-secondary hover:text-brand hover:bg-brand/10 rounded transition-colors"
+                  title="Editar plan"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Prices */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-border-default">
+                <span className="text-sm text-text-secondary">Precio Base</span>
+                <span className="text-lg font-bold text-brand">{formatCurrency(plan.price)}</span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2 bg-bg-surface rounded-lg">
+                  <p className="text-xs text-text-tertiary mb-1">Efectivo</p>
+                  <p className="text-sm font-semibold text-text-primary">{formatCurrency(plan.priceEfectivo)}</p>
+                </div>
+                <div className="p-2 bg-bg-surface rounded-lg">
+                  <p className="text-xs text-text-tertiary mb-1">Débito Auto.</p>
+                  <p className="text-sm font-semibold text-text-primary">{formatCurrency(plan.priceDebitoAutomatico)}</p>
+                </div>
+                <div className="p-2 bg-bg-surface rounded-lg">
+                  <p className="text-xs text-text-tertiary mb-1">Tarjeta/Transf.</p>
+                  <p className="text-sm font-semibold text-text-primary">{formatCurrency(plan.priceTarjetaTransferencia)}</p>
+                </div>
+              </div>
+            </div>
+
+            {plan.description && (
+              <p className="mt-4 text-sm text-text-secondary">{plan.description}</p>
+            )}
+          </div>
+        ))}
       </div>
+
+      {plans.length === 0 && (
+        <div className="text-center py-12 card">
+          <p className="text-text-secondary">No hay planes de membresía configurados</p>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary mt-4"
+            >
+              Crear primer plan
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Info Box */}
       <div className="card bg-info/5 border-info/20">
@@ -260,8 +247,132 @@ export default function MembershipPlans({ userRole }) {
           <li>• Los planes inactivos no aparecerán al crear nuevas membresías</li>
           <li>• La duración no se puede modificar una vez creado el plan</li>
           <li>• Los cambios de precio solo afectan a nuevas membresías</li>
+          <li>• <strong>Efectivo:</strong> Precio cuando pagan en efectivo</li>
+          <li>• <strong>Débito Automático:</strong> Precio para débito recurrente</li>
+          <li>• <strong>Tarjeta/Transferencia:</strong> Precio para pago con tarjeta o transferencia</li>
         </ul>
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && editingPlan && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/30 z-40"
+            onClick={cancelEdit}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
+              <div className="flex items-center justify-between p-4 border-b border-border-default">
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary">Editar Plan</h2>
+                  <p className="text-sm text-text-secondary capitalize">{editingPlan.name} - {editingPlan.durationMonths} {editingPlan.durationMonths === 1 ? 'mes' : 'meses'}</p>
+                </div>
+                <button
+                  onClick={cancelEdit}
+                  className="p-1 hover:bg-bg-surface rounded transition-colors"
+                >
+                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
+                </button>
+              </div>
+              
+              <form onSubmit={saveEdit} className="p-4 space-y-4">
+                <div>
+                  <label className="form-label">Precio Base (ARS) *</label>
+                  <input
+                    type="number"
+                    value={editForm.price}
+                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                    className="form-input"
+                    placeholder="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+
+                <div className="border-t border-border-default pt-4">
+                  <p className="text-sm font-medium text-text-primary mb-3">Precios por Método de Pago</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="form-label text-xs">Efectivo</label>
+                      <input
+                        type="number"
+                        value={editForm.priceEfectivo}
+                        onChange={(e) => setEditForm({ ...editForm, priceEfectivo: e.target.value })}
+                        className="form-input"
+                        placeholder="Mismo que base"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label text-xs">Débito Auto.</label>
+                      <input
+                        type="number"
+                        value={editForm.priceDebitoAutomatico}
+                        onChange={(e) => setEditForm({ ...editForm, priceDebitoAutomatico: e.target.value })}
+                        className="form-input"
+                        placeholder="Mismo que base"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label text-xs">Tarjeta/Transf.</label>
+                      <input
+                        type="number"
+                        value={editForm.priceTarjetaTransferencia}
+                        onChange={(e) => setEditForm({ ...editForm, priceTarjetaTransferencia: e.target.value })}
+                        className="form-input"
+                        placeholder="Mismo que base"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label">Descripción</label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className="form-textarea"
+                    rows={2}
+                    placeholder="Descripción del plan..."
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="editIsActive"
+                    checked={editForm.isActive}
+                    onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
+                    className="h-4 w-4 text-brand rounded border-border-default focus:ring-brand"
+                  />
+                  <label htmlFor="editIsActive" className="text-sm text-text-secondary">
+                    Plan activo (visible al crear membresías)
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="btn-secondary"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="btn-primary disabled:opacity-50"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Create Modal */}
       {showCreateModal && (
@@ -324,7 +435,8 @@ export default function MembershipPlans({ userRole }) {
                 </div>
 
                 <div className="border-t border-border-default pt-4">
-                  <p className="text-sm text-text-secondary mb-3">Precios por método de pago (opcional)</p>
+                  <p className="text-sm font-medium text-text-primary mb-3">Precios por Método de Pago</p>
+                  <p className="text-xs text-text-tertiary mb-3">Deja vacío para usar el precio base</p>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="form-label text-xs">Efectivo</label>

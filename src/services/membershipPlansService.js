@@ -127,6 +127,9 @@ const membershipPlansService = {
 
       const updateData = {
         price: planData.price,
+        price_efectivo: planData.priceEfectivo || planData.price,
+        price_debito_automatico: planData.priceDebitoAutomatico || planData.price,
+        price_tarjeta_transferencia: planData.priceTarjetaTransferencia || planData.price,
         description: planData.description,
         is_active: planData.isActive,
         updated_at: new Date().toISOString()
