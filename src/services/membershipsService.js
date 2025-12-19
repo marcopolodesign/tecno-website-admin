@@ -122,10 +122,35 @@ const membershipsService = {
 
       const userName = `${userInfo.first_name} ${userInfo.last_name}`
 
+      // Look up membership_plan_id if not provided but membershipType is
+      let membershipPlanId = membershipData.membershipPlanId
+      if (!membershipPlanId && membershipData.membershipType) {
+        const { data: plan } = await supabase
+          .from('membership_plans')
+          .select('id')
+          .eq('name', membershipData.membershipType)
+          .single()
+        
+        if (plan) {
+          membershipPlanId = plan.id
+        } else {
+          // If no matching plan found, try to get any active plan as fallback
+          const { data: fallbackPlan } = await supabase
+            .from('membership_plans')
+            .select('id')
+            .eq('is_active', true)
+            .limit(1)
+            .single()
+          
+          membershipPlanId = fallbackPlan?.id || null
+          console.warn(`No matching plan found for type "${membershipData.membershipType}", using fallback:`, membershipPlanId)
+        }
+      }
+
       // 1. Create membership
       const membership = {
         user_id: membershipData.userId,
-        membership_plan_id: membershipData.membershipPlanId,
+        membership_plan_id: membershipPlanId,
         membership_type: membershipData.membershipType,
         start_date: membershipData.startDate,
         end_date: membershipData.endDate,
