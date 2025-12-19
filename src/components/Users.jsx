@@ -460,26 +460,66 @@ const Users = () => {
       return
     }
 
+    // Save the data for logging BEFORE resetting the form
+    const newMembershipData = {
+      membershipType: changeMembershipFormData.membershipType,
+      startDate: changeMembershipFormData.startDate,
+      endDate: changeMembershipFormData.endDate,
+      status: changeMembershipFormData.status
+    }
+    const oldMembershipData = {
+      type: selectedUser.membershipType,
+      startDate: selectedUser.membershipStartDate,
+      endDate: selectedUser.membershipEndDate,
+      status: selectedUser.membershipStatus
+    }
+    const userInfo = {
+      id: selectedUser.id,
+      membershipId: selectedUser.currentMembershipId,
+      name: `${selectedUser.firstName} ${selectedUser.lastName}`
+    }
+
     try {
       // Update the user's membership directly
       await usersService.updateUser(selectedUser.id, {
-        membershipType: changeMembershipFormData.membershipType,
-        membershipStartDate: changeMembershipFormData.startDate,
-        membershipEndDate: changeMembershipFormData.endDate,
-        membershipStatus: changeMembershipFormData.status // Keep as 'active', 'expired', or 'cancelled'
+        membershipType: newMembershipData.membershipType,
+        membershipStartDate: newMembershipData.startDate,
+        membershipEndDate: newMembershipData.endDate,
+        membershipStatus: newMembershipData.status
       })
 
       // If there's a current membership, update it as well
       if (selectedUser.currentMembershipId) {
         await membershipsService.updateMembership(selectedUser.currentMembershipId, {
-          membershipType: changeMembershipFormData.membershipType,
-          startDate: changeMembershipFormData.startDate,
-          endDate: changeMembershipFormData.endDate,
-          status: changeMembershipFormData.status,
+          membershipType: newMembershipData.membershipType,
+          startDate: newMembershipData.startDate,
+          endDate: newMembershipData.endDate,
+          status: newMembershipData.status,
           updateUser: true
         })
       }
 
+      // Log the membership change BEFORE resetting state
+      try {
+        const performedBy = await getCurrentUserForLogging()
+        await logsService.logMembershipChanged(
+          userInfo.membershipId,
+          userInfo.id,
+          userInfo.name,
+          oldMembershipData,
+          {
+            type: newMembershipData.membershipType,
+            startDate: newMembershipData.startDate,
+            endDate: newMembershipData.endDate,
+            status: newMembershipData.status
+          },
+          performedBy
+        )
+      } catch (logError) {
+        console.error('Error logging membership change:', logError)
+      }
+
+      // Reset form state after logging
       setShowChangeMembershipModal(false)
       setChangeMembershipFormData({
         membershipType: '',
@@ -487,26 +527,6 @@ const Users = () => {
         endDate: '',
         status: 'active'
       })
-
-      // Log the membership change
-      try {
-        const performedBy = await getCurrentUserForLogging()
-        await logsService.logMembershipChanged(
-          selectedUser.currentMembershipId,
-          selectedUser.id,
-          `${selectedUser.firstName} ${selectedUser.lastName}`,
-          {
-            type: selectedUser.membershipType,
-            startDate: selectedUser.membershipStartDate,
-            endDate: selectedUser.membershipEndDate,
-            status: selectedUser.membershipStatus
-          },
-          changeMembershipFormData,
-          performedBy
-        )
-      } catch (logError) {
-        console.error('Error logging membership change:', logError)
-      }
 
       toast.success('Membresía actualizada exitosamente')
       fetchUsers()
