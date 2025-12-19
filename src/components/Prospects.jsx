@@ -62,6 +62,12 @@ const Prospects = () => {
     }
   }
 
+  const getSellerName = (sellerId) => {
+    if (!sellerId) return 'Sin asignar'
+    const seller = sellers.find(s => s.id === sellerId)
+    return seller ? `${seller.first_name} ${seller.last_name}` : 'Sin asignar'
+  }
+
   const handleOpenConvertModal = (prospect) => {
     setProspectToConvert(prospect)
     setConvertFormData({
@@ -297,6 +303,16 @@ const Prospects = () => {
               )
             },
             {
+              field: 'assignedSellerId',
+              headerName: 'Vendedor',
+              width: 150,
+              renderCell: (params) => (
+                <span className="text-text-secondary text-sm">
+                  {getSellerName(params.value)}
+                </span>
+              )
+            },
+            {
               field: 'capturedAt',
               headerName: 'Fecha',
               width: 120,
@@ -348,7 +364,8 @@ const Prospects = () => {
               lastName: params.row.lastName || '',
               phone: params.row.phone || '',
               trainingGoal: params.row.trainingGoal || '',
-              notes: params.row.notes || ''
+              notes: params.row.notes || '',
+              assignedSellerId: params.row.assignedSellerId || null
             })
             setHasChanges(false)
             setShowSidePanel(true)
@@ -433,6 +450,22 @@ const Prospects = () => {
                     <option value="preparacion-competencias">Preparación para competencias</option>
                     <option value="rehabilitacion-fisica">Rehabilitación física</option>
                     <option value="reduccion-estres">Reducción del estrés</option>
+                  </select>
+                </div>
+
+                <div className="border-t border-border-default pt-4">
+                  <label className="form-label">Vendedor Asignado</label>
+                  <select
+                    value={editFormData.assignedSellerId || ''}
+                    onChange={(e) => handleFormChange('assignedSellerId', e.target.value || null)}
+                    className="form-select w-full"
+                  >
+                    <option value="">Sin asignar</option>
+                    {sellers.map(seller => (
+                      <option key={seller.id} value={seller.id}>
+                        {seller.first_name} {seller.last_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

@@ -1,4 +1,6 @@
 import { supabase, toCamelCase, toSnakeCase } from '../lib/supabase'
+import logsService from './logsService'
+import { getCurrentUserForLogging } from '../utils/logHelpers'
 
 export const prospectsService = {
   async getProspects() {
@@ -105,6 +107,21 @@ export const prospectsService = {
         .eq('id', prospectId)
 
       if (prospectError) throw prospectError
+
+      // Log the conversion
+      try {
+        const performedBy = await getCurrentUserForLogging()
+        const prospectName = `${prospectData.firstName || additionalData.firstName} ${prospectData.lastName || additionalData.lastName}`
+        await logsService.logProspectConvertedToLead(
+          prospectId,
+          lead.id,
+          prospectName,
+          performedBy
+        )
+      } catch (logError) {
+        console.error('Error logging prospect conversion:', logError)
+        // Don't throw - logging should never break the main flow
+      }
 
       return { data: toCamelCase(lead) }
     } catch (error) {

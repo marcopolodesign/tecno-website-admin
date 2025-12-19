@@ -11,6 +11,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { DataGrid } from '@mui/x-data-grid'
 import { leadsService } from '../services/leadsService'
+import { sellersService } from '../services/sellersService'
+import membershipPlansService from '../services/membershipPlansService'
 import { dataGridStyles, toastOptions } from '../lib/themeStyles'
 
 const Leads = () => {
@@ -24,10 +26,12 @@ const Leads = () => {
   const [editingStatus, setEditingStatus] = useState('')
   const [editFormData, setEditFormData] = useState({})
   const [hasChanges, setHasChanges] = useState(false)
+  const [sellers, setSellers] = useState([])
+  const [membershipPlans, setMembershipPlans] = useState([])
   const [showConvertModal, setShowConvertModal] = useState(false)
   const [leadToConvert, setLeadToConvert] = useState(null)
   const [convertFormData, setConvertFormData] = useState({
-    membershipType: 'mensual',
+    membershipType: 'Socio_Basic',
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     emergencyContact: '',
@@ -56,6 +60,8 @@ const Leads = () => {
 
   useEffect(() => {
     fetchLeads()
+    fetchSellers()
+    fetchMembershipPlans()
   }, [])
 
   useEffect(() => {
@@ -71,6 +77,52 @@ const Leads = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchSellers = async () => {
+    try {
+      const response = await sellersService.getSellers()
+      setSellers(response.data || [])
+    } catch (error) {
+      console.error('Error fetching sellers:', error)
+    }
+  }
+
+  const fetchMembershipPlans = async () => {
+    try {
+      const response = await membershipPlansService.getPlans()
+      setMembershipPlans(response.data || [])
+    } catch (error) {
+      console.error('Error fetching membership plans:', error)
+    }
+  }
+
+  // Get price based on selected plan and payment method
+  const getCalculatedPrice = (planName, paymentMethod) => {
+    const plan = membershipPlans.find(p => p.name === planName)
+    if (!plan) return ''
+    return membershipPlansService.getPriceForPaymentMethod(plan, paymentMethod)
+  }
+
+  // Handle membership type or payment method change with auto-price
+  const handleConvertFormChange = (field, value) => {
+    const newFormData = { ...convertFormData, [field]: value }
+    
+    // Auto-calculate price when membership type or payment method changes
+    if (field === 'membershipType' || field === 'paymentMethod') {
+      const planName = field === 'membershipType' ? value : convertFormData.membershipType
+      const method = field === 'paymentMethod' ? value : convertFormData.paymentMethod
+      const calculatedPrice = getCalculatedPrice(planName, method)
+      newFormData.paymentAmount = calculatedPrice
+    }
+    
+    setConvertFormData(newFormData)
+  }
+
+  const getSellerName = (sellerId) => {
+    if (!sellerId) return 'Sin asignar'
+    const seller = sellers.find(s => s.id === sellerId)
+    return seller ? `${seller.first_name} ${seller.last_name}` : 'Sin asignar'
   }
 
   const filterLeads = () => {
@@ -188,13 +240,22 @@ const Leads = () => {
     setLeadToConvert(lead)
     const endDate = new Date()
     endDate.setMonth(endDate.getMonth() + 1)
+    
+    // Default to Socio_Basic for new members with efectivo payment
+    const defaultPlan = 'Socio_Basic'
+    const defaultPaymentMethod = 'efectivo'
+    const initialPrice = getCalculatedPrice(defaultPlan, defaultPaymentMethod)
+    
     setConvertFormData({
-      membershipType: 'mensual',
+      membershipType: defaultPlan,
       startDate: new Date().toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0],
       emergencyContact: '',
       emergencyPhone: '',
-      medicalNotes: ''
+      medicalNotes: '',
+      paymentMethod: defaultPaymentMethod,
+      paymentAmount: initialPrice || 60000,
+      paymentNotes: ''
     })
     setShowConvertModal(true)
   }
@@ -466,6 +527,16 @@ const Leads = () => {
               )
             },
             {
+              field: 'assignedSellerId',
+              headerName: 'Vendedor',
+              width: 150,
+              renderCell: (params) => (
+                <span className="text-text-secondary text-sm">
+                  {getSellerName(params.value)}
+                </span>
+              )
+            },
+            {
               field: 'submittedAt',
               headerName: 'Fecha',
               width: 120,
@@ -517,7 +588,8 @@ const Leads = () => {
               firstName: params.row.firstName || '',
               lastName: params.row.lastName || '',
               phone: params.row.phone || '',
-              notes: params.row.notes || ''
+              notes: params.row.notes || '',
+              assignedSellerId: params.row.assignedSellerId || null
             })
             setHasChanges(false)
             setShowSidePanel(true)
@@ -647,6 +719,22 @@ const Leads = () => {
                       Guardar Estado
                     </button>
                   )}
+                </div>
+
+                <div className="border-t border-border-default pt-4">
+                  <label className="form-label">Vendedor Asignado</label>
+                  <select
+                    value={editFormData.assignedSellerId || ''}
+                    onChange={(e) => handleFormChange('assignedSellerId', e.target.value || null)}
+                    className="form-select w-full"
+                  >
+                    <option value="">Sin asignar</option>
+                    {sellers.map(seller => (
+                      <option key={seller.id} value={seller.id}>
+                        {seller.first_name} {seller.last_name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -792,13 +880,14 @@ const Leads = () => {
                 <select
                   className="form-input"
                   value={convertFormData.membershipType}
-                  onChange={(e) => setConvertFormData({...convertFormData, membershipType: e.target.value})}
+                  onChange={(e) => handleConvertFormChange('membershipType', e.target.value)}
                   required
                 >
-                  <option value="mensual">Mensual</option>
-                  <option value="trimestral">Trimestral</option>
-                  <option value="semestral">Semestral</option>
-                  <option value="anual">Anual</option>
+                  {membershipPlans.map(plan => (
+                    <option key={plan.id} value={plan.name}>
+                      {plan.name} ({plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -861,24 +950,29 @@ const Leads = () => {
                     <select
                       className="form-input"
                       value={convertFormData.paymentMethod}
-                      onChange={(e) => setConvertFormData({...convertFormData, paymentMethod: e.target.value})}
+                      onChange={(e) => handleConvertFormChange('paymentMethod', e.target.value)}
                     >
-                      <option value="efectivo">Efectivo</option>
-                      <option value="tarjeta">Tarjeta</option>
-                      <option value="transferencia">Transferencia</option>
-                      <option value="mercadopago">Mercado Pago</option>
+                      <option value="efectivo">Efectivo (Promo)</option>
+                      <option value="debito_automatico">Débito Automático</option>
+                      <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">Monto (opcional)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={convertFormData.paymentAmount}
-                      onChange={(e) => setConvertFormData({...convertFormData, paymentAmount: e.target.value})}
-                      placeholder="Dejar vacío para usar precio de plan"
-                      step="0.01"
-                    />
+                    <label className="form-label">Monto *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
+                      <input
+                        type="number"
+                        className="form-input pl-7"
+                        value={convertFormData.paymentAmount}
+                        onChange={(e) => setConvertFormData({...convertFormData, paymentAmount: e.target.value})}
+                        placeholder="0"
+                        step="1"
+                      />
+                    </div>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      Precio sugerido según plan y método de pago. Editar para casos especiales.
+                    </p>
                   </div>
                   <div>
                     <label className="form-label">Notas de Pago</label>

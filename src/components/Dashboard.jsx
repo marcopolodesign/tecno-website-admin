@@ -41,6 +41,7 @@ const Dashboard = () => {
     users: []
   })
   const [loading, setLoading] = useState(true)
+  const [funnelData, setFunnelData] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
@@ -53,13 +54,17 @@ const Dashboard = () => {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
 
-      const [usersData, revenueData, expiringData] = await Promise.allSettled([
+      const [usersData, prospectsData, leadsData, revenueData, expiringData] = await Promise.allSettled([
         usersService.getUsers(),
+        prospectsService.getProspects(),
+        leadsService.getLeads(),
         paymentsService.getRevenueStats(startOfMonth, endOfMonth),
         membershipsService.getExpiringMemberships(30)
       ])
-      
+
       const users = usersData.status === 'fulfilled' ? (usersData.value.data || []) : []
+      const prospects = prospectsData.status === 'fulfilled' ? (prospectsData.value.data || []) : []
+      const leads = leadsData.status === 'fulfilled' ? (leadsData.value.data || []) : []
       const revenue = revenueData.status === 'fulfilled' ? (revenueData.value.data || {}) : {}
       const expiring = expiringData.status === 'fulfilled' ? (expiringData.value.data || []) : []
       
@@ -72,12 +77,20 @@ const Dashboard = () => {
         freeUsers: users.filter(user => user.membershipType === 'free').length
       }
       
+      // Create funnel data
+      const funnelStats = [
+        { name: 'Prospectos', value: prospects.length, color: '#3b82f6' },
+        { name: 'Leads', value: leads.length, color: '#f59e0b' },
+        { name: 'Usuarios', value: users.length, color: '#10b981' }
+      ]
+
       setStats(newStats)
+      setFunnelData(funnelStats)
       setRevenueStats(revenue)
       setExpiringMemberships(expiring)
       setRecentItems({
-        prospects: [],
-        leads: [],
+        prospects: prospects.slice(0, 3),
+        leads: leads.slice(0, 3),
         users: users.slice(0, 3)
       })
     } catch (error) {

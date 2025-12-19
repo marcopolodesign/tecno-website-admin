@@ -45,6 +45,23 @@ const membershipPlansService = {
     }
   },
 
+  // Helper to get price based on payment method
+  getPriceForPaymentMethod(plan, paymentMethod) {
+    if (!plan) return 0
+    switch (paymentMethod) {
+      case 'efectivo':
+        return plan.priceEfectivo || plan.price
+      case 'debito_automatico':
+        return plan.priceDebitoAutomatico || plan.price
+      case 'tarjeta':
+      case 'transferencia':
+      case 'tarjeta_transferencia':
+        return plan.priceTarjetaTransferencia || plan.price
+      default:
+        return plan.price
+    }
+  },
+
   async getPlan(id) {
     try {
       const { data, error } = await supabase

@@ -1,6 +1,26 @@
 import { supabase, toCamelCase, toSnakeCase } from '../lib/supabase'
 import membershipsService from './membershipsService'
 import membershipPlansService from './membershipPlansService'
+import logsService from './logsService'
+import { getCurrentUserForLogging } from '../utils/logHelpers'
+
+// Map frontend training goal values to database enum values
+const trainingGoalMap = {
+  'perdida-peso': 'weight_loss',
+  'aumento-masa-muscular': 'muscle_gain',
+  'mejora-resistencia': 'general_fitness',
+  'tonificacion': 'general_fitness',
+  'entrenamiento-funcional': 'general_fitness',
+  'preparacion-competencias': 'sports_performance',
+  'rehabilitacion': 'rehabilitation',
+  'reduccion-estres': 'general_fitness',
+  // Direct mappings (in case already in DB format)
+  'weight_loss': 'weight_loss',
+  'muscle_gain': 'muscle_gain',
+  'general_fitness': 'general_fitness',
+  'sports_performance': 'sports_performance',
+  'rehabilitation': 'rehabilitation'
+}
 
 export const leadsService = {
   async getLeads() {
@@ -55,10 +75,9 @@ export const leadsService = {
         last_name: data.lastName || '',
         email: data.email,
         phone: data.phone,
-        training_goal: data.trainingGoal,
-        status: 'nuevo',
+        training_goal: trainingGoalMap[data.trainingGoal] || data.trainingGoal,
+        status: 'new',
         notes: data.notes || '',
-        source: data.source || 'manual',
         submitted_at: new Date().toISOString(),
         converted_to_user: false,
         utm_source: data.utmSource || null,
@@ -66,6 +85,11 @@ export const leadsService = {
         utm_campaign: data.utmCampaign || null,
         utm_term: data.utmTerm || null,
         utm_content: data.utmContent || null
+      }
+      
+      // Add source field only if provided (requires schema cache refresh after adding column)
+      if (data.source) {
+        leadData.source = data.source
       }
 
       const { data: result, error } = await supabase
@@ -132,9 +156,8 @@ export const leadsService = {
 
   async convertToUser(leadId, leadData, membershipData, paymentData = null) {
     try {
-      // Get current user for profile association
+      // Get current user for logging (optional - don't fail if not authenticated)
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('User not authenticated')
 
       // Get membership plan to get price
       const { data: plans } = await membershipPlansService.getPlans()
@@ -143,7 +166,6 @@ export const leadsService = {
 
       // Create user (customer) with lead data
       const userData = {
-        profile_id: user.id,
         lead_id: leadId,
         first_name: leadData.firstName,
         last_name: leadData.lastName,
@@ -151,9 +173,9 @@ export const leadsService = {
         phone: leadData.phone,
         training_goal: leadData.trainingGoal,
         membership_type: membershipData.membershipType,
-        membership_status: 'activo',
-        start_date: membershipData.startDate,
-        end_date: membershipData.endDate,
+        membership_status: 'active',
+        membership_start_date: membershipData.startDate,
+        membership_end_date: membershipData.endDate,
         emergency_contact: membershipData.emergencyContact || '',
         emergency_phone: membershipData.emergencyPhone || '',
         medical_notes: membershipData.medicalNotes || '',
@@ -199,13 +221,36 @@ export const leadsService = {
       const { error: leadError } = await supabase
         .from('leads')
         .update({
-          status: 'convertido',
+          status: 'converted',
           converted_to_user: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId)
 
       if (leadError) throw leadError
+
+      // Log the conversion
+      try {
+        const performedBy = await getCurrentUserForLogging()
+        const userName = `${leadData.firstName} ${leadData.lastName}`
+        await logsService.logLeadConvertedToUser(
+          leadId,
+          customer.id,
+          customer.current_membership_id,
+          userName,
+          {
+            type: membershipData.membershipType,
+            startDate: membershipData.startDate,
+            endDate: membershipData.endDate,
+            paymentMethod: paymentData?.paymentMethod || 'efectivo',
+            paymentAmount: paymentData?.amount || selectedPlan.price
+          },
+          performedBy
+        )
+      } catch (logError) {
+        console.error('Error logging lead conversion:', logError)
+        // Don't throw - logging should never break the main flow
+      }
 
       return { data: toCamelCase(customer) }
     } catch (error) {

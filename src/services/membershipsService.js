@@ -149,9 +149,9 @@ const membershipsService = {
         .update({ 
           current_membership_id: membershipResult.id,
           membership_type: membershipData.membershipType,
-          membership_status: 'activo',
-          start_date: membershipData.startDate,
-          end_date: membershipData.endDate
+          membership_status: 'active',
+          membership_start_date: membershipData.startDate,
+          membership_end_date: membershipData.endDate
         })
         .eq('id', membershipData.userId)
 
@@ -214,9 +214,8 @@ const membershipsService = {
         const { error: userError } = await supabase
           .from('users')
           .update({
-            membership_status: membershipData.status === 'active' ? 'activo' : 
-                             membershipData.status === 'expired' ? 'vencido' : 'cancelado',
-            end_date: membershipData.endDate
+            membership_status: membershipData.status,
+            membership_end_date: membershipData.endDate
           })
           .eq('current_membership_id', id)
 

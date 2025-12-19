@@ -60,6 +60,7 @@ export const usersService = {
         emergency_phone: data.emergencyPhone || '',
         medical_notes: data.medicalNotes || '',
         notes: data.notes || '',
+        source: data.source || null,
         utm_source: data.utmSource || null,
         utm_medium: data.utmMedium || null,
         utm_campaign: data.utmCampaign || null,
