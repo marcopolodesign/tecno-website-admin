@@ -228,23 +228,28 @@ const membershipsService = {
 
   async renewMembership(userId, currentMembershipId, renewalData, paymentData) {
     try {
-      // 1. Mark current membership as expired
-      const { error: expireError } = await supabase
-        .from('memberships')
-        .update({ status: 'expired' })
-        .eq('id', currentMembershipId)
+      // 1. Mark current membership as expired (only if it exists)
+      if (currentMembershipId) {
+        const { error: expireError } = await supabase
+          .from('memberships')
+          .update({ status: 'expired' })
+          .eq('id', currentMembershipId)
 
-      if (expireError) throw expireError
+        if (expireError) {
+          console.error('Error expiring current membership:', expireError)
+          // Don't throw - continue with renewal even if expire fails
+        }
+      }
 
-      // 2. Create new membership with is_renewal = true
+      // 2. Create new membership with is_renewal = true (if there was a previous membership)
       const newMembership = {
         userId,
         membershipPlanId: renewalData.membershipPlanId,
         membershipType: renewalData.membershipType,
         startDate: renewalData.startDate,
         endDate: renewalData.endDate,
-        isRenewal: true,
-        previousMembershipId: currentMembershipId
+        isRenewal: !!currentMembershipId,
+        previousMembershipId: currentMembershipId || null
       }
 
       return await this.createMembership(newMembership, paymentData)
