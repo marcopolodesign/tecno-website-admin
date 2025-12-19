@@ -13,6 +13,9 @@ import { sellersService } from '../services/sellersService'
 import membershipPlansService from '../services/membershipPlansService'
 import { dataGridStyles, toastOptions } from '../lib/themeStyles'
 import membershipsService from '../services/membershipsService'
+import logsService from '../services/logsService'
+import { getCurrentUserForLogging } from '../utils/logHelpers'
+import LogsTimeline from './LogsTimeline'
 
 const Users = () => {
   const [users, setUsers] = useState([])
@@ -410,6 +413,28 @@ const Users = () => {
         paymentAmount: '',
         paymentNotes: ''
       })
+
+      // Log the membership renewal
+      try {
+        const performedBy = await getCurrentUserForLogging()
+        await logsService.logMembershipRenewed(
+          selectedUser.currentMembershipId,
+          null, // New membership ID will be set by the service
+          selectedUser.id,
+          `${selectedUser.firstName} ${selectedUser.lastName}`,
+          {
+            type: renewalFormData.membershipType,
+            startDate: renewalFormData.startDate,
+            endDate: renewalFormData.endDate,
+            paymentMethod: renewalFormData.paymentMethod,
+            paymentAmount: renewalFormData.paymentAmount
+          },
+          performedBy
+        )
+      } catch (logError) {
+        console.error('Error logging membership renewal:', logError)
+      }
+
       fetchUsers()
       toast.success('Membresía renovada exitosamente')
     } catch (error) {
@@ -431,8 +456,7 @@ const Users = () => {
         membershipType: changeMembershipFormData.membershipType,
         membershipStartDate: changeMembershipFormData.startDate,
         membershipEndDate: changeMembershipFormData.endDate,
-        membershipStatus: changeMembershipFormData.status === 'active' ? 'activo' : 
-                         changeMembershipFormData.status === 'expired' ? 'vencido' : 'cancelado'
+        membershipStatus: changeMembershipFormData.status // Keep as 'active', 'expired', or 'cancelled'
       })
 
       // If there's a current membership, update it as well
@@ -453,6 +477,26 @@ const Users = () => {
         endDate: '',
         status: 'active'
       })
+
+      // Log the membership change
+      try {
+        const performedBy = await getCurrentUserForLogging()
+        await logsService.logMembershipChanged(
+          selectedUser.currentMembershipId,
+          selectedUser.id,
+          `${selectedUser.firstName} ${selectedUser.lastName}`,
+          {
+            type: selectedUser.membershipType,
+            startDate: selectedUser.membershipStartDate,
+            endDate: selectedUser.membershipEndDate,
+            status: selectedUser.membershipStatus
+          },
+          changeMembershipFormData,
+          performedBy
+        )
+      } catch (logError) {
+        console.error('Error logging membership change:', logError)
+      }
 
       toast.success('Membresía actualizada exitosamente')
       fetchUsers()
@@ -905,6 +949,11 @@ const Users = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Activity Logs */}
+                <div className="border-t border-border-default pt-4">
+                  <LogsTimeline userId={selectedUser.id} limit={10} />
+                </div>
               </div>
 
             </div>
