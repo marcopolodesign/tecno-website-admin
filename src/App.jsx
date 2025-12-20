@@ -10,6 +10,8 @@ import Coaches from './components/Coaches'
 import Locations from './components/Locations'
 import ContentManagement from './components/ContentManagement'
 import MembershipPlans from './components/MembershipPlans'
+import Exercises from './components/Exercises'
+import Routines from './components/Routines'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { authService } from './services/authService'
@@ -87,13 +89,14 @@ function App() {
     // Seller (Front Desk)
     if (role === 'front_desk') {
       if (route === '/dashboard') return false
+      if (['/exercises', '/routines'].includes(route)) return false // Fitness is for coaches
       return true // Access to prospects, leads, users, content
     }
 
-    // Coach
+    // Coach - has access to fitness features
     if (role === 'coach') {
       if (['/dashboard', '/leads', '/prospects'].includes(route)) return false
-      return true // Access to users, content
+      return true // Access to users, content, exercises, routines
     }
 
     return false
@@ -138,6 +141,10 @@ function App() {
                 {canAccess('/coaches') && <Route path="/coaches" element={<Coaches />} />}
                 {canAccess('/locations') && <Route path="/locations" element={<Locations />} />}
                 {canAccess('/content') && <Route path="/content" element={<ContentManagement />} />}
+                
+                {/* Fitness Routes */}
+                {canAccess('/exercises') && <Route path="/exercises" element={<Exercises />} />}
+                {canAccess('/routines') && <Route path="/routines" element={<Routines />} />}
                 
                 {/* Fallback for unauthorized routes */}
                 <Route path="*" element={<Navigate to={canAccess('/dashboard') ? "/dashboard" : "/users"} replace />} />

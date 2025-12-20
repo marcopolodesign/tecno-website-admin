@@ -10,13 +10,16 @@ import {
   AcademicCapIcon,
   MapPinIcon,
   CreditCardIcon,
-  XMarkIcon
+  XMarkIcon,
+  // Fitness icons
+  ListBulletIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline'
 
 const Sidebar = ({ userRole, mobileMenuOpen, onCloseMobileMenu }) => {
   const location = useLocation()
 
-  const allNavigation = [
+  const managementNav = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, roles: ['super_admin', 'admin'] },
     { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
     { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
@@ -28,7 +31,19 @@ const Sidebar = ({ userRole, mobileMenuOpen, onCloseMobileMenu }) => {
     { name: 'Contenido', href: '/content', icon: DocumentTextIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
   ]
 
-  const navigation = allNavigation.filter(item => {
+  const fitnessNav = [
+    { name: 'Ejercicios', href: '/exercises', icon: ListBulletIcon, roles: ['super_admin', 'admin', 'coach'] },
+    { name: 'Rutinas', href: '/routines', icon: ClipboardDocumentListIcon, roles: ['super_admin', 'admin', 'coach'] },
+  ]
+
+  const allNavigation = [...managementNav, ...fitnessNav]
+
+  const navigation = managementNav.filter(item => {
+    if (!userRole) return false
+    return item.roles.includes(userRole)
+  })
+
+  const fitnessNavigation = fitnessNav.filter(item => {
     if (!userRole) return false
     return item.roles.includes(userRole)
   })
@@ -77,6 +92,26 @@ const Sidebar = ({ userRole, mobileMenuOpen, onCloseMobileMenu }) => {
             </Link>
           )
         })}
+
+        {fitnessNavigation.length > 0 && (
+          <>
+            <div className="section-header mt-4">Fitness</div>
+            {fitnessNavigation.map((item) => {
+              const isActive = location.pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={handleNavClick}
+                  className={isActive ? 'nav-item-active' : 'nav-item-inactive'}
+                >
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  <span>{item.name}</span>
+                </Link>
+              )
+            })}
+          </>
+        )}
       </nav>
 
       {/* Footer */}
