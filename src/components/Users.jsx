@@ -621,10 +621,9 @@ const Users = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">Todos</option>
-              <option value="activo">Activo</option>
-              <option value="inactivo">Inactivo</option>
-              <option value="suspendido">Suspendido</option>
-              <option value="vencido">Vencido</option>
+              <option value="active">Activo</option>
+              <option value="expired">Vencido</option>
+              <option value="cancelled">Cancelado</option>
             </select>
           </div>
         </div>
