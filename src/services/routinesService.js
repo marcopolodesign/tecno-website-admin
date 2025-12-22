@@ -1,6 +1,39 @@
 import { supabase, toCamelCase, toSnakeCase, getCurrentUser } from '../lib/supabase'
 
 export const routinesService = {
+  // ==================== BOXES (STATIONS) ====================
+  async getBoxes() {
+    try {
+      const { data, error } = await supabase
+        .from('boxes')
+        .select('*')
+        .eq('is_active', true)
+        .order('box_number', { ascending: true })
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error fetching boxes:', error)
+      throw error
+    }
+  },
+
+  async getBoxElements(boxId) {
+    try {
+      const { data, error } = await supabase
+        .from('box_elements')
+        .select('*')
+        .eq('box_id', boxId)
+        .order('element_name', { ascending: true })
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error fetching box elements:', error)
+      throw error
+    }
+  },
+
   // ==================== TRAINING ROUTINES ====================
   async getRoutines(clientId = null, status = null) {
     try {
@@ -64,10 +97,19 @@ export const routinesService = {
             session_exercises (
               id,
               exercise_order,
+              box_id,
+              box_number,
               sets_reps,
               rest_time,
+              repetition_time,
               weight_kg,
+              micro_pause,
               notes,
+              boxes (
+                id,
+                name,
+                box_number
+              ),
               exercises (
                 id,
                 name,
@@ -174,10 +216,19 @@ export const routinesService = {
           session_exercises (
             id,
             exercise_order,
+            box_id,
+            box_number,
             sets_reps,
             rest_time,
+            repetition_time,
             weight_kg,
+            micro_pause,
             notes,
+            boxes (
+              id,
+              name,
+              box_number
+            ),
             exercises (
               id,
               name,
@@ -193,6 +244,19 @@ export const routinesService = {
       return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching sessions:', error)
+      throw error
+    }
+  },
+
+  async getSessionExercisesByBox(sessionId) {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_session_exercises_by_box', { p_session_id: sessionId })
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error fetching session exercises by box:', error)
       throw error
     }
   },
@@ -260,9 +324,13 @@ export const routinesService = {
         session_id: sessionExerciseData.sessionId,
         exercise_id: sessionExerciseData.exerciseId,
         exercise_order: sessionExerciseData.exerciseOrder,
+        box_id: sessionExerciseData.boxId || null,
+        box_number: sessionExerciseData.boxNumber || null,
         sets_reps: sessionExerciseData.setsReps,
         rest_time: sessionExerciseData.restTime || '60s',
+        repetition_time: sessionExerciseData.repetitionTime || null,
         weight_kg: sessionExerciseData.weightKg || null,
+        micro_pause: sessionExerciseData.microPause || 0,
         notes: sessionExerciseData.notes || null
       }
 
@@ -271,6 +339,11 @@ export const routinesService = {
         .insert([insertData])
         .select(`
           *,
+          boxes (
+            id,
+            name,
+            box_number
+          ),
           exercises (
             id,
             name,
@@ -368,15 +441,19 @@ export const routinesService = {
           description: session.description
         })
 
-        // Duplicate exercises in the session
+        // Duplicate exercises in the session (including box info)
         for (const exercise of session.sessionExercises || []) {
           await this.addExerciseToSession({
             sessionId: newSession.id,
             exerciseId: exercise.exercises.id,
             exerciseOrder: exercise.exerciseOrder,
+            boxId: exercise.boxId,
+            boxNumber: exercise.boxNumber,
             setsReps: exercise.setsReps,
             restTime: exercise.restTime,
+            repetitionTime: exercise.repetitionTime,
             weightKg: exercise.weightKg,
+            microPause: exercise.microPause,
             notes: exercise.notes
           })
         }

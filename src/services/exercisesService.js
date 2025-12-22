@@ -155,6 +155,16 @@ export const exercisesService = {
               id,
               name
             )
+          ),
+          easier_variation:exercises!easier_variation_id (
+            id,
+            name,
+            difficulty_level
+          ),
+          harder_variation:exercises!harder_variation_id (
+            id,
+            name,
+            difficulty_level
           )
         `)
         .order('name', { ascending: true })
@@ -190,6 +200,18 @@ export const exercisesService = {
               id,
               name
             )
+          ),
+          easier_variation:exercises!easier_variation_id (
+            id,
+            name,
+            difficulty_level,
+            video_thumbnail_url
+          ),
+          harder_variation:exercises!harder_variation_id (
+            id,
+            name,
+            difficulty_level,
+            video_thumbnail_url
           )
         `)
         .eq('id', id)
@@ -300,6 +322,41 @@ export const exercisesService = {
       console.error('Error searching exercises:', error)
       throw error
     }
+  },
+
+  // Get simplified list for modification dropdowns
+  async getExercisesForSelect() {
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('id, name, difficulty_level, category_id')
+        .order('name', { ascending: true })
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error fetching exercises for select:', error)
+      throw error
+    }
+  },
+
+  // Helper to generate video embed HTML
+  getVideoEmbed(exercise, width = 320, height = 180) {
+    if (!exercise?.videoUrl) return null
+    
+    if (exercise.videoPlatform === 'youtube' && exercise.videoEmbedId) {
+      return `<iframe width="${width}" height="${height}" src="https://www.youtube.com/embed/${exercise.videoEmbedId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+    }
+    
+    if (exercise.videoPlatform === 'vimeo' && exercise.videoEmbedId) {
+      return `<iframe width="${width}" height="${height}" src="https://player.vimeo.com/video/${exercise.videoEmbedId}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`
+    }
+    
+    if (exercise.videoPlatform === 'direct') {
+      return `<video width="${width}" height="${height}" controls><source src="${exercise.videoUrl}" type="video/mp4">Your browser does not support the video tag.</video>`
+    }
+    
+    return null
   }
 }
 

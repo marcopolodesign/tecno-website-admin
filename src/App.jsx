@@ -16,10 +16,14 @@ import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { authService } from './services/authService'
 
+// Emails allowed to see fitness section (beta feature)
+const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com']
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState(null)
+  const [userEmail, setUserEmail] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -33,6 +37,7 @@ function App() {
           if (isValid) {
             const profile = await authService.getCurrentUserProfile()
             setUserRole(profile?.role || 'coach') // Fallback/Default
+            setUserEmail(profile?.email || null)
           } else {
             localStorage.removeItem('admin_token')
           }
@@ -54,9 +59,10 @@ function App() {
   const handleLogin = (token) => {
     localStorage.setItem('admin_token', token)
     setIsAuthenticated(true)
-    // Update role immediately after login
+    // Update role and email immediately after login
     authService.getCurrentUserProfile().then(profile => {
       setUserRole(profile?.role)
+      setUserEmail(profile?.email)
     })
   }
 
@@ -75,10 +81,18 @@ function App() {
     setMobileMenuOpen(false)
   }
 
+  // Check if user can see fitness features (email-restricted beta)
+  const canSeeFitness = userEmail && FITNESS_ALLOWED_EMAILS.includes(userEmail.toLowerCase())
+
   // Permission Logic
   const canAccess = (route) => {
     if (!userRole) return false
     const role = userRole // 'super_admin', 'admin', 'front_desk', 'coach'
+
+    // Fitness routes are restricted to specific emails
+    if (['/exercises', '/routines'].includes(route)) {
+      return canSeeFitness
+    }
 
     // Super Admin & Admin have full access
     if (role === 'super_admin' || role === 'admin') return true
@@ -89,14 +103,13 @@ function App() {
     // Seller (Front Desk)
     if (role === 'front_desk') {
       if (route === '/dashboard') return false
-      if (['/exercises', '/routines'].includes(route)) return false // Fitness is for coaches
       return true // Access to prospects, leads, users, content
     }
 
-    // Coach - has access to fitness features
+    // Coach - has access to fitness features (but only if email is allowed)
     if (role === 'coach') {
       if (['/dashboard', '/leads', '/prospects'].includes(route)) return false
-      return true // Access to users, content, exercises, routines
+      return true // Access to users, content
     }
 
     return false
@@ -122,6 +135,7 @@ function App() {
       <div className="min-h-screen bg-bg-primary flex">
         <Sidebar 
           userRole={userRole} 
+          userEmail={userEmail}
           mobileMenuOpen={mobileMenuOpen} 
           onCloseMobileMenu={closeMobileMenu} 
         />

@@ -149,7 +149,7 @@ const membershipPlansService = {
         const performedBy = await getCurrentUserForLogging()
 
         await logsService.createLog({
-          actionType: 'membership_plan_changed',
+          actionType: 'membership_updated',  // Using existing enum value for plan changes
           actionDescription: `Plan "${oldPlan.name}" modificado`,
           performedById: performedBy.id,
           performedByType: performedBy.type,

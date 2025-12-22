@@ -252,7 +252,7 @@ const Users = () => {
 
   const handleSaveEdit = async () => {
     try {
-      await usersService.updateUser(selectedUser.documentId, editFormData)
+      await usersService.updateUser(selectedUser.id, editFormData)
       setUsers(users.map(u => 
         u.id === selectedUser.id 
           ? { ...u, ...editFormData }
@@ -764,7 +764,7 @@ const Users = () => {
             
             // Handle other edits
             try {
-              await usersService.updateUser(newRow.documentId, {
+              await usersService.updateUser(newRow.id, {
                 firstName: newRow.firstName,
                 lastName: newRow.lastName,
                 phone: newRow.phone,

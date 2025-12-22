@@ -160,7 +160,7 @@ export const usersService = {
         const userName = `${oldUser.first_name} ${oldUser.last_name}`
 
         await logsService.createLog({
-          actionType: 'user_changed',
+          actionType: 'user_updated',  // Using existing enum value
           actionDescription: `Usuario ${userName} modificado`,
           performedById: performedBy.id,
           performedByType: performedBy.type,

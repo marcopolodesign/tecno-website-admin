@@ -16,7 +16,10 @@ import {
   ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline'
 
-const Sidebar = ({ userRole, mobileMenuOpen, onCloseMobileMenu }) => {
+// Emails allowed to see fitness section (beta feature)
+const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com']
+
+const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => {
   const location = useLocation()
 
   const managementNav = [
@@ -43,10 +46,13 @@ const Sidebar = ({ userRole, mobileMenuOpen, onCloseMobileMenu }) => {
     return item.roles.includes(userRole)
   })
 
-  const fitnessNavigation = fitnessNav.filter(item => {
+  // Only show fitness nav if user email is in allowed list
+  const canSeeFitness = userEmail && FITNESS_ALLOWED_EMAILS.includes(userEmail.toLowerCase())
+  
+  const fitnessNavigation = canSeeFitness ? fitnessNav.filter(item => {
     if (!userRole) return false
     return item.roles.includes(userRole)
-  })
+  }) : []
 
   const handleNavClick = () => {
     // Close mobile menu when navigating

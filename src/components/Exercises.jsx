@@ -7,7 +7,10 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  PlayCircleIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline'
 import exercisesService from '../services/exercisesService'
 import toast, { Toaster } from 'react-hot-toast'
@@ -44,7 +47,10 @@ export default function Exercises() {
     targetMuscles: [],
     equipmentNeeded: [],
     difficultyLevel: 'intermediate',
-    estimatedDuration: 0
+    estimatedDuration: 0,
+    videoUrl: '',
+    easierVariationId: '',
+    harderVariationId: ''
   })
 
   const [categoryForm, setCategoryForm] = useState({
@@ -136,7 +142,10 @@ export default function Exercises() {
         targetMuscles: exercise.targetMuscles || [],
         equipmentNeeded: exercise.equipmentNeeded || [],
         difficultyLevel: exercise.difficultyLevel || 'intermediate',
-        estimatedDuration: exercise.estimatedDuration || 0
+        estimatedDuration: exercise.estimatedDuration || 0,
+        videoUrl: exercise.videoUrl || '',
+        easierVariationId: exercise.easierVariationId || '',
+        harderVariationId: exercise.harderVariationId || ''
       })
     } else {
       setEditingItem(null)
@@ -148,7 +157,10 @@ export default function Exercises() {
         targetMuscles: [],
         equipmentNeeded: [],
         difficultyLevel: 'intermediate',
-        estimatedDuration: 0
+        estimatedDuration: 0,
+        videoUrl: '',
+        easierVariationId: '',
+        harderVariationId: ''
       })
     }
     setShowExerciseModal(true)
@@ -325,6 +337,15 @@ export default function Exercises() {
     )
   }
 
+  const getDifficultyBadgeText = (level) => {
+    const labels = {
+      beginner: 'Fácil',
+      intermediate: 'Medio',
+      advanced: 'Difícil'
+    }
+    return labels[level] || level
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -483,6 +504,15 @@ export default function Exercises() {
                                     <div className="flex items-center gap-2">
                                       <span className="text-sm font-medium text-text-primary">{exercise.name}</span>
                                       {getDifficultyBadge(exercise.difficultyLevel)}
+                                      {exercise.videoUrl && (
+                                        <PlayCircleIcon className="h-4 w-4 text-brand" title="Tiene video" />
+                                      )}
+                                      {(exercise.easierVariationId || exercise.harderVariationId) && (
+                                        <span className="flex items-center gap-0.5" title="Tiene modificaciones">
+                                          {exercise.easierVariationId && <ArrowTrendingDownIcon className="h-3.5 w-3.5 text-green-500" />}
+                                          {exercise.harderVariationId && <ArrowTrendingUpIcon className="h-3.5 w-3.5 text-red-500" />}
+                                        </span>
+                                      )}
                                     </div>
                                     {exercise.description && (
                                       <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{exercise.description}</p>
@@ -723,6 +753,73 @@ export default function Exercises() {
                       className="form-input"
                       min="0"
                     />
+                  </div>
+                </div>
+
+                {/* Video URL */}
+                <div>
+                  <label className="form-label flex items-center gap-2">
+                    <PlayCircleIcon className="h-4 w-4 text-brand" />
+                    Video Demo (YouTube/Vimeo URL)
+                  </label>
+                  <input
+                    type="url"
+                    value={exerciseForm.videoUrl}
+                    onChange={(e) => setExerciseForm({ ...exerciseForm, videoUrl: e.target.value })}
+                    className="form-input"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                  <p className="text-xs text-text-tertiary mt-1">
+                    Pega un link de YouTube o Vimeo. El thumbnail se genera automáticamente.
+                  </p>
+                </div>
+
+                {/* Modification Variations */}
+                <div className="border-t border-border-default pt-4">
+                  <label className="form-label mb-3">Modificaciones</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-text-secondary flex items-center gap-1 mb-1">
+                        <ArrowTrendingDownIcon className="h-3.5 w-3.5 text-green-500" />
+                        Variación Fácil
+                      </label>
+                      <select
+                        value={exerciseForm.easierVariationId}
+                        onChange={(e) => setExerciseForm({ ...exerciseForm, easierVariationId: e.target.value || null })}
+                        className="form-select text-sm"
+                      >
+                        <option value="">Sin variación</option>
+                        {exercises
+                          .filter(ex => ex.id !== editingItem?.id)
+                          .map(ex => (
+                            <option key={ex.id} value={ex.id}>
+                              {ex.name} ({getDifficultyBadgeText(ex.difficultyLevel)})
+                            </option>
+                          ))
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-text-secondary flex items-center gap-1 mb-1">
+                        <ArrowTrendingUpIcon className="h-3.5 w-3.5 text-red-500" />
+                        Variación Difícil
+                      </label>
+                      <select
+                        value={exerciseForm.harderVariationId}
+                        onChange={(e) => setExerciseForm({ ...exerciseForm, harderVariationId: e.target.value || null })}
+                        className="form-select text-sm"
+                      >
+                        <option value="">Sin variación</option>
+                        {exercises
+                          .filter(ex => ex.id !== editingItem?.id)
+                          .map(ex => (
+                            <option key={ex.id} value={ex.id}>
+                              {ex.name} ({getDifficultyBadgeText(ex.difficultyLevel)})
+                            </option>
+                          ))
+                        }
+                      </select>
+                    </div>
                   </div>
                 </div>
 
