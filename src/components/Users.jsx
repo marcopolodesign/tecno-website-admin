@@ -538,14 +538,12 @@ const Users = () => {
 
   const getTrainingGoalLabel = (goal) => {
     const goals = {
-      'perdida-peso': 'Pérdida de peso',
-      'aumento-masa-muscular': 'Aumento de masa muscular',
-      'mejora-resistencia': 'Mejora de resistencia',
-      'tonificacion': 'Tonificación',
-      'entrenamiento-funcional': 'Entrenamiento funcional',
-      'preparacion-competencias': 'Preparación para competencias',
-      'rehabilitacion-fisica': 'Rehabilitación física',
-      'reduccion-estres': 'Reducción del estrés'
+      // Database enum values
+      'weight_loss': 'Pérdida de peso',
+      'muscle_gain': 'Aumento de masa muscular',
+      'general_fitness': 'Fitness general',
+      'sports_performance': 'Rendimiento deportivo',
+      'rehabilitation': 'Rehabilitación'
     }
     return goals[goal] || goal
   }
@@ -1160,14 +1158,11 @@ const Users = () => {
                     onChange={(e) => setCreateFormData({...createFormData, trainingGoal: e.target.value})}
                   >
                     <option value="">Seleccionar...</option>
-                    <option value="perdida-peso">Pérdida de peso</option>
-                    <option value="aumento-masa-muscular">Aumento de masa muscular</option>
-                    <option value="mejora-resistencia">Mejora de resistencia</option>
-                    <option value="tonificacion">Tonificación</option>
-                    <option value="entrenamiento-funcional">Entrenamiento funcional</option>
-                    <option value="preparacion-competencias">Preparación para competencias</option>
-                    <option value="rehabilitacion-fisica">Rehabilitación física</option>
-                    <option value="reduccion-estres">Reducción del estrés</option>
+                    <option value="weight_loss">Pérdida de peso</option>
+                    <option value="muscle_gain">Aumento de masa muscular</option>
+                    <option value="general_fitness">Fitness general</option>
+                    <option value="sports_performance">Rendimiento deportivo</option>
+                    <option value="rehabilitation">Rehabilitación</option>
                   </select>
                 </div>
               </div>
