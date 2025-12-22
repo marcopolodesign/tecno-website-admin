@@ -219,32 +219,8 @@ const membershipsService = {
           performedBy
         )
 
-        // Log payment if payment data was provided
-        if (paymentData) {
-          await logsService.createLog({
-            actionType: 'payment_created',
-            actionDescription: `Pago creado: $${paymentData.amount} por ${paymentData.paymentMethod} para ${userName}`,
-            performedById: performedBy.id,
-            performedByType: performedBy.type,
-            performedByName: performedBy.name,
-            entityType: 'payment',
-            entityId: membershipResult.id, // Using membership ID as reference
-            entityName: `Pago - ${userName}`,
-            relatedUserId: membershipData.userId,
-            relatedMembershipId: membershipResult.id,
-            changes: {
-              amount: paymentData.amount,
-              payment_method: paymentData.paymentMethod,
-              payment_status: paymentData.paymentStatus || 'completed',
-              payment_date: paymentData.paymentDate || new Date().toISOString(),
-              notes: paymentData.notes || ''
-            },
-            metadata: {
-              created_via: 'membership_creation',
-              timestamp: new Date().toISOString()
-            }
-          })
-        }
+        // Payment info is already included in membership_created log above
+        // No need for separate payment log
       } catch (logError) {
         console.error('Error logging membership/payment creation:', logError)
         // Don't fail the operation if logging fails

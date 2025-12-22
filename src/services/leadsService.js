@@ -106,7 +106,7 @@ export const leadsService = {
         const leadName = `${data.firstName} ${data.lastName || ''}`.trim()
 
         await logsService.createLog({
-          actionType: 'lead_created_manually',
+          actionType: 'lead_created',
           actionDescription: `Lead creado manualmente desde admin: ${leadName}`,
           performedById: performedBy.id,
           performedByType: performedBy.type,
