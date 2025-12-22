@@ -16,6 +16,7 @@ import membershipsService from '../services/membershipsService'
 import logsService from '../services/logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
 import LogsTimeline from './LogsTimeline'
+import Modal from './Modal'
 
 const Users = () => {
   const [users, setUsers] = useState([])
@@ -77,7 +78,10 @@ const Users = () => {
     membershipType: '',
     startDate: '',
     endDate: '',
-    status: 'active'
+    status: 'active',
+    paymentMethod: 'efectivo',
+    paymentAmount: '',
+    paymentNotes: ''
   })
 
   useEffect(() => {
@@ -161,6 +165,23 @@ const Users = () => {
     }
     
     setRenewalFormData(newFormData)
+  }
+
+  // Handle change membership form with auto-price
+  const handleChangeMembershipFormChange = (field, value) => {
+    const newFormData = { ...changeMembershipFormData, [field]: value }
+    
+    // Auto-calculate price when membership type or payment method changes
+    if (field === 'membershipType' || field === 'paymentMethod') {
+      const planName = field === 'membershipType' ? value : changeMembershipFormData.membershipType
+      const method = field === 'paymentMethod' ? value : changeMembershipFormData.paymentMethod
+      const calculatedPrice = getCalculatedPrice(planName, method)
+      if (calculatedPrice !== undefined && calculatedPrice !== null) {
+        newFormData.paymentAmount = calculatedPrice
+      }
+    }
+    
+    setChangeMembershipFormData(newFormData)
   }
 
   const filterUsers = () => {
@@ -1527,130 +1548,188 @@ const Users = () => {
       )}
 
       {/* Change Membership Modal */}
-      {showChangeMembershipModal && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/50 z-70"
-            onClick={() => setShowChangeMembershipModal(false)}
-          />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-70 p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-text-primary mb-6">
-              Cambiar Membresía
-            </h3>
+      <Modal
+        isOpen={showChangeMembershipModal}
+        onClose={() => {
+          setShowChangeMembershipModal(false)
+          setChangeMembershipFormData({
+            membershipType: '',
+            startDate: '',
+            endDate: '',
+            status: 'active',
+            paymentMethod: 'efectivo',
+            paymentAmount: '',
+            paymentNotes: ''
+          })
+        }}
+        title="Cambiar Membresía"
+        subtitle={selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : ''}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowChangeMembershipModal(false)
+                setChangeMembershipFormData({
+                  membershipType: '',
+                  startDate: '',
+                  endDate: '',
+                  status: 'active',
+                  paymentMethod: 'efectivo',
+                  paymentAmount: '',
+                  paymentNotes: ''
+                })
+              }}
+              className="btn-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleChangeMembership}
+              className="btn-primary"
+            >
+              Guardar Cambios
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Current User Info */}
+          <div className="bg-bg-surface rounded-lg p-3 border border-border-default">
+            <p className="text-sm text-text-secondary">
+              Membresía actual: <span className="font-semibold text-text-primary capitalize">{selectedUser?.membershipType}</span>
+            </p>
+            <p className="text-sm text-text-secondary mt-1">
+              Vence: <span className="font-semibold text-text-primary">
+                {selectedUser?.membershipEndDate ? new Date(selectedUser.membershipEndDate).toLocaleDateString('es-AR') : 'N/A'}
+              </span>
+            </p>
+          </div>
+
+          {/* Membership & Payment Section */}
+          <div className="border-b border-border-default pb-4">
+            <h4 className="font-semibold text-text-primary mb-3">Membresía y Pago</h4>
             
-            <div className="space-y-4">
-              {/* Current User Info */}
-              <div className="border-b border-border-default pb-4">
-                <p className="text-sm text-text-secondary">
-                  Usuario: <span className="font-semibold text-text-primary">{selectedUser?.firstName} {selectedUser?.lastName}</span>
-                </p>
-                <p className="text-sm text-text-secondary mt-1">
-                  Membresía actual: <span className="font-semibold text-text-primary capitalize">{selectedUser?.membershipType}</span>
-                </p>
-                <p className="text-sm text-text-secondary mt-1">
-                  Vence: <span className="font-semibold text-text-primary">
-                    {selectedUser?.membershipEndDate ? new Date(selectedUser.membershipEndDate).toLocaleDateString('es-AR') : 'N/A'}
-                  </span>
-                </p>
+            <div className="space-y-3">
+              <div>
+                <label className="form-label">Tipo de Membresía *</label>
+                <select
+                  className="form-select"
+                  value={changeMembershipFormData.membershipType}
+                  onChange={(e) => handleChangeMembershipFormChange('membershipType', e.target.value)}
+                >
+                  <option value="">Seleccionar tipo</option>
+                  {membershipPlans.map(plan => (
+                    <option key={plan.id} value={plan.name}>
+                      {plan.name} ({plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'})
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Membership Form */}
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="form-label">Tipo de Membresía *</label>
-                  <select
-                    className="form-select"
-                    value={changeMembershipFormData.membershipType}
-                    onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, membershipType: e.target.value})}
-                  >
-                    <option value="">Seleccionar tipo</option>
-                    <option value="free">Free</option>
-                    <option value="basic">Basic</option>
-                    <option value="mensual">Mensual</option>
-                    <option value="trimestral">Trimestral</option>
-                    <option value="semestral">Semestral</option>
-                    <option value="anual">Anual</option>
-                    <option value="socio_fundador">Socio Fundador</option>
-                    <option value="sportclub">SportClub</option>
-                    <option value="wellhub">Wellhub</option>
-                  </select>
+                  <label className="form-label">Fecha de Inicio *</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={changeMembershipFormData.startDate}
+                    onChange={(e) => {
+                      const startDate = new Date(e.target.value)
+                      const endDate = new Date(startDate)
+                      endDate.setMonth(endDate.getMonth() + 1)
+                      setChangeMembershipFormData({
+                        ...changeMembershipFormData,
+                        startDate: e.target.value,
+                        endDate: endDate.toISOString().split('T')[0]
+                      })
+                    }}
+                  />
                 </div>
+                <div>
+                  <label className="form-label">Fecha de Fin *</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={changeMembershipFormData.endDate}
+                    onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, endDate: e.target.value})}
+                  />
+                </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="form-label">Estado de Membresía *</label>
+                <select
+                  className="form-select"
+                  value={changeMembershipFormData.status}
+                  onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, status: e.target.value})}
+                >
+                  <option value="active">Activo</option>
+                  <option value="expired">Vencido</option>
+                  <option value="cancelled">Cancelado</option>
+                </select>
+              </div>
+
+              {/* Payment Section */}
+              <div className="mt-4 pt-4 border-t border-border-default">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="form-label">Fecha de Inicio *</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={changeMembershipFormData.startDate}
-                      onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, startDate: e.target.value})}
-                    />
+                    <label className="form-label">Método de Pago *</label>
+                    <select
+                      className="form-select"
+                      value={changeMembershipFormData.paymentMethod}
+                      onChange={(e) => handleChangeMembershipFormChange('paymentMethod', e.target.value)}
+                    >
+                      <option value="efectivo">Efectivo (Promo)</option>
+                      <option value="debito_automatico">Débito Automático</option>
+                      <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
+                    </select>
                   </div>
                   <div>
-                    <label className="form-label">Fecha de Fin *</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={changeMembershipFormData.endDate}
-                      onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, endDate: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">Estado de Membresía *</label>
-                  <select
-                    className="form-select"
-                    value={changeMembershipFormData.status}
-                    onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, status: e.target.value})}
-                  >
-                    <option value="active">Activo</option>
-                    <option value="expired">Vencido</option>
-                    <option value="cancelled">Cancelado</option>
-                  </select>
-                </div>
-
-                <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <svg className="h-5 w-5 text-warning shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-medium text-warning">Nota Importante</p>
-                      <p className="text-xs text-text-secondary mt-1">
-                        Esta acción modificará la membresía actual del usuario. Si necesitas crear una renovación con historial de pago, usa el botón "Renovar Membresía".
-                      </p>
+                    <label className="form-label">Monto *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
+                      <input
+                        type="number"
+                        className="form-input pl-7"
+                        value={changeMembershipFormData.paymentAmount}
+                        onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, paymentAmount: e.target.value})}
+                        placeholder="0"
+                        step="1"
+                      />
                     </div>
                   </div>
                 </div>
+                <div className="mt-3">
+                  <label className="form-label">Notas de Pago</label>
+                  <textarea
+                    className="form-textarea"
+                    rows="2"
+                    value={changeMembershipFormData.paymentNotes}
+                    onChange={(e) => setChangeMembershipFormData({...changeMembershipFormData, paymentNotes: e.target.value})}
+                    placeholder="Información adicional sobre el pago..."
+                  />
+                </div>
               </div>
             </div>
+          </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowChangeMembershipModal(false)
-                  setChangeMembershipFormData({
-                    membershipType: '',
-                    startDate: '',
-                    endDate: '',
-                    status: 'active'
-                  })
-                }}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleChangeMembership}
-                className="btn-primary"
-              >
-                Guardar Cambios
-              </button>
+          {/* Warning Note */}
+          <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
+            <div className="flex items-start gap-2">
+              <svg className="h-5 w-5 text-warning shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-warning">Nota Importante</p>
+                <p className="text-xs text-text-secondary mt-1">
+                  Esta acción modificará la membresía actual del usuario. Si necesitas crear una renovación con historial de pago, usa el botón "Renovar Membresía".
+                </p>
+              </div>
             </div>
           </div>
-        </>
-      )}
+        </div>
+      </Modal>
 
       <Toaster position="top-right" toastOptions={toastOptions} />
     </div>

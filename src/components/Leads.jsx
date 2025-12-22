@@ -662,7 +662,7 @@ const Leads = ({ userRole }) => {
                 className="btn-primary w-full flex items-center justify-center"
               >
                 <CheckIcon className="h-5 w-5 mr-2" />
-                Marcar como Convertido
+                Convertir Lead a Usuario
               </button>
             )}
             <button
