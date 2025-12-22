@@ -14,6 +14,8 @@ import { leadsService } from '../services/leadsService'
 import { sellersService } from '../services/sellersService'
 import membershipPlansService from '../services/membershipPlansService'
 import { dataGridStyles, toastOptions } from '../lib/themeStyles'
+import Sidecart from './Sidecart'
+import Modal from './Modal'
 
 const Leads = () => {
   const [leads, setLeads] = useState([])
@@ -632,253 +634,237 @@ const Leads = () => {
       </div>
 
       {/* Lead Detail Side Panel */}
-      {showSidePanel && selectedLead && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/30 z-40 animate-fade-in"
-            onClick={() => setShowSidePanel(false)}
-          />
-          
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-bg-secondary border-l border-border-default z-50 flex flex-col animate-slide-in-right">
-            <div className="flex items-center justify-between p-5 border-b border-border-default">
-              <h3 className="text-lg font-semibold text-text-primary">
-                Detalles del Lead
-              </h3>
+      <Sidecart
+        isOpen={showSidePanel && !!selectedLead}
+        onClose={() => setShowSidePanel(false)}
+        title="Detalles del Lead"
+        footer={
+          <div className="space-y-3">
+            {hasChanges && (
               <button
-                onClick={() => setShowSidePanel(false)}
-                className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-surface rounded transition-colors"
+                onClick={handleSaveEdit}
+                className="btn-primary w-full"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Confirmar edición
               </button>
+            )}
+            {selectedLead && !selectedLead.convertedToUser && selectedLead.status !== 'convertido' && (
+              <button
+                onClick={() => {
+                  setShowSidePanel(false)
+                  handleOpenConvertModal(selectedLead)
+                }}
+                className="btn-primary w-full flex items-center justify-center"
+              >
+                <CheckIcon className="h-5 w-5 mr-2" />
+                Marcar como Convertido
+              </button>
+            )}
+            <button
+              onClick={() => setShowSidePanel(false)}
+              className="btn-secondary w-full"
+            >
+              Cerrar
+            </button>
+          </div>
+        }
+      >
+        {selectedLead && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Email</label>
+              <p className="text-sm font-medium text-text-primary mt-1">{selectedLead.email}</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Email</label>
-                  <p className="text-sm font-medium text-text-primary mt-1">{selectedLead.email}</p>
-                </div>
+            <div className="border-t border-border-default pt-4">
+              <label className="form-label">Nombre</label>
+              <input
+                type="text"
+                className="form-input"
+                value={editFormData.firstName}
+                onChange={(e) => handleFormChange('firstName', e.target.value)}
+              />
+            </div>
 
-                <div className="border-t border-border-default pt-4">
-                  <label className="form-label">Nombre</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editFormData.firstName}
-                    onChange={(e) => handleFormChange('firstName', e.target.value)}
-                  />
-                </div>
+            <div>
+              <label className="form-label">Apellido</label>
+              <input
+                type="text"
+                className="form-input"
+                value={editFormData.lastName}
+                onChange={(e) => handleFormChange('lastName', e.target.value)}
+              />
+            </div>
 
-                <div>
-                  <label className="form-label">Apellido</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editFormData.lastName}
-                    onChange={(e) => handleFormChange('lastName', e.target.value)}
-                  />
-                </div>
+            <div>
+              <label className="form-label">Teléfono</label>
+              <input
+                type="tel"
+                className="form-input"
+                value={editFormData.phone}
+                onChange={(e) => handleFormChange('phone', e.target.value)}
+              />
+            </div>
 
-                <div>
-                  <label className="form-label">Teléfono</label>
-                  <input
-                    type="tel"
-                    className="form-input"
-                    value={editFormData.phone}
-                    onChange={(e) => handleFormChange('phone', e.target.value)}
-                  />
-                </div>
+            <div className="border-t border-border-default pt-4">
+              <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Objetivo de entrenamiento</label>
+              <p className="text-sm text-text-primary mt-1">
+                {getTrainingGoalLabel(selectedLead.trainingGoal)}
+              </p>
+            </div>
 
-                <div className="border-t border-border-default pt-4">
-                  <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Objetivo de entrenamiento</label>
-                  <p className="text-sm text-text-primary mt-1">
-                    {getTrainingGoalLabel(selectedLead.trainingGoal)}
-                  </p>
-                </div>
+            <div className="border-t border-border-default pt-4">
+              <label className="form-label">Estado del Lead</label>
+              <select
+                value={editingStatus}
+                onChange={(e) => setEditingStatus(e.target.value)}
+                className="form-select w-full"
+              >
+                <option value="nuevo">Nuevo</option>
+                <option value="contactado">Contactado</option>
+                <option value="en-negociacion">En negociación</option>
+                <option value="convertido">Convertido</option>
+                <option value="perdido">Perdido</option>
+              </select>
+              {editingStatus !== selectedLead.status && (
+                <button
+                  onClick={handleUpdateStatus}
+                  className="mt-2 btn-primary w-full"
+                >
+                  Guardar Estado
+                </button>
+              )}
+            </div>
 
-                <div className="border-t border-border-default pt-4">
-                  <label className="form-label">Estado del Lead</label>
-                  <select
-                    value={editingStatus}
-                    onChange={(e) => setEditingStatus(e.target.value)}
-                    className="form-select w-full"
-                  >
-                    <option value="nuevo">Nuevo</option>
-                    <option value="contactado">Contactado</option>
-                    <option value="en-negociacion">En negociación</option>
-                    <option value="convertido">Convertido</option>
-                    <option value="perdido">Perdido</option>
-                  </select>
-                  {editingStatus !== selectedLead.status && (
-                    <button
-                      onClick={handleUpdateStatus}
-                      className="mt-2 btn-primary w-full"
-                    >
-                      Guardar Estado
-                    </button>
+            <div className="border-t border-border-default pt-4">
+              <label className="form-label">Vendedor Asignado</label>
+              <select
+                value={editFormData.assignedSellerId || ''}
+                onChange={(e) => handleFormChange('assignedSellerId', e.target.value || null)}
+                className="form-select w-full"
+              >
+                <option value="">Sin asignar</option>
+                {sellers.map(seller => (
+                  <option key={seller.id} value={seller.id}>
+                    {seller.first_name} {seller.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">Notas</label>
+              <textarea
+                className="form-input"
+                rows="3"
+                value={editFormData.notes}
+                onChange={(e) => handleFormChange('notes', e.target.value)}
+              />
+            </div>
+
+            {/* Read-only info */}
+            <div className="border-t border-border-default pt-4">
+              <label className="text-sm font-medium text-text-tertiary">Fecha de envío</label>
+              <p className="text-text-primary">
+                {new Date(selectedLead.submittedAt).toLocaleString('es-AR')}
+              </p>
+            </div>
+
+            {selectedLead.lastContactedAt && (
+              <div>
+                <label className="text-sm font-medium text-text-tertiary">Último contacto</label>
+                <p className="text-text-primary">
+                  {new Date(selectedLead.lastContactedAt).toLocaleString('es-AR')}
+                </p>
+              </div>
+            )}
+
+            {/* UTM Parameters */}
+            {(selectedLead.utmSource || selectedLead.utmMedium || selectedLead.utmCampaign || selectedLead.utmTerm || selectedLead.utmContent) && (
+              <div className="border-t border-border-default pt-4">
+                <label className="text-sm font-medium text-text-tertiary mb-2 block">Parámetros UTM</label>
+                <div className="bg-bg-surface rounded-lg p-3 space-y-2 text-sm">
+                  {selectedLead.utmSource && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Source:</span>
+                      <span className="font-medium text-text-primary">{selectedLead.utmSource}</span>
+                    </div>
+                  )}
+                  {selectedLead.utmMedium && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Medium:</span>
+                      <span className="font-medium text-text-primary">{selectedLead.utmMedium}</span>
+                    </div>
+                  )}
+                  {selectedLead.utmCampaign && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Campaign:</span>
+                      <span className="font-medium text-text-primary">{selectedLead.utmCampaign}</span>
+                    </div>
+                  )}
+                  {selectedLead.utmTerm && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Term:</span>
+                      <span className="font-medium text-text-primary">{selectedLead.utmTerm}</span>
+                    </div>
+                  )}
+                  {selectedLead.utmContent && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Content:</span>
+                      <span className="font-medium text-text-primary">{selectedLead.utmContent}</span>
+                    </div>
                   )}
                 </div>
-
-                <div className="border-t border-border-default pt-4">
-                  <label className="form-label">Vendedor Asignado</label>
-                  <select
-                    value={editFormData.assignedSellerId || ''}
-                    onChange={(e) => handleFormChange('assignedSellerId', e.target.value || null)}
-                    className="form-select w-full"
-                  >
-                    <option value="">Sin asignar</option>
-                    {sellers.map(seller => (
-                      <option key={seller.id} value={seller.id}>
-                        {seller.first_name} {seller.last_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="form-label">Notas</label>
-                  <textarea
-                    className="form-input"
-                    rows="3"
-                    value={editFormData.notes}
-                    onChange={(e) => handleFormChange('notes', e.target.value)}
-                  />
-                </div>
-
-                {/* Read-only info */}
-                <div className="border-t border-border-default pt-4">
-                  <label className="text-sm font-medium text-text-tertiary">Fecha de envío</label>
-                  <p className="text-text-primary">
-                    {new Date(selectedLead.submittedAt).toLocaleString('es-AR')}
-                  </p>
-                </div>
-
-                {selectedLead.lastContactedAt && (
-                  <div>
-                    <label className="text-sm font-medium text-text-tertiary">Último contacto</label>
-                    <p className="text-text-primary">
-                      {new Date(selectedLead.lastContactedAt).toLocaleString('es-AR')}
-                    </p>
-                  </div>
-                )}
-
-                {/* UTM Parameters */}
-                {(selectedLead.utmSource || selectedLead.utmMedium || selectedLead.utmCampaign || selectedLead.utmTerm || selectedLead.utmContent) && (
-                  <div className="border-t border-border-default pt-4">
-                    <label className="text-sm font-medium text-text-tertiary mb-2 block">Parámetros UTM</label>
-                    <div className="bg-bg-surface rounded-lg p-3 space-y-2 text-sm">
-                      {selectedLead.utmSource && (
-                        <div className="flex justify-between">
-                          <span className="text-text-secondary">Source:</span>
-                          <span className="font-medium text-text-primary">{selectedLead.utmSource}</span>
-                        </div>
-                      )}
-                      {selectedLead.utmMedium && (
-                        <div className="flex justify-between">
-                          <span className="text-text-secondary">Medium:</span>
-                          <span className="font-medium text-text-primary">{selectedLead.utmMedium}</span>
-                        </div>
-                      )}
-                      {selectedLead.utmCampaign && (
-                        <div className="flex justify-between">
-                          <span className="text-text-secondary">Campaign:</span>
-                          <span className="font-medium text-text-primary">{selectedLead.utmCampaign}</span>
-                        </div>
-                      )}
-                      {selectedLead.utmTerm && (
-                        <div className="flex justify-between">
-                          <span className="text-text-secondary">Term:</span>
-                          <span className="font-medium text-text-primary">{selectedLead.utmTerm}</span>
-                        </div>
-                      )}
-                      {selectedLead.utmContent && (
-                        <div className="flex justify-between">
-                          <span className="text-text-secondary">Content:</span>
-                          <span className="font-medium text-text-primary">{selectedLead.utmContent}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
-
-            {/* Fixed Actions at Bottom */}
-            <div className="border-t border-border-default bg-bg-secondary p-6 space-y-3">
-              {hasChanges && (
-                <button
-                  onClick={handleSaveEdit}
-                  className="btn-primary w-full"
-                >
-                  Confirmar edición
-                </button>
-              )}
-              {!selectedLead.convertedToUser && selectedLead.status !== 'convertido' && (
-                <button
-                  onClick={() => {
-                    setShowSidePanel(false)
-                    handleOpenConvertModal(selectedLead)
-                  }}
-                  className="btn-primary w-full flex items-center justify-center"
-                >
-                  <CheckIcon className="h-5 w-5 mr-2" />
-                  Marcar como Convertido
-                </button>
-              )}
-              <button
-                onClick={() => setShowSidePanel(false)}
-                className="btn-secondary w-full"
-              >
-                Cerrar
-              </button>
-            </div>
+            )}
           </div>
-        </>
-      )}
+        )}
+      </Sidecart>
 
-      {/* Convert to User Side Panel */}
-      {showConvertModal && leadToConvert && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-bg-secondary/70 backdrop-blur-sm z-[60] animate-[fadeIn_0.3s_ease-in-out]"
-            onClick={() => setShowConvertModal(false)}
-          />
-          
-          {/* Side Panel */}
-          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-bg-secondary shadow-2xl z-[60] overflow-y-auto animate-[slideInRight_0.3s_ease-out]">
-            <div className="p-6">
-              {/* Header with Close Button */}
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-text-primary">
-                  Convertir a Usuario
-                </h3>
-                <button
-                  onClick={() => setShowConvertModal(false)}
-                  className="text-text-tertiary hover:text-text-secondary"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            
-            {/* Email Display */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+      {/* Convert to User Sidecart */}
+      <Sidecart
+        isOpen={showConvertModal && !!leadToConvert}
+        onClose={() => setShowConvertModal(false)}
+        title="Convertir a Usuario"
+        subtitle="Completa los datos de membresía para convertir este lead en cliente"
+        zIndex={60}
+        headerContent={
+          leadToConvert && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <label className="text-xs font-medium text-green-700 uppercase tracking-wide">Email</label>
               <p className="text-lg font-semibold text-green-900 mt-1">{leadToConvert.email}</p>
             </div>
+          )
+        }
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowConvertModal(false)}
+              className="btn-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConvertToUser}
+              className="btn-primary"
+              disabled={!convertFormData.membershipType || !convertFormData.startDate || !convertFormData.endDate}
+            >
+              Convertir a Usuario
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Membership & Payment Combined */}
+          <div className="border-b border-border-default pb-4">
+            <h4 className="font-semibold text-text-primary mb-3">Membresía y Pago</h4>
             
-            <p className="text-sm text-text-secondary mb-4">
-              Completa los datos de membresía para convertir este lead en cliente
-            </p>
-            <div className="space-y-3">
+            {/* Membership Selection */}
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="form-label">Tipo de Membresía *</label>
                 <select
-                  className="form-input"
+                  className="form-select"
                   value={convertFormData.membershipType}
                   onChange={(e) => handleConvertFormChange('membershipType', e.target.value)}
                   required
@@ -890,28 +876,95 @@ const Leads = () => {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="form-label">Fecha de Inicio *</label>
-                <input
-                  type="date"
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Fecha de Inicio *</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={convertFormData.startDate}
+                    onChange={(e) => {
+                      const startDate = new Date(e.target.value)
+                      const endDate = new Date(startDate)
+                      endDate.setMonth(endDate.getMonth() + 1)
+                      setConvertFormData({
+                        ...convertFormData, 
+                        startDate: e.target.value,
+                        endDate: endDate.toISOString().split('T')[0]
+                      })
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Fecha de Fin *</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={convertFormData.endDate}
+                    onChange={(e) => setConvertFormData({...convertFormData, endDate: e.target.value})}
+                    required
+                  />
+                  <p className="text-xs text-text-tertiary mt-1">
+                    Por defecto: 1 mes desde inicio
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Section */}
+            <div className="mt-4 pt-4 border-t border-border-default">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Método de Pago *</label>
+                  <select
+                    className="form-select"
+                    value={convertFormData.paymentMethod}
+                    onChange={(e) => handleConvertFormChange('paymentMethod', e.target.value)}
+                  >
+                    <option value="efectivo">Efectivo (Promo)</option>
+                    <option value="debito_automatico">Débito Automático</option>
+                    <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Monto *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      className="form-input pl-7"
+                      value={convertFormData.paymentAmount}
+                      onChange={(e) => setConvertFormData({...convertFormData, paymentAmount: e.target.value})}
+                      placeholder="0"
+                      step="1"
+                    />
+                  </div>
+                  <p className="text-xs text-text-tertiary mt-1">
+                    Precio sugerido. Editar para casos especiales.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="form-label">Notas de Pago</label>
+                <textarea
                   className="form-input"
-                  value={convertFormData.startDate}
-                  onChange={(e) => setConvertFormData({...convertFormData, startDate: e.target.value})}
-                  required
+                  rows="2"
+                  value={convertFormData.paymentNotes}
+                  onChange={(e) => setConvertFormData({...convertFormData, paymentNotes: e.target.value})}
+                  placeholder="Información adicional sobre el pago..."
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Emergency Contact */}
+          <div className="border-b border-border-default pb-4">
+            <h4 className="font-semibold text-text-primary mb-3">Contacto de Emergencia</h4>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="form-label">Fecha de Fin *</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={convertFormData.endDate}
-                  onChange={(e) => setConvertFormData({...convertFormData, endDate: e.target.value})}
-                  required
-                />
-              </div>
-              <div>
-                <label className="form-label">Contacto de Emergencia</label>
+                <label className="form-label">Nombre del Contacto</label>
                 <input
                   type="text"
                   className="form-input"
@@ -921,7 +974,7 @@ const Leads = () => {
                 />
               </div>
               <div>
-                <label className="form-label">Teléfono de Emergencia</label>
+                <label className="form-label">Teléfono</label>
                 <input
                   type="tel"
                   className="form-input"
@@ -930,239 +983,186 @@ const Leads = () => {
                   placeholder="+54 11 1234-5678"
                 />
               </div>
-              <div>
-                <label className="form-label">Notas Médicas</label>
-                <textarea
-                  className="form-input"
-                  value={convertFormData.medicalNotes}
-                  onChange={(e) => setConvertFormData({...convertFormData, medicalNotes: e.target.value})}
-                  rows="3"
-                  placeholder="Alergias, lesiones, condiciones médicas..."
-                />
-              </div>
-
-              {/* Payment Info */}
-              <div className="border-t border-border-default pt-4 mt-4">
-                <h4 className="font-semibold text-text-primary mb-3">Información de Pago</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="form-label">Método de Pago *</label>
-                    <select
-                      className="form-input"
-                      value={convertFormData.paymentMethod}
-                      onChange={(e) => handleConvertFormChange('paymentMethod', e.target.value)}
-                    >
-                      <option value="efectivo">Efectivo (Promo)</option>
-                      <option value="debito_automatico">Débito Automático</option>
-                      <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Monto *</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
-                      <input
-                        type="number"
-                        className="form-input pl-7"
-                        value={convertFormData.paymentAmount}
-                        onChange={(e) => setConvertFormData({...convertFormData, paymentAmount: e.target.value})}
-                        placeholder="0"
-                        step="1"
-                      />
-                    </div>
-                    <p className="text-xs text-text-tertiary mt-1">
-                      Precio sugerido según plan y método de pago. Editar para casos especiales.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="form-label">Notas de Pago</label>
-                    <textarea
-                      className="form-input"
-                      rows="2"
-                      value={convertFormData.paymentNotes}
-                      onChange={(e) => setConvertFormData({...convertFormData, paymentNotes: e.target.value})}
-                      placeholder="Información adicional sobre el pago..."
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => setShowConvertModal(false)}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConvertToUser}
-                className="btn-primary"
-                disabled={!convertFormData.membershipType || !convertFormData.startDate || !convertFormData.endDate}
-              >
-                Convertir a Usuario
-              </button>
-            </div>
             </div>
           </div>
-        </>
-      )}
+
+          {/* Medical Notes */}
+          <div>
+            <h4 className="font-semibold text-text-primary mb-3">Notas</h4>
+            <div>
+              <label className="form-label">Notas Médicas</label>
+              <textarea
+                className="form-input"
+                value={convertFormData.medicalNotes}
+                onChange={(e) => setConvertFormData({...convertFormData, medicalNotes: e.target.value})}
+                rows="3"
+                placeholder="Alergias, lesiones, condiciones médicas..."
+              />
+            </div>
+          </div>
+        </div>
+      </Sidecart>
 
       {/* Reason Modal */}
-      {showReasonModal && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
-            onClick={() => setShowReasonModal(false)}
-          />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-text-primary mb-4">
-              ¿Por qué se marcó como perdido?
-            </h3>
-            <textarea
-              className="form-input w-full"
-              rows="4"
-              placeholder="Ingresa la razón..."
-              value={reasonData.reason}
-              onChange={(e) => setReasonData({...reasonData, reason: e.target.value})}
-            />
-            <div className="mt-4 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowReasonModal(false)
-                  setReasonData({ leadId: null, newStatus: '', reason: '' })
-                }}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmStatusWithReason}
-                className="btn-primary"
-              >
-                Confirmar
-              </button>
-            </div>
+      <Modal
+        isOpen={showReasonModal}
+        onClose={() => {
+          setShowReasonModal(false)
+          setReasonData({ leadId: null, newStatus: '', reason: '' })
+        }}
+        title="¿Por qué se marcó como perdido?"
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowReasonModal(false)
+                setReasonData({ leadId: null, newStatus: '', reason: '' })
+              }}
+              className="btn-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirmStatusWithReason}
+              className="btn-primary"
+            >
+              Confirmar
+            </button>
           </div>
-        </>
-      )}
+        }
+      >
+        <textarea
+          className="form-input w-full"
+          rows="4"
+          placeholder="Ingresa la razón..."
+          value={reasonData.reason}
+          onChange={(e) => setReasonData({...reasonData, reason: e.target.value})}
+        />
+      </Modal>
 
       {/* Create Lead Modal */}
-      {showCreateModal && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
-            onClick={() => setShowCreateModal(false)}
-          />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-text-primary mb-6">
-              Crear Nuevo Lead
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">Nombre *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={createFormData.firstName}
-                    onChange={(e) => setCreateFormData({...createFormData, firstName: e.target.value})}
-                    placeholder="Juan"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Apellido</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={createFormData.lastName}
-                    onChange={(e) => setCreateFormData({...createFormData, lastName: e.target.value})}
-                    placeholder="Pérez"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="form-label">Email *</label>
-                <input
-                  type="email"
-                  className="form-input"
-                  value={createFormData.email}
-                  onChange={(e) => setCreateFormData({...createFormData, email: e.target.value})}
-                  placeholder="juan@example.com"
-                />
-              </div>
-
-              <div>
-                <label className="form-label">Teléfono *</label>
-                <input
-                  type="tel"
-                  className="form-input"
-                  value={createFormData.phone}
-                  onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
-                  placeholder="+54 9 11 1234-5678"
-                />
-              </div>
-
-              <div>
-                <label className="form-label">Objetivo de entrenamiento *</label>
-                <select
-                  className="form-input"
-                  value={createFormData.trainingGoal}
-                  onChange={(e) => setCreateFormData({...createFormData, trainingGoal: e.target.value})}
-                >
-                  <option value="">Seleccionar...</option>
-                  <option value="perdida-peso">Pérdida de peso</option>
-                  <option value="aumento-masa-muscular">Aumento de masa muscular</option>
-                  <option value="mejora-resistencia">Mejora de resistencia</option>
-                  <option value="tonificacion">Tonificación</option>
-                  <option value="entrenamiento-funcional">Entrenamiento funcional</option>
-                  <option value="preparacion-competencias">Preparación para competencias</option>
-                  <option value="rehabilitacion-fisica">Rehabilitación física</option>
-                  <option value="reduccion-estres">Reducción del estrés</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="form-label">Notas</label>
-                <textarea
-                  className="form-input"
-                  rows="3"
-                  value={createFormData.notes}
-                  onChange={(e) => setCreateFormData({...createFormData, notes: e.target.value})}
-                  placeholder="Información adicional..."
-                />
-              </div>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false)
+          setCreateFormData({
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            trainingGoal: '',
+            notes: '',
+            source: 'manual'
+          })
+        }}
+        title="Crear Nuevo Lead"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowCreateModal(false)
+                setCreateFormData({
+                  firstName: '',
+                  lastName: '',
+                  email: '',
+                  phone: '',
+                  trainingGoal: '',
+                  notes: '',
+                  source: 'manual'
+                })
+              }}
+              className="btn-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCreateLead}
+              className="btn-primary"
+            >
+              Crear Lead
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Nombre *</label>
+              <input
+                type="text"
+                className="form-input"
+                value={createFormData.firstName}
+                onChange={(e) => setCreateFormData({...createFormData, firstName: e.target.value})}
+                placeholder="Juan"
+              />
             </div>
-
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowCreateModal(false)
-                  setCreateFormData({
-                    firstName: '',
-                    lastName: '',
-                    email: '',
-                    phone: '',
-                    trainingGoal: '',
-                    notes: '',
-                    source: 'manual'
-                  })
-                }}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateLead}
-                className="btn-primary"
-              >
-                Crear Lead
-              </button>
+            <div>
+              <label className="form-label">Apellido</label>
+              <input
+                type="text"
+                className="form-input"
+                value={createFormData.lastName}
+                onChange={(e) => setCreateFormData({...createFormData, lastName: e.target.value})}
+                placeholder="Pérez"
+              />
             </div>
           </div>
-        </>
-      )}
+
+          <div>
+            <label className="form-label">Email *</label>
+            <input
+              type="email"
+              className="form-input"
+              value={createFormData.email}
+              onChange={(e) => setCreateFormData({...createFormData, email: e.target.value})}
+              placeholder="juan@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="form-label">Teléfono *</label>
+            <input
+              type="tel"
+              className="form-input"
+              value={createFormData.phone}
+              onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
+              placeholder="+54 9 11 1234-5678"
+            />
+          </div>
+
+          <div>
+            <label className="form-label">Objetivo de entrenamiento *</label>
+            <select
+              className="form-select"
+              value={createFormData.trainingGoal}
+              onChange={(e) => setCreateFormData({...createFormData, trainingGoal: e.target.value})}
+            >
+              <option value="">Seleccionar...</option>
+              <option value="perdida-peso">Pérdida de peso</option>
+              <option value="aumento-masa-muscular">Aumento de masa muscular</option>
+              <option value="mejora-resistencia">Mejora de resistencia</option>
+              <option value="tonificacion">Tonificación</option>
+              <option value="entrenamiento-funcional">Entrenamiento funcional</option>
+              <option value="preparacion-competencias">Preparación para competencias</option>
+              <option value="rehabilitacion-fisica">Rehabilitación física</option>
+              <option value="reduccion-estres">Reducción del estrés</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">Notas</label>
+            <textarea
+              className="form-textarea"
+              rows="3"
+              value={createFormData.notes}
+              onChange={(e) => setCreateFormData({...createFormData, notes: e.target.value})}
+              placeholder="Información adicional..."
+            />
+          </div>
+        </div>
+      </Modal>
 
       <Toaster position="top-right" toastOptions={toastOptions} />
     </div>
