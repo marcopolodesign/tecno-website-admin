@@ -148,7 +148,7 @@ function App() {
                 
                 {canAccess('/dashboard') && <Route path="/dashboard" element={<Dashboard />} />}
                 {canAccess('/prospects') && <Route path="/prospects" element={<Prospects />} />}
-                {canAccess('/leads') && <Route path="/leads" element={<Leads />} />}
+                {canAccess('/leads') && <Route path="/leads" element={<Leads userRole={userRole} />} />}
                 {canAccess('/users') && <Route path="/users" element={<Users />} />}
                 {canAccess('/membership-plans') && <Route path="/membership-plans" element={<MembershipPlans userRole={userRole} />} />}
                 {canAccess('/sellers') && <Route path="/sellers" element={<Sellers />} />}

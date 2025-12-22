@@ -17,7 +17,7 @@ import { dataGridStyles, toastOptions } from '../lib/themeStyles'
 import Sidecart from './Sidecart'
 import Modal from './Modal'
 
-const Leads = () => {
+const Leads = ({ userRole }) => {
   const [leads, setLeads] = useState([])
   const [filteredLeads, setFilteredLeads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -934,15 +934,22 @@ const Leads = () => {
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
                     <input
                       type="number"
-                      className="form-input pl-7"
+                      className={`form-input pl-7 ${userRole === 'front_desk' ? 'bg-bg-surface cursor-not-allowed' : ''}`}
                       value={convertFormData.paymentAmount}
-                      onChange={(e) => setConvertFormData({...convertFormData, paymentAmount: e.target.value})}
+                      onChange={(e) => {
+                        if (userRole !== 'front_desk') {
+                          setConvertFormData({...convertFormData, paymentAmount: e.target.value})
+                        }
+                      }}
                       placeholder="0"
                       step="1"
+                      readOnly={userRole === 'front_desk'}
                     />
                   </div>
                   <p className="text-xs text-text-tertiary mt-1">
-                    Precio sugerido. Editar para casos especiales.
+                    {userRole === 'front_desk' 
+                      ? 'Precio calculado automáticamente según plan y método de pago.'
+                      : 'Precio sugerido. Editar para casos especiales.'}
                   </p>
                 </div>
               </div>

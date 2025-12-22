@@ -703,16 +703,16 @@ const Users = () => {
               )
             },
             {
-              field: 'startDate',
+              field: 'membershipStartDate',
               headerName: 'Inicio',
               width: 120,
-              valueFormatter: (value) => new Date(value).toLocaleDateString('es-AR')
+              valueFormatter: (value) => value ? new Date(value).toLocaleDateString('es-AR') : '-'
             },
             {
-              field: 'endDate',
+              field: 'membershipEndDate',
               headerName: 'Fin',
               width: 120,
-              valueFormatter: (value) => new Date(value).toLocaleDateString('es-AR')
+              valueFormatter: (value) => value ? new Date(value).toLocaleDateString('es-AR') : '-'
             },
             {
               field: 'actions',
