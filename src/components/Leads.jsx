@@ -33,7 +33,7 @@ const Leads = ({ userRole }) => {
   const [showConvertModal, setShowConvertModal] = useState(false)
   const [leadToConvert, setLeadToConvert] = useState(null)
   const [convertFormData, setConvertFormData] = useState({
-    membershipType: 'Socio_Basic',
+    membershipType: 'mensual',
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     emergencyContact: '',
@@ -243,11 +243,12 @@ const Leads = ({ userRole }) => {
     const endDate = new Date()
     endDate.setMonth(endDate.getMonth() + 1)
     
-    // Default to Socio_Basic for new members with efectivo payment
-    const defaultPlan = 'Socio_Basic'
+    // Default to mensual for new members with efectivo payment
+    const mensualPlan = membershipPlans.find(p => p.name === 'mensual')
+    const defaultPlan = mensualPlan ? 'mensual' : (membershipPlans.length > 0 ? membershipPlans[0].name : 'mensual')
     const defaultPaymentMethod = 'efectivo'
     const initialPrice = getCalculatedPrice(defaultPlan, defaultPaymentMethod)
-    
+
     setConvertFormData({
       membershipType: defaultPlan,
       startDate: new Date().toISOString().split('T')[0],
