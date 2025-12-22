@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, isServiceRole } from '../lib/supabase'
 import { locationsService } from '../services/locationsService'
 import { PlusIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import Modal from './Modal'
 
 const Coaches = () => {
   const [coaches, setCoaches] = useState([])

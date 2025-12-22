@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { PencilIcon, CheckIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, PlusIcon } from '@heroicons/react/24/outline'
 import membershipPlansService from '../services/membershipPlansService'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
+import Modal from './Modal'
 
 export default function MembershipPlans({ userRole }) {
   const [plans, setPlans] = useState([])
@@ -254,271 +255,231 @@ export default function MembershipPlans({ userRole }) {
       </div>
 
       {/* Edit Modal */}
-      {showEditModal && editingPlan && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={cancelEdit}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <div>
-                  <h2 className="text-lg font-semibold text-text-primary">Editar Plan</h2>
-                  <p className="text-sm text-text-secondary capitalize">{editingPlan.name} - {editingPlan.durationMonths} {editingPlan.durationMonths === 1 ? 'mes' : 'meses'}</p>
-                </div>
-                <button
-                  onClick={cancelEdit}
-                  className="p-1 hover:bg-bg-surface rounded transition-colors"
-                >
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
+      <Modal
+        isOpen={showEditModal && !!editingPlan}
+        onClose={cancelEdit}
+        title="Editar Plan"
+        subtitle={editingPlan ? `${editingPlan.name} - ${editingPlan.durationMonths} ${editingPlan.durationMonths === 1 ? 'mes' : 'meses'}` : ''}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={cancelEdit} className="btn-secondary">
+              Cancelar
+            </button>
+            <button
+              onClick={saveEdit}
+              disabled={saving}
+              className="btn-primary disabled:opacity-50"
+            >
+              {saving ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={saveEdit} className="space-y-4">
+          <div>
+            <label className="form-label">Precio Base (ARS) *</label>
+            <input
+              type="number"
+              value={editForm.price}
+              onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+              className="form-input"
+              placeholder="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div className="border-t border-border-default pt-4">
+            <p className="text-sm font-medium text-text-primary mb-3">Precios por Método de Pago</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="form-label text-xs">Efectivo</label>
+                <input
+                  type="number"
+                  value={editForm.priceEfectivo}
+                  onChange={(e) => setEditForm({ ...editForm, priceEfectivo: e.target.value })}
+                  className="form-input"
+                  placeholder="Mismo que base"
+                  step="0.01"
+                />
               </div>
-              
-              <form onSubmit={saveEdit} className="p-4 space-y-4">
-                <div>
-                  <label className="form-label">Precio Base (ARS) *</label>
-                  <input
-                    type="number"
-                    value={editForm.price}
-                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                    className="form-input"
-                    placeholder="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
-
-                <div className="border-t border-border-default pt-4">
-                  <p className="text-sm font-medium text-text-primary mb-3">Precios por Método de Pago</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="form-label text-xs">Efectivo</label>
-                      <input
-                        type="number"
-                        value={editForm.priceEfectivo}
-                        onChange={(e) => setEditForm({ ...editForm, priceEfectivo: e.target.value })}
-                        className="form-input"
-                        placeholder="Mismo que base"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label text-xs">Débito Auto.</label>
-                      <input
-                        type="number"
-                        value={editForm.priceDebitoAutomatico}
-                        onChange={(e) => setEditForm({ ...editForm, priceDebitoAutomatico: e.target.value })}
-                        className="form-input"
-                        placeholder="Mismo que base"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label text-xs">Tarjeta/Transf.</label>
-                      <input
-                        type="number"
-                        value={editForm.priceTarjetaTransferencia}
-                        onChange={(e) => setEditForm({ ...editForm, priceTarjetaTransferencia: e.target.value })}
-                        className="form-input"
-                        placeholder="Mismo que base"
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">Descripción</label>
-                  <textarea
-                    value={editForm.description}
-                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    className="form-textarea"
-                    rows={2}
-                    placeholder="Descripción del plan..."
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="editIsActive"
-                    checked={editForm.isActive}
-                    onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                    className="h-4 w-4 text-brand rounded border-border-default focus:ring-brand"
-                  />
-                  <label htmlFor="editIsActive" className="text-sm text-text-secondary">
-                    Plan activo (visible al crear membresías)
-                  </label>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="btn-secondary"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="btn-primary disabled:opacity-50"
-                  >
-                    {saving ? 'Guardando...' : 'Guardar Cambios'}
-                  </button>
-                </div>
-              </form>
+              <div>
+                <label className="form-label text-xs">Débito Auto.</label>
+                <input
+                  type="number"
+                  value={editForm.priceDebitoAutomatico}
+                  onChange={(e) => setEditForm({ ...editForm, priceDebitoAutomatico: e.target.value })}
+                  className="form-input"
+                  placeholder="Mismo que base"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="form-label text-xs">Tarjeta/Transf.</label>
+                <input
+                  type="number"
+                  value={editForm.priceTarjetaTransferencia}
+                  onChange={(e) => setEditForm({ ...editForm, priceTarjetaTransferencia: e.target.value })}
+                  className="form-input"
+                  placeholder="Mismo que base"
+                  step="0.01"
+                />
+              </div>
             </div>
           </div>
-        </>
-      )}
+
+          <div>
+            <label className="form-label">Descripción</label>
+            <textarea
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              className="form-textarea"
+              rows={2}
+              placeholder="Descripción del plan..."
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="editIsActive"
+              checked={editForm.isActive}
+              onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
+              className="h-4 w-4 text-brand rounded border-border-default focus:ring-brand"
+            />
+            <label htmlFor="editIsActive" className="text-sm text-text-secondary">
+              Plan activo (visible al crear membresías)
+            </label>
+          </div>
+        </form>
+      </Modal>
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => setShowCreateModal(false)}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-text-primary">Nuevo Plan de Membresía</h2>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="p-1 hover:bg-bg-surface rounded transition-colors"
-                >
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
-              </div>
-              
-              <form onSubmit={handleCreatePlan} className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label">Nombre del Plan *</label>
-                    <input
-                      type="text"
-                      value={createForm.name}
-                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                      className="form-input"
-                      placeholder="Ej: Mensual, Trimestral..."
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Duración (meses) *</label>
-                    <select
-                      value={createForm.durationMonths}
-                      onChange={(e) => setCreateForm({ ...createForm, durationMonths: e.target.value })}
-                      className="form-select"
-                    >
-                      <option value={1}>1 mes</option>
-                      <option value={3}>3 meses</option>
-                      <option value={6}>6 meses</option>
-                      <option value={12}>12 meses</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">Precio Base (ARS) *</label>
-                  <input
-                    type="number"
-                    value={createForm.price}
-                    onChange={(e) => setCreateForm({ ...createForm, price: e.target.value })}
-                    className="form-input"
-                    placeholder="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
-
-                <div className="border-t border-border-default pt-4">
-                  <p className="text-sm font-medium text-text-primary mb-3">Precios por Método de Pago</p>
-                  <p className="text-xs text-text-tertiary mb-3">Deja vacío para usar el precio base</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="form-label text-xs">Efectivo</label>
-                      <input
-                        type="number"
-                        value={createForm.priceEfectivo}
-                        onChange={(e) => setCreateForm({ ...createForm, priceEfectivo: e.target.value })}
-                        className="form-input"
-                        placeholder="Mismo que base"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label text-xs">Débito Auto.</label>
-                      <input
-                        type="number"
-                        value={createForm.priceDebitoAutomatico}
-                        onChange={(e) => setCreateForm({ ...createForm, priceDebitoAutomatico: e.target.value })}
-                        className="form-input"
-                        placeholder="Mismo que base"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label text-xs">Tarjeta/Transf.</label>
-                      <input
-                        type="number"
-                        value={createForm.priceTarjetaTransferencia}
-                        onChange={(e) => setCreateForm({ ...createForm, priceTarjetaTransferencia: e.target.value })}
-                        className="form-input"
-                        placeholder="Mismo que base"
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">Descripción</label>
-                  <textarea
-                    value={createForm.description}
-                    onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                    className="form-textarea"
-                    rows={2}
-                    placeholder="Descripción del plan..."
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isActive"
-                    checked={createForm.isActive}
-                    onChange={(e) => setCreateForm({ ...createForm, isActive: e.target.checked })}
-                    className="h-4 w-4 text-brand rounded border-border-default focus:ring-brand"
-                  />
-                  <label htmlFor="isActive" className="text-sm text-text-secondary">
-                    Plan activo (visible al crear membresías)
-                  </label>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="btn-secondary"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creating}
-                    className="btn-primary disabled:opacity-50"
-                  >
-                    {creating ? 'Creando...' : 'Crear Plan'}
-                  </button>
-                </div>
-              </form>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Nuevo Plan de Membresía"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowCreateModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button
+              onClick={handleCreatePlan}
+              disabled={creating}
+              className="btn-primary disabled:opacity-50"
+            >
+              {creating ? 'Creando...' : 'Crear Plan'}
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleCreatePlan} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Nombre del Plan *</label>
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                className="form-input"
+                placeholder="Ej: Mensual, Trimestral..."
+                required
+              />
+            </div>
+            <div>
+              <label className="form-label">Duración (meses) *</label>
+              <select
+                value={createForm.durationMonths}
+                onChange={(e) => setCreateForm({ ...createForm, durationMonths: e.target.value })}
+                className="form-select"
+              >
+                <option value={1}>1 mes</option>
+                <option value={3}>3 meses</option>
+                <option value={6}>6 meses</option>
+                <option value={12}>12 meses</option>
+              </select>
             </div>
           </div>
-        </>
-      )}
+
+          <div>
+            <label className="form-label">Precio Base (ARS) *</label>
+            <input
+              type="number"
+              value={createForm.price}
+              onChange={(e) => setCreateForm({ ...createForm, price: e.target.value })}
+              className="form-input"
+              placeholder="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div className="border-t border-border-default pt-4">
+            <p className="text-sm font-medium text-text-primary mb-3">Precios por Método de Pago</p>
+            <p className="text-xs text-text-tertiary mb-3">Deja vacío para usar el precio base</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="form-label text-xs">Efectivo</label>
+                <input
+                  type="number"
+                  value={createForm.priceEfectivo}
+                  onChange={(e) => setCreateForm({ ...createForm, priceEfectivo: e.target.value })}
+                  className="form-input"
+                  placeholder="Mismo que base"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="form-label text-xs">Débito Auto.</label>
+                <input
+                  type="number"
+                  value={createForm.priceDebitoAutomatico}
+                  onChange={(e) => setCreateForm({ ...createForm, priceDebitoAutomatico: e.target.value })}
+                  className="form-input"
+                  placeholder="Mismo que base"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="form-label text-xs">Tarjeta/Transf.</label>
+                <input
+                  type="number"
+                  value={createForm.priceTarjetaTransferencia}
+                  onChange={(e) => setCreateForm({ ...createForm, priceTarjetaTransferencia: e.target.value })}
+                  className="form-input"
+                  placeholder="Mismo que base"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label">Descripción</label>
+            <textarea
+              value={createForm.description}
+              onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+              className="form-textarea"
+              rows={2}
+              placeholder="Descripción del plan..."
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isActive"
+              checked={createForm.isActive}
+              onChange={(e) => setCreateForm({ ...createForm, isActive: e.target.checked })}
+              className="h-4 w-4 text-brand rounded border-border-default focus:ring-brand"
+            />
+            <label htmlFor="isActive" className="text-sm text-text-secondary">
+              Plan activo (visible al crear membresías)
+            </label>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
