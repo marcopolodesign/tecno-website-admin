@@ -188,12 +188,17 @@ const Users = () => {
     let filtered = users
 
     if (searchTerm) {
-      filtered = filtered.filter(user => 
-        user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.phone.includes(searchTerm)
-      )
+      const search = searchTerm.toLowerCase()
+      filtered = filtered.filter(user => {
+        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase()
+        return (
+          fullName.includes(search) ||
+          user.firstName.toLowerCase().includes(search) ||
+          user.lastName.toLowerCase().includes(search) ||
+          user.email.toLowerCase().includes(search) ||
+          user.phone.includes(searchTerm)
+        )
+      })
     }
 
     if (membershipFilter !== 'all') {

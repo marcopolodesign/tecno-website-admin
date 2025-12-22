@@ -135,12 +135,17 @@ const Leads = ({ userRole }) => {
     let filtered = leads
 
     if (searchTerm) {
-      filtered = filtered.filter(lead => 
-        lead.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.phone.includes(searchTerm)
-      )
+      const search = searchTerm.toLowerCase()
+      filtered = filtered.filter(lead => {
+        const fullName = `${lead.firstName} ${lead.lastName}`.toLowerCase()
+        return (
+          fullName.includes(search) ||
+          lead.firstName.toLowerCase().includes(search) ||
+          lead.lastName.toLowerCase().includes(search) ||
+          lead.email.toLowerCase().includes(search) ||
+          lead.phone.includes(searchTerm)
+        )
+      })
     }
 
     if (statusFilter !== 'all') {

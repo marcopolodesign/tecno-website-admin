@@ -96,12 +96,17 @@ const Prospects = () => {
     let filtered = prospects
 
     if (searchTerm) {
-      filtered = filtered.filter(prospect => 
-        (prospect.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-        (prospect.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-        prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (prospect.phone?.includes(searchTerm) || false)
-      )
+      const search = searchTerm.toLowerCase()
+      filtered = filtered.filter(prospect => {
+        const fullName = `${prospect.firstName || ''} ${prospect.lastName || ''}`.toLowerCase()
+        return (
+          fullName.includes(search) ||
+          (prospect.firstName?.toLowerCase().includes(search) || false) ||
+          (prospect.lastName?.toLowerCase().includes(search) || false) ||
+          prospect.email.toLowerCase().includes(search) ||
+          (prospect.phone?.includes(searchTerm) || false)
+        )
+      })
     }
 
     if (convertedFilter !== 'all') {
