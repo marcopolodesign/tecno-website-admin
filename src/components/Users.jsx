@@ -128,8 +128,9 @@ const Users = () => {
   // Get price based on selected plan and payment method
   const getCalculatedPrice = (planName, paymentMethod) => {
     const plan = membershipPlans.find(p => p.name === planName)
-    if (!plan) return ''
-    return membershipPlansService.getPriceForPaymentMethod(plan, paymentMethod)
+    if (!plan) return 0
+    const price = membershipPlansService.getPriceForPaymentMethod(plan, paymentMethod)
+    return price || plan.price || 0
   }
 
   // Handle create form change with auto-price

@@ -102,8 +102,9 @@ const Leads = ({ userRole }) => {
   // Get price based on selected plan and payment method
   const getCalculatedPrice = (planName, paymentMethod) => {
     const plan = membershipPlans.find(p => p.name === planName)
-    if (!plan) return ''
-    return membershipPlansService.getPriceForPaymentMethod(plan, paymentMethod)
+    if (!plan) return 0
+    const price = membershipPlansService.getPriceForPaymentMethod(plan, paymentMethod)
+    return price || plan.price || 0
   }
 
   // Handle membership type or payment method change with auto-price
@@ -115,7 +116,10 @@ const Leads = ({ userRole }) => {
       const planName = field === 'membershipType' ? value : convertFormData.membershipType
       const method = field === 'paymentMethod' ? value : convertFormData.paymentMethod
       const calculatedPrice = getCalculatedPrice(planName, method)
-      newFormData.paymentAmount = calculatedPrice
+      // Only update if we got a valid price
+      if (calculatedPrice !== undefined && calculatedPrice !== null) {
+        newFormData.paymentAmount = calculatedPrice
+      }
     }
     
     setConvertFormData(newFormData)
