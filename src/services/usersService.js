@@ -48,16 +48,15 @@ export const usersService = {
       if (!selectedPlan) throw new Error('Invalid membership type')
 
       const userData = {
-        profile_id: user.id,
         first_name: data.firstName,
         last_name: data.lastName || '',
         email: data.email,
         phone: data.phone,
         training_goal: data.trainingGoal,
         membership_type: data.membershipType,
-        membership_status: 'activo',
-        start_date: data.startDate,
-        end_date: data.endDate,
+        membership_status: 'active',
+        membership_start_date: data.startDate,
+        membership_end_date: data.endDate,
         emergency_contact: data.emergencyContact || '',
         emergency_phone: data.emergencyPhone || '',
         medical_notes: data.medicalNotes || '',
