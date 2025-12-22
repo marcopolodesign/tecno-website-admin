@@ -37,6 +37,14 @@ const Users = () => {
     reason: ''
   })
   const [showCreateModal, setShowCreateModal] = useState(false)
+  // Calculate default end date (1 month from today)
+  const getDefaultEndDate = () => {
+    const today = new Date()
+    const endDate = new Date(today)
+    endDate.setMonth(endDate.getMonth() + 1)
+    return endDate.toISOString().split('T')[0]
+  }
+
   const [createFormData, setCreateFormData] = useState({
     firstName: '',
     lastName: '',
@@ -45,7 +53,7 @@ const Users = () => {
     trainingGoal: '',
     membershipType: 'Socio_Basic',
     startDate: new Date().toISOString().split('T')[0],
-    endDate: '',
+    endDate: getDefaultEndDate(),
     emergencyContact: '',
     emergencyPhone: '',
     medicalNotes: '',
@@ -212,24 +220,25 @@ const Users = () => {
       setUsers([response.data, ...users])
       setShowCreateModal(false)
       // Reset form
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
+      const today = new Date()
+      const endDate = new Date(today)
+      endDate.setMonth(endDate.getMonth() + 1)
       setCreateFormData({
         firstName: '',
         lastName: '',
         email: '',
         phone: '',
         trainingGoal: '',
-        membershipType: 'mensual',
-        startDate: tomorrow.toISOString().split('T')[0],
-        endDate: '',
+        membershipType: 'Socio_Basic',
+        startDate: today.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
         emergencyContact: '',
         emergencyPhone: '',
         medicalNotes: '',
         notes: '',
         createPayment: true,
         paymentMethod: 'efectivo',
-        paymentAmount: '',
+        paymentAmount: 60000,
         paymentNotes: ''
       })
       toast.success('Usuario creado exitosamente')
@@ -1095,238 +1104,259 @@ const Users = () => {
             className="fixed inset-0 bg-black/50 z-[70]"
             onClick={() => setShowCreateModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-text-primary mb-6">
-              Crear Nuevo Usuario
-            </h3>
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] w-full max-w-3xl max-h-[90vh] flex flex-col">
+            {/* Header - Fixed */}
+            <div className="p-6 border-b border-border-default shrink-0">
+              <h3 className="text-xl font-bold text-text-primary">
+                Crear Nuevo Usuario
+              </h3>
+            </div>
             
-            <div className="space-y-4">
-              {/* Personal Info */}
-              <div className="border-b border-border-default pb-4">
-                <h4 className="font-semibold text-text-primary mb-3">Información Personal</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label">Nombre *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={createFormData.firstName}
-                      onChange={(e) => setCreateFormData({...createFormData, firstName: e.target.value})}
-                      placeholder="Juan"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Apellido</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={createFormData.lastName}
-                      onChange={(e) => setCreateFormData({...createFormData, lastName: e.target.value})}
-                      placeholder="Pérez"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <label className="form-label">Email *</label>
-                    <input
-                      type="email"
-                      className="form-input"
-                      value={createFormData.email}
-                      onChange={(e) => setCreateFormData({...createFormData, email: e.target.value})}
-                      placeholder="juan@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Teléfono *</label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      value={createFormData.phone}
-                      onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
-                      placeholder="+54 9 11 1234-5678"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="form-label">Objetivo de entrenamiento *</label>
-                  <select
-                    className="form-input"
-                    value={createFormData.trainingGoal}
-                    onChange={(e) => setCreateFormData({...createFormData, trainingGoal: e.target.value})}
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="weight_loss">Pérdida de peso</option>
-                    <option value="muscle_gain">Aumento de masa muscular</option>
-                    <option value="general_fitness">Fitness general</option>
-                    <option value="sports_performance">Rendimiento deportivo</option>
-                    <option value="rehabilitation">Rehabilitación</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Membership Info */}
-              <div className="border-b border-border-default pb-4">
-                <h4 className="font-semibold text-text-primary mb-3">Información de Membresía</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="form-label">Tipo de Membresía *</label>
-                    <select
-                      className="form-input"
-                      value={createFormData.membershipType}
-                      onChange={(e) => handleCreateFormChange('membershipType', e.target.value)}
-                    >
-                      {membershipPlans.map(plan => (
-                        <option key={plan.id} value={plan.name}>
-                          {plan.name} ({plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Fecha de Inicio *</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={createFormData.startDate}
-                      onChange={(e) => setCreateFormData({...createFormData, startDate: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Fecha de Fin *</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={createFormData.endDate}
-                      onChange={(e) => setCreateFormData({...createFormData, endDate: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Emergency Contact */}
-              <div className="border-b border-border-default pb-4">
-                <h4 className="font-semibold text-text-primary mb-3">Contacto de Emergencia</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label">Nombre del Contacto</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={createFormData.emergencyContact}
-                      onChange={(e) => setCreateFormData({...createFormData, emergencyContact: e.target.value})}
-                      placeholder="María Pérez"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Teléfono de Emergencia</label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      value={createFormData.emergencyPhone}
-                      onChange={(e) => setCreateFormData({...createFormData, emergencyPhone: e.target.value})}
-                      placeholder="+54 9 11 9876-5432"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <h4 className="font-semibold text-text-primary mb-3">Notas</h4>
-                <div>
-                  <label className="form-label">Notas Médicas</label>
-                  <textarea
-                    className="form-input"
-                    rows="2"
-                    value={createFormData.medicalNotes}
-                    onChange={(e) => setCreateFormData({...createFormData, medicalNotes: e.target.value})}
-                    placeholder="Condiciones médicas, lesiones, etc..."
-                  />
-                </div>
-                <div className="mt-4">
-                  <label className="form-label">Notas Generales</label>
-                  <textarea
-                    className="form-input"
-                    rows="2"
-                    value={createFormData.notes}
-                    onChange={(e) => setCreateFormData({...createFormData, notes: e.target.value})}
-                    placeholder="Información adicional..."
-                  />
-                </div>
-              </div>
-
-              {/* Payment Info */}
-              <div className="border-b border-border-default pb-4">
-                <h4 className="font-semibold text-text-primary mb-3">Información de Pago</h4>
-                <div className="mb-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={createFormData.createPayment}
-                      onChange={(e) => setCreateFormData({...createFormData, createPayment: e.target.checked})}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Registrar pago</span>
-                  </label>
-                </div>
-
-                {createFormData.createPayment && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="form-label">Método de Pago *</label>
-                        <select
-                          className="form-input"
-                          value={createFormData.paymentMethod}
-                          onChange={(e) => handleCreateFormChange('paymentMethod', e.target.value)}
-                        >
-                          <option value="efectivo">Efectivo (Promo)</option>
-                          <option value="debito_automatico">Débito Automático</option>
-                          <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="form-label">Monto *</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
-                          <input
-                            type="number"
-                            className="form-input pl-7"
-                            value={createFormData.paymentAmount}
-                            onChange={(e) => setCreateFormData({...createFormData, paymentAmount: e.target.value})}
-                            placeholder="0"
-                            step="1"
-                          />
-                        </div>
-                        <p className="text-xs text-text-tertiary mt-1">
-                          Precio sugerido. Editar para casos especiales.
-                        </p>
-                      </div>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {/* Personal Info */}
+                <div className="border-b border-border-default pb-4">
+                  <h4 className="font-semibold text-text-primary mb-3">Información Personal</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">Nombre *</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={createFormData.firstName}
+                        onChange={(e) => setCreateFormData({...createFormData, firstName: e.target.value})}
+                        placeholder="Juan"
+                      />
                     </div>
                     <div>
-                      <label className="form-label">Notas de Pago</label>
-                      <textarea
+                      <label className="form-label">Apellido</label>
+                      <input
+                        type="text"
                         className="form-input"
-                        rows="2"
-                        value={createFormData.paymentNotes}
-                        onChange={(e) => setCreateFormData({...createFormData, paymentNotes: e.target.value})}
-                        placeholder="Información adicional sobre el pago..."
+                        value={createFormData.lastName}
+                        onChange={(e) => setCreateFormData({...createFormData, lastName: e.target.value})}
+                        placeholder="Pérez"
                       />
                     </div>
                   </div>
-                )}
+
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="form-label">Email *</label>
+                      <input
+                        type="email"
+                        className="form-input"
+                        value={createFormData.email}
+                        onChange={(e) => setCreateFormData({...createFormData, email: e.target.value})}
+                        placeholder="juan@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Teléfono *</label>
+                      <input
+                        type="tel"
+                        className="form-input"
+                        value={createFormData.phone}
+                        onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
+                        placeholder="+54 9 11 1234-5678"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="form-label">Objetivo de entrenamiento *</label>
+                    <select
+                      className="form-input"
+                      value={createFormData.trainingGoal}
+                      onChange={(e) => setCreateFormData({...createFormData, trainingGoal: e.target.value})}
+                    >
+                      <option value="">Seleccionar...</option>
+                      <option value="weight_loss">Pérdida de peso</option>
+                      <option value="muscle_gain">Aumento de masa muscular</option>
+                      <option value="general_fitness">Fitness general</option>
+                      <option value="sports_performance">Rendimiento deportivo</option>
+                      <option value="rehabilitation">Rehabilitación</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Membership & Payment Combined */}
+                <div className="border-b border-border-default pb-4">
+                  <h4 className="font-semibold text-text-primary mb-3">Membresía y Pago</h4>
+                  
+                  {/* Membership Selection */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="form-label">Tipo de Membresía *</label>
+                      <select
+                        className="form-input"
+                        value={createFormData.membershipType}
+                        onChange={(e) => handleCreateFormChange('membershipType', e.target.value)}
+                      >
+                        {membershipPlans.map(plan => (
+                          <option key={plan.id} value={plan.name}>
+                            {plan.name} ({plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Fecha de Inicio *</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={createFormData.startDate}
+                        onChange={(e) => {
+                          const startDate = new Date(e.target.value)
+                          const endDate = new Date(startDate)
+                          endDate.setMonth(endDate.getMonth() + 1)
+                          setCreateFormData({
+                            ...createFormData, 
+                            startDate: e.target.value,
+                            endDate: endDate.toISOString().split('T')[0]
+                          })
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Fecha de Fin *</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={createFormData.endDate}
+                        onChange={(e) => setCreateFormData({...createFormData, endDate: e.target.value})}
+                      />
+                      <p className="text-xs text-text-tertiary mt-1">
+                        Por defecto: 1 mes desde inicio
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Payment Section */}
+                  <div className="mt-4 pt-4 border-t border-border-default">
+                    <div className="mb-4">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={createFormData.createPayment}
+                          onChange={(e) => setCreateFormData({...createFormData, createPayment: e.target.checked})}
+                          className="h-4 w-4 text-brand focus:ring-brand border-border-default rounded"
+                        />
+                        <span className="ml-2 text-sm text-text-secondary">Registrar pago inicial</span>
+                      </label>
+                    </div>
+
+                    {createFormData.createPayment && (
+                      <div className="space-y-4 bg-bg-surface/50 p-4 rounded-lg">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="form-label">Método de Pago *</label>
+                            <select
+                              className="form-input"
+                              value={createFormData.paymentMethod}
+                              onChange={(e) => handleCreateFormChange('paymentMethod', e.target.value)}
+                            >
+                              <option value="efectivo">Efectivo (Promo)</option>
+                              <option value="debito_automatico">Débito Automático</option>
+                              <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="form-label">Monto *</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-tertiary">$</span>
+                              <input
+                                type="number"
+                                className="form-input pl-7"
+                                value={createFormData.paymentAmount}
+                                onChange={(e) => setCreateFormData({...createFormData, paymentAmount: e.target.value})}
+                                placeholder="0"
+                                step="1"
+                              />
+                            </div>
+                            <p className="text-xs text-text-tertiary mt-1">
+                              Precio sugerido. Editar para casos especiales.
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="form-label">Notas de Pago</label>
+                          <textarea
+                            className="form-input"
+                            rows="2"
+                            value={createFormData.paymentNotes}
+                            onChange={(e) => setCreateFormData({...createFormData, paymentNotes: e.target.value})}
+                            placeholder="Información adicional sobre el pago..."
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Emergency Contact */}
+                <div className="border-b border-border-default pb-4">
+                  <h4 className="font-semibold text-text-primary mb-3">Contacto de Emergencia</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">Nombre del Contacto</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={createFormData.emergencyContact}
+                        onChange={(e) => setCreateFormData({...createFormData, emergencyContact: e.target.value})}
+                        placeholder="María Pérez"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Teléfono de Emergencia</label>
+                      <input
+                        type="tel"
+                        className="form-input"
+                        value={createFormData.emergencyPhone}
+                        onChange={(e) => setCreateFormData({...createFormData, emergencyPhone: e.target.value})}
+                        placeholder="+54 9 11 9876-5432"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <h4 className="font-semibold text-text-primary mb-3">Notas</h4>
+                  <div>
+                    <label className="form-label">Notas Médicas</label>
+                    <textarea
+                      className="form-input"
+                      rows="2"
+                      value={createFormData.medicalNotes}
+                      onChange={(e) => setCreateFormData({...createFormData, medicalNotes: e.target.value})}
+                      placeholder="Condiciones médicas, lesiones, etc..."
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <label className="form-label">Notas Generales</label>
+                    <textarea
+                      className="form-input"
+                      rows="2"
+                      value={createFormData.notes}
+                      onChange={(e) => setCreateFormData({...createFormData, notes: e.target.value})}
+                      placeholder="Información adicional..."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
+            {/* Footer - Fixed/Sticky */}
+            <div className="p-6 border-t border-border-default bg-bg-secondary shrink-0 flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setShowCreateModal(false)
-                  const tomorrow = new Date()
-                  tomorrow.setDate(tomorrow.getDate() + 1)
+                  const today = new Date()
+                  const endDate = new Date(today)
+                  endDate.setMonth(endDate.getMonth() + 1)
                   setCreateFormData({
                     firstName: '',
                     lastName: '',
@@ -1334,8 +1364,8 @@ const Users = () => {
                     phone: '',
                     trainingGoal: '',
                     membershipType: 'Socio_Basic',
-                    startDate: tomorrow.toISOString().split('T')[0],
-                    endDate: '',
+                    startDate: today.toISOString().split('T')[0],
+                    endDate: endDate.toISOString().split('T')[0],
                     emergencyContact: '',
                     emergencyPhone: '',
                     medicalNotes: '',
