@@ -18,6 +18,17 @@ import { getCurrentUserForLogging } from '../utils/logHelpers'
 import LogsTimeline from './LogsTimeline'
 import Modal from './Modal'
 
+// Helper to format date without timezone issues
+// Parses YYYY-MM-DD string and formats as DD/MM/YYYY without timezone shift
+const formatDateSafe = (dateString) => {
+  if (!dateString) return '-'
+  // If it's a date string like "2025-01-25" or "2025-01-25T00:00:00"
+  const datePart = dateString.split('T')[0]
+  const [year, month, day] = datePart.split('-')
+  if (!year || !month || !day) return '-'
+  return `${day}/${month}/${year}`
+}
+
 const Users = () => {
   const [users, setUsers] = useState([])
   const [filteredUsers, setFilteredUsers] = useState([])
@@ -761,13 +772,13 @@ const Users = () => {
               field: 'membershipStartDate',
               headerName: 'Inicio',
               width: 120,
-              valueFormatter: (value) => value ? new Date(value).toLocaleDateString('es-AR') : '-'
+              valueFormatter: (value) => formatDateSafe(value)
             },
             {
               field: 'membershipEndDate',
               headerName: 'Fin',
               width: 120,
-              valueFormatter: (value) => value ? new Date(value).toLocaleDateString('es-AR') : '-'
+              valueFormatter: (value) => formatDateSafe(value)
             },
             {
               field: 'actions',
@@ -952,10 +963,10 @@ const Users = () => {
                 <div className="border-t border-border-default pt-4">
                   <label className="text-sm font-medium text-text-tertiary">Período de membresía</label>
                   <p className="text-text-primary">
-                    {new Date(selectedUser.startDate).toLocaleDateString('es-AR')}
+                    {formatDateSafe(selectedUser.startDate || selectedUser.membershipStartDate)}
                   </p>
                   <p className="text-text-secondary text-sm">
-                    hasta {new Date(selectedUser.endDate).toLocaleDateString('es-AR')}
+                    hasta {formatDateSafe(selectedUser.endDate || selectedUser.membershipEndDate)}
                   </p>
                 </div>
 
@@ -1638,7 +1649,7 @@ const Users = () => {
             </p>
             <p className="text-sm text-text-secondary mt-1">
               Vence: <span className="font-semibold text-text-primary">
-                {selectedUser?.membershipEndDate ? new Date(selectedUser.membershipEndDate).toLocaleDateString('es-AR') : 'N/A'}
+                {formatDateSafe(selectedUser?.membershipEndDate)}
               </span>
             </p>
           </div>
