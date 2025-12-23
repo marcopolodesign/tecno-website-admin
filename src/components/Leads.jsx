@@ -280,14 +280,21 @@ const Leads = ({ userRole }) => {
         paymentDate: new Date().toISOString(),
         notes: convertFormData.paymentNotes
       }
-      
+
       await leadsService.convertToUser(leadToConvert.id, leadToConvert, convertFormData, paymentData)
       setShowConvertModal(false)
       fetchLeads()
-      alert('¡Lead convertido a Usuario exitosamente!')
+      toast.success('¡Lead convertido a Usuario exitosamente!')
     } catch (error) {
       console.error('Error converting lead:', error)
-      alert('Error al convertir lead. Verifica que los datos estén completos.')
+      
+      // Check if it's a duplicate email error
+      if (error?.code === '23505' || error?.message?.includes('users_email_key') || error?.message?.includes('duplicate key')) {
+        toast.error('Este email ya está en uso. Ya existe un usuario con este email.')
+        setShowConvertModal(false)
+      } else {
+        toast.error('Error al convertir lead. Verifica que los datos estén completos.')
+      }
     }
   }
 

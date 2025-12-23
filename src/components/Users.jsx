@@ -271,7 +271,35 @@ const Users = () => {
       toast.success('Usuario creado exitosamente')
     } catch (error) {
       console.error('Error creating user:', error)
-      toast.error('Error al crear usuario')
+      
+      // Check if it's a duplicate email error
+      if (error?.code === '23505' || error?.message?.includes('users_email_key') || error?.message?.includes('duplicate key')) {
+        toast.error('Este email ya está en uso')
+        
+        // Find the existing user with this email and open their sidecart
+        const existingUser = users.find(u => u.email.toLowerCase() === createFormData.email.toLowerCase())
+        if (existingUser) {
+          setShowCreateModal(false)
+          setSelectedUser(existingUser)
+          setEditFormData({
+            firstName: existingUser.firstName || '',
+            lastName: existingUser.lastName || '',
+            email: existingUser.email || '',
+            phone: existingUser.phone || '',
+            trainingGoal: existingUser.trainingGoal || '',
+            membershipType: existingUser.membershipType || '',
+            emergencyContact: existingUser.emergencyContact || '',
+            emergencyPhone: existingUser.emergencyPhone || '',
+            medicalNotes: existingUser.medicalNotes || '',
+            notes: existingUser.notes || '',
+            assignedSellerId: existingUser.assignedSellerId || null
+          })
+          setHasChanges(false)
+          setShowSidePanel(true)
+        }
+      } else {
+        toast.error('Error al crear usuario')
+      }
     }
   }
 
