@@ -940,9 +940,11 @@ const Leads = ({ userRole }) => {
                     value={convertFormData.paymentMethod}
                     onChange={(e) => handleConvertFormChange('paymentMethod', e.target.value)}
                   >
-                    <option value="efectivo">Efectivo (Promo)</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="mercadopago">MercadoPago</option>
                     <option value="debito_automatico">Débito Automático</option>
-                    <option value="tarjeta_transferencia">Tarjeta / Transferencia</option>
                   </select>
                 </div>
                 <div>
