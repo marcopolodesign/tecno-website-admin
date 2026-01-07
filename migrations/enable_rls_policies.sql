@@ -26,3 +26,9 @@ CREATE POLICY "Allow write for staff" ON users FOR ALL USING (auth.role() = 'aut
 CREATE POLICY "Allow write for staff" ON sellers FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow write for staff" ON coaches FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow write for staff" ON locations FOR ALL USING (auth.role() = 'authenticated');
+
+
+
+
+
+

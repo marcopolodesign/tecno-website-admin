@@ -377,20 +377,22 @@ const Leads = ({ userRole }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'nuevo': return 'status-nuevo'
-      case 'contactado': return 'status-contactado'
-      case 'convertido': return 'status-convertido'
-      case 'perdido': return 'status-perdido'
+      case 'new': return 'status-nuevo'
+      case 'contacted': return 'status-contactado'
+      case 'qualified': return 'status-calificado'
+      case 'converted': return 'status-convertido'
+      case 'lost': return 'status-perdido'
       default: return 'bg-bg-surface text-text-secondary'
     }
   }
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'nuevo': return 'Nuevo'
-      case 'contactado': return 'Contactado'
-      case 'convertido': return 'Convertido'
-      case 'perdido': return 'Perdido'
+      case 'new': return 'Nuevo'
+      case 'contacted': return 'Contactado'
+      case 'qualified': return 'Calificado'
+      case 'converted': return 'Convertido'
+      case 'lost': return 'Perdido'
       default: return status
     }
   }
@@ -466,10 +468,11 @@ const Leads = ({ userRole }) => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">Todos los estados</option>
-              <option value="nuevo">Nuevo</option>
-              <option value="contactado">Contactado</option>
-              <option value="convertido">Convertido</option>
-              <option value="perdido">Perdido</option>
+              <option value="new">Nuevo</option>
+              <option value="contacted">Contactado</option>
+              <option value="qualified">Calificado</option>
+              <option value="converted">Convertido</option>
+              <option value="lost">Perdido</option>
             </select>
           </div>
         </div>
@@ -615,10 +618,10 @@ const Leads = ({ userRole }) => {
           }}
           processRowUpdate={async (newRow, oldRow) => {
             // Handle status change with reason if needed
-            if (newRow.status !== oldRow.status && newRow.status === 'perdido') {
+            if (newRow.status !== oldRow.status && newRow.status === 'lost') {
               setReasonData({
                 leadId: newRow.id,
-                newStatus: 'perdido',
+                newStatus: 'lost',
                 reason: ''
               })
               setShowReasonModal(true)
@@ -737,11 +740,11 @@ const Leads = ({ userRole }) => {
                 onChange={(e) => setEditingStatus(e.target.value)}
                 className="form-select w-full"
               >
-                <option value="nuevo">Nuevo</option>
-                <option value="contactado">Contactado</option>
-                <option value="en-negociacion">En negociación</option>
-                <option value="convertido">Convertido</option>
-                <option value="perdido">Perdido</option>
+                <option value="new">Nuevo</option>
+                <option value="contacted">Contactado</option>
+                <option value="qualified">Calificado</option>
+                <option value="converted">Convertido</option>
+                <option value="lost">Perdido</option>
               </select>
               {editingStatus !== selectedLead.status && (
                 <button
