@@ -320,9 +320,14 @@ const Leads = ({ userRole }) => {
     const newFormData = { ...editFormData, [field]: value }
     setEditFormData(newFormData)
     
-    // Check if there are changes
+    // Check if there are changes (handle null values properly)
     const hasAnyChanges = Object.keys(newFormData).some(key => {
-      return newFormData[key] !== (selectedLead[key] || '')
+      const newValue = newFormData[key]
+      const oldValue = selectedLead[key]
+      // Handle null/undefined/empty string comparisons
+      const normalizedNew = newValue === null || newValue === undefined ? '' : newValue
+      const normalizedOld = oldValue === null || oldValue === undefined ? '' : oldValue
+      return normalizedNew !== normalizedOld
     })
     setHasChanges(hasAnyChanges)
   }
