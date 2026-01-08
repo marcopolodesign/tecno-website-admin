@@ -300,7 +300,7 @@ const Leads = ({ userRole }) => {
 
   const handleUpdateStatus = async () => {
     try {
-      await leadsService.updateLead(selectedLead.documentId, { 
+      await leadsService.updateLead(selectedLead.id, { 
         status: editingStatus,
         lastContactedAt: new Date().toISOString()
       })
@@ -334,7 +334,7 @@ const Leads = ({ userRole }) => {
 
   const handleSaveEdit = async () => {
     try {
-      await leadsService.updateLead(selectedLead.documentId, editFormData)
+      await leadsService.updateLead(selectedLead.id, editFormData)
       setLeads(leads.map(l => 
         l.id === selectedLead.id 
           ? { ...l, ...editFormData }
@@ -635,7 +635,7 @@ const Leads = ({ userRole }) => {
             
             // Handle other edits
             try {
-              await leadsService.updateLead(newRow.documentId, {
+              await leadsService.updateLead(newRow.id, {
                 firstName: newRow.firstName,
                 lastName: newRow.lastName,
                 phone: newRow.phone,

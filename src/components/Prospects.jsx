@@ -148,7 +148,7 @@ const Prospects = () => {
 
   const handleSaveEdit = async () => {
     try {
-      await prospectsService.updateProspect(selectedProspect.documentId, editFormData)
+      await prospectsService.updateProspect(selectedProspect.id, editFormData)
       setProspects(prospects.map(p => 
         p.id === selectedProspect.id 
           ? { ...p, ...editFormData }
