@@ -817,6 +817,7 @@ const Users = () => {
             setEditFormData({
               firstName: params.row.firstName || '',
               lastName: params.row.lastName || '',
+              email: params.row.email || '',
               phone: params.row.phone || '',
               emergencyContact: params.row.emergencyContact || '',
               emergencyPhone: params.row.emergencyPhone || '',
@@ -898,8 +899,13 @@ const Users = () => {
               {/* User Info - Editable Fields */}
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-text-tertiary">Email</label>
-                  <p className="text-lg font-medium text-text-primary">{selectedUser.email}</p>
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={editFormData.email ?? ''}
+                    onChange={(e) => handleFormChange('email', e.target.value)}
+                  />
                 </div>
 
                 <div className="border-t border-border-default pt-4">

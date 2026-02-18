@@ -36,6 +36,8 @@ const Dashboard = () => {
   })
   const [expiringMemberships, setExpiringMemberships] = useState([])
   const [showExpiringSidecart, setShowExpiringSidecart] = useState(false)
+  const [uncontactedLeads, setUncontactedLeads] = useState([])
+  const [showUncontactedSidecart, setShowUncontactedSidecart] = useState(false)
   const [showMembershipTypeSidecart, setShowMembershipTypeSidecart] = useState(false)
   const [selectedMembershipType, setSelectedMembershipType] = useState(null)
   const [recentItems, setRecentItems] = useState({
@@ -71,6 +73,9 @@ const Dashboard = () => {
       const revenue = revenueData.status === 'fulfilled' ? (revenueData.value.data || {}) : {}
       const expiring = expiringData.status === 'fulfilled' ? (expiringData.value.data || []) : []
       
+      // Filter leads with status 'nuevo' (uncontacted)
+      const newLeads = leads.filter(lead => lead.status === 'nuevo')
+      
       const newStats = {
         totalUsers: users.length,
         activeUsers: users.filter(user => user.membershipStatus === 'active').length,
@@ -92,6 +97,7 @@ const Dashboard = () => {
       setFunnelData(funnelStats)
       setRevenueStats(revenue)
       setExpiringMemberships(expiring)
+      setUncontactedLeads(newLeads)
       setRecentItems({
         prospects: prospects.slice(0, 3),
         leads: leads.slice(0, 3),
@@ -387,6 +393,33 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Uncontacted Leads Alert */}
+      {uncontactedLeads.length > 0 && (
+        <div 
+          className="card bg-info/5 border-info/20 cursor-pointer hover:bg-info/10 transition-colors"
+          onClick={() => setShowUncontactedSidecart(true)}
+        >
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 bg-info/10 rounded">
+              <PhoneIcon className="h-4 w-4 text-info" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-info">
+                {uncontactedLeads.length} lead{uncontactedLeads.length > 1 ? 's' : ''} sin contactar
+              </p>
+              <p className="text-xs text-text-secondary mt-1">
+                Hay leads nuevos que aún no han sido contactados. Haz clic para ver detalles.
+              </p>
+            </div>
+            <div className="text-text-tertiary">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Leads Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="card">
@@ -631,6 +664,163 @@ const Dashboard = () => {
                 </div>
                 <button
                   onClick={() => setShowExpiringSidecart(false)}
+                  className="btn-secondary"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Uncontacted Leads Sidecart */}
+      {showUncontactedSidecart && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+            onClick={() => setShowUncontactedSidecart(false)}
+          />
+          
+          {/* Sidecart Panel */}
+          <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-bg-primary shadow-xl z-50 overflow-hidden flex flex-col animate-slide-in-right">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border-default">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-info/10 rounded-lg">
+                  <PhoneIcon className="h-6 w-6 text-info" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-text-primary">Leads Sin Contactar</h2>
+                  <p className="text-sm text-text-secondary mt-1">
+                    {uncontactedLeads.length} lead{uncontactedLeads.length > 1 ? 's' : ''} pendiente{uncontactedLeads.length > 1 ? 's' : ''} de contacto
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUncontactedSidecart(false)}
+                className="p-2 hover:bg-bg-surface rounded-lg transition-colors"
+              >
+                <XMarkIcon className="h-6 w-6 text-text-secondary" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-3">
+                {uncontactedLeads.map((lead) => {
+                  const createdAt = lead.createdAt ? new Date(lead.createdAt) : null
+                  const daysSinceCreation = createdAt 
+                    ? Math.floor((new Date() - createdAt) / (1000 * 60 * 60 * 24))
+                    : null
+                  const isUrgent = daysSinceCreation !== null && daysSinceCreation >= 3
+                  
+                  return (
+                    <div 
+                      key={lead.id} 
+                      className={`card ${isUrgent ? 'border-error/30 bg-error/5' : 'border-info/30 bg-info/5'}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1">
+                          {/* Avatar */}
+                          <div className={`h-10 w-10 rounded-full ${isUrgent ? 'bg-error/20' : 'bg-info/20'} flex items-center justify-center shrink-0`}>
+                            <span className={`text-sm font-semibold ${isUrgent ? 'text-error' : 'text-info'}`}>
+                              {lead.firstName?.charAt(0) || 'L'}
+                              {lead.lastName?.charAt(0) || ''}
+                            </span>
+                          </div>
+
+                          {/* Lead Info */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-text-primary truncate">
+                              {lead.firstName} {lead.lastName || ''}
+                            </h3>
+                            <p className="text-xs text-text-secondary truncate">
+                              {lead.email}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-text-muted">
+                                {lead.phone}
+                              </p>
+                              {lead.phone && (
+                                <a
+                                  href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center w-5 h-5 rounded hover:bg-success/10 transition-colors group"
+                                  title="Abrir WhatsApp"
+                                >
+                                  <svg className="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                                  </svg>
+                                </a>
+                              )}
+                            </div>
+                            
+                            {/* Lead Details */}
+                            <div className="flex items-center gap-3 mt-2 flex-wrap">
+                              <span className="status-badge status-nuevo">
+                                Nuevo
+                              </span>
+                              {lead.source && (
+                                <span className="text-xs text-text-muted capitalize">
+                                  Fuente: {lead.source}
+                                </span>
+                              )}
+                              {createdAt && (
+                                <span className="text-xs text-text-muted">
+                                  {createdAt.toLocaleDateString('es-AR')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Days Badge */}
+                        {daysSinceCreation !== null && (
+                          <div className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg ${isUrgent ? 'bg-error/10' : 'bg-info/10'}`}>
+                            <span className={`text-2xl font-bold ${isUrgent ? 'text-error' : 'text-info'}`}>
+                              {daysSinceCreation}
+                            </span>
+                            <span className={`text-xs ${isUrgent ? 'text-error' : 'text-info'}`}>
+                              día{daysSinceCreation !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {uncontactedLeads.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-4">
+                    <svg className="h-8 w-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-text-secondary">No hay leads sin contactar</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-border-default bg-bg-surface">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-error/20" />
+                    <span className="text-text-secondary">Urgente (≥3 días)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-info/20" />
+                    <span className="text-text-secondary">Nuevo (&lt;3 días)</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowUncontactedSidecart(false)}
                   className="btn-secondary"
                 >
                   Cerrar
