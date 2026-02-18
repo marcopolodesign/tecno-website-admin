@@ -1068,7 +1068,7 @@ const Users = () => {
                 )}
 
                 {/* Activity Logs */}
-                <div className="border-t border-border-default pt-4">
+                <div className="pt-4">
                   <LogsTimeline userId={selectedUser.id} limit={10} />
                 </div>
               </div>
