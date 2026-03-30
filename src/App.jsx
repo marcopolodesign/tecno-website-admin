@@ -12,6 +12,8 @@ import ContentManagement from './components/ContentManagement'
 import MembershipPlans from './components/MembershipPlans'
 import Exercises from './components/Exercises'
 import Routines from './components/Routines'
+import CheckIn from './components/CheckIn'
+import MemberAccess from './components/MemberAccess'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { authService } from './services/authService'
@@ -33,7 +35,7 @@ function App() {
         if (token) {
           const isValid = await authService.verifyToken(token)
           setIsAuthenticated(isValid)
-          
+
           if (isValid) {
             const profile = await authService.getCurrentUserProfile()
             setUserRole(profile?.role || 'coach') // Fallback/Default
@@ -115,59 +117,136 @@ function App() {
     return false
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          <span className="text-text-secondary text-sm">Cargando...</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />
-  }
-
   return (
     <Router>
-      <div className="min-h-screen bg-bg-primary flex">
-        <Sidebar 
-          userRole={userRole} 
-          userEmail={userEmail}
-          mobileMenuOpen={mobileMenuOpen} 
-          onCloseMobileMenu={closeMobileMenu} 
+      <Routes>
+        {/* ─── Public standalone routes (no auth required) ─── */}
+        <Route path="/check-in" element={<CheckIn />} />
+        <Route path="/acceso" element={<MemberAccess />} />
+
+        {/* ─── All other routes — behind auth wall ─── */}
+        <Route
+          path="*"
+          element={
+            loading ? (
+              <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                  <span className="text-text-secondary text-sm">Cargando...</span>
+                </div>
+              </div>
+            ) : !isAuthenticated ? (
+              <Login onLogin={handleLogin} />
+            ) : (
+              <AuthenticatedShell
+                userRole={userRole}
+                userEmail={userEmail}
+                mobileMenuOpen={mobileMenuOpen}
+                onLogout={handleLogout}
+                onMenuToggle={toggleMobileMenu}
+                onCloseMobileMenu={closeMobileMenu}
+                canAccess={canAccess}
+              />
+            )
+          }
         />
-        <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-          <Header onLogout={handleLogout} onMenuToggle={toggleMobileMenu} />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-              <Routes>
-                <Route path="/" element={<Navigate to={canAccess('/dashboard') ? "/dashboard" : "/users"} replace />} />
-                
-                {canAccess('/dashboard') && <Route path="/dashboard" element={<Dashboard />} />}
-                {canAccess('/prospects') && <Route path="/prospects" element={<Prospects />} />}
-                {canAccess('/leads') && <Route path="/leads" element={<Leads userRole={userRole} />} />}
-                {canAccess('/users') && <Route path="/users" element={<Users />} />}
-                {canAccess('/membership-plans') && <Route path="/membership-plans" element={<MembershipPlans userRole={userRole} />} />}
-                {canAccess('/sellers') && <Route path="/sellers" element={<Sellers />} />}
-                {canAccess('/coaches') && <Route path="/coaches" element={<Coaches />} />}
-                {canAccess('/locations') && <Route path="/locations" element={<Locations />} />}
-                {canAccess('/content') && <Route path="/content" element={<ContentManagement />} />}
-                
-                {/* Fitness Routes */}
-                {canAccess('/exercises') && <Route path="/exercises" element={<Exercises />} />}
-                {canAccess('/routines') && <Route path="/routines" element={<Routines />} />}
-                
-                {/* Fallback for unauthorized routes */}
-                <Route path="*" element={<Navigate to={canAccess('/dashboard') ? "/dashboard" : "/users"} replace />} />
-              </Routes>
-            </div>
-          </main>
-        </div>
-      </div>
+      </Routes>
     </Router>
+  )
+}
+
+function AuthenticatedShell({
+  userRole,
+  userEmail,
+  mobileMenuOpen,
+  onLogout,
+  onMenuToggle,
+  onCloseMobileMenu,
+  canAccess,
+}) {
+  const canSeeFitness =
+    userEmail && FITNESS_ALLOWED_EMAILS.includes(userEmail.toLowerCase())
+
+  return (
+    <div className="min-h-screen bg-bg-primary flex">
+      <Sidebar
+        userRole={userRole}
+        userEmail={userEmail}
+        mobileMenuOpen={mobileMenuOpen}
+        onCloseMobileMenu={onCloseMobileMenu}
+      />
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        <Header onLogout={onLogout} onMenuToggle={onMenuToggle} />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <Navigate
+                    to={canAccess('/dashboard') ? '/dashboard' : '/users'}
+                    replace
+                  />
+                }
+              />
+
+              {canAccess('/dashboard') && (
+                <Route path="/dashboard" element={<Dashboard />} />
+              )}
+              {canAccess('/prospects') && (
+                <Route path="/prospects" element={<Prospects />} />
+              )}
+              {canAccess('/leads') && (
+                <Route path="/leads" element={<Leads userRole={userRole} />} />
+              )}
+              {canAccess('/users') && (
+                <Route path="/users" element={<Users />} />
+              )}
+              {canAccess('/membership-plans') && (
+                <Route
+                  path="/membership-plans"
+                  element={<MembershipPlans userRole={userRole} />}
+                />
+              )}
+              {canAccess('/sellers') && (
+                <Route path="/sellers" element={<Sellers />} />
+              )}
+              {canAccess('/coaches') && (
+                <Route path="/coaches" element={<Coaches />} />
+              )}
+              {canAccess('/locations') && (
+                <Route path="/locations" element={<Locations />} />
+              )}
+              {canAccess('/content') && (
+                <Route path="/content" element={<ContentManagement />} />
+              )}
+
+              {/* Fitness Routes */}
+              {canSeeFitness && (
+                <Route path="/exercises" element={<Exercises />} />
+              )}
+              {canSeeFitness && (
+                <Route path="/routines" element={<Routines />} />
+              )}
+
+              {/* Check-in also accessible while authenticated */}
+              <Route path="/check-in" element={<CheckIn />} />
+
+              {/* Fallback for unauthorized routes */}
+              <Route
+                path="*"
+                element={
+                  <Navigate
+                    to={canAccess('/dashboard') ? '/dashboard' : '/users'}
+                    replace
+                  />
+                }
+              />
+            </Routes>
+          </div>
+        </main>
+      </div>
+    </div>
   )
 }
 
