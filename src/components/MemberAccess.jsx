@@ -13,7 +13,7 @@ function maskEmail(email) {
   const at = email.indexOf('@')
   const local = email.slice(0, at)
   const domain = email.slice(at + 1)
-  const visible = local.slice(0, Math.min(3, local.length))
+  const visible = local.slice(0, Math.min(6, local.length))
   const hidden = '*'.repeat(local.length - visible.length)
   return `${visible}${hidden}@${domain}`
 }
