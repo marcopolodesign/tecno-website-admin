@@ -179,7 +179,7 @@ function ScannerView({ onBack }) {
 
     if (error || !user) {
       setResult({ granted: false, member: null, reason: 'Código no reconocido' })
-    } else if (user.membership_status === 'active' && user.membership_end_date >= today) {
+    } else if (user.membership_status === 'active') {
       setResult({ granted: true, member: user })
     } else if (user.membership_status === 'cancelled') {
       setResult({ granted: false, member: user, reason: 'Membresía cancelada' })

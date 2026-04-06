@@ -78,8 +78,9 @@ export default function CheckIn() {
 
     channel.on('broadcast', { event: 'checkin' }, ({ payload }) => {
       const { membership_status, membership_end_date } = payload
+      const today = new Date().toISOString().slice(0, 10)
 
-      if (membership_status === 'active' && membership_end_date >= today) {
+      if (membership_status === 'active') {
         setMemberData(payload)
         setState('granted')
         playGranted()
