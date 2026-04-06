@@ -225,6 +225,26 @@ function ScannerView({ onBack }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// Look up public.users by auth_user_id (fast path) or email (first login),
+// and link auth_user_id for future sessions.
+async function lookupAndLinkUser(authUserId, email) {
+  const SELECT = 'id, first_name, last_name, membership_status, membership_end_date, membership_type'
+
+  // Fast path — already linked
+  const { data: byAuth } = await supabase
+    .from('users').select(SELECT).eq('auth_user_id', authUserId).single()
+  if (byAuth) return byAuth
+
+  // First login — find by email and write the link
+  if (!email) return null
+  const { data: byEmail } = await supabase
+    .from('users').select(SELECT).eq('email', email.toLowerCase()).single()
+  if (!byEmail) return null
+
+  await supabase.from('users').update({ auth_user_id: authUserId }).eq('id', byEmail.id)
+  return byEmail
+}
+
 // Broadcast a check-in event to the /check-in kiosk screen
 async function broadcastCheckIn(sessionId, memberInfo) {
   if (!sessionId) return
@@ -274,11 +294,7 @@ export default function MemberAccess() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        const { data: user } = await supabase
-          .from('users')
-          .select('id, first_name, last_name, membership_status, membership_end_date, membership_type')
-          .eq('auth_user_id', session.user.id)
-          .single()
+        const user = await lookupAndLinkUser(session.user.id, session.user.email)
         if (user) {
           setMember(user)
           if (sessionId) {
@@ -328,12 +344,7 @@ export default function MemberAccess() {
       })
       if (signInErr) throw signInErr
 
-      const { data: user } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, membership_status')
-        .eq('auth_user_id', data.user.id)
-        .single()
-
+      const user = await lookupAndLinkUser(data.user.id, data.user.email)
       if (user) {
         setMember(user)
         if (sessionId) {
