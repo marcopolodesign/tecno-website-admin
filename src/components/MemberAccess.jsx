@@ -105,7 +105,7 @@ function QRModal({ member, onClose }) {
 
 // ─── Scanner ──────────────────────────────────────────────────────────────────
 
-function ScannerView({ onBack }) {
+function ScannerView({ onBack, member }) {
   const scannerRef = useRef(null)
   const [result, setResult] = useState(null) // null | { granted, member, reason }
   const [cameraError, setCameraError] = useState('')
@@ -160,17 +160,34 @@ function ScannerView({ onBack }) {
     // Pause immediately to prevent duplicate scans
     try { scannerRef.current?.pause() } catch {}
 
-    // Extract UUID — handle both raw UUID and full URLs (/acceso?session=… or member QR)
+    // Extract UUID from raw value (handles full URLs or bare UUIDs)
     const uuidMatch = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
     const uuid = uuidMatch?.[0]
 
     if (!uuid) {
       setResult({ granted: false, member: null, reason: 'Código no reconocido' })
-      setTimeout(() => { setResult(null); try { scannerRef.current?.resume() } catch {} }, 4000)
+      setTimeout(() => { setResult(null); try { scannerRef.current?.resume() } catch {} }, 5000)
       return
     }
 
-    const today = new Date().toISOString().slice(0, 10)
+    // ── Kiosk QR: scanned value contains "session=" → broadcast to kiosk ──────
+    if (raw.includes('session=') && member) {
+      const memberStatus = member.membership_status
+      if (memberStatus === 'active') {
+        await broadcastCheckIn(uuid, member)
+        setResult({ granted: true, member })
+      } else if (memberStatus === 'cancelled') {
+        await broadcastCheckIn(uuid, member)
+        setResult({ granted: false, member, reason: 'Membresía cancelada' })
+      } else {
+        await broadcastCheckIn(uuid, member)
+        setResult({ granted: false, member, reason: 'Membresía vencida' })
+      }
+      setTimeout(() => { setResult(null); try { scannerRef.current?.resume() } catch {} }, 5000)
+      return
+    }
+
+    // ── Member QR: bare UUID → look up user in Supabase (staff scanning member) ─
     const { data: user, error } = await supabase
       .from('users')
       .select('first_name, last_name, membership_status, membership_end_date, membership_type')
@@ -190,7 +207,7 @@ function ScannerView({ onBack }) {
     setTimeout(() => {
       setResult(null)
       try { scannerRef.current?.resume() } catch {}
-    }, 4000)
+    }, 5000)
   }
 
   if (result) {
@@ -546,7 +563,7 @@ export default function MemberAccess() {
     }
   }
 
-  if (showScanner) return <ScannerView onBack={() => setShowScanner(false)} />
+  if (showScanner) return <ScannerView member={member} onBack={() => setShowScanner(false)} />
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
