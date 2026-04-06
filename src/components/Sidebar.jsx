@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
-import { 
-  HomeIcon, 
-  UserGroupIcon, 
+import {
+  HomeIcon,
+  UserGroupIcon,
   DocumentTextIcon,
   EnvelopeIcon,
   UserCircleIcon,
@@ -11,6 +11,8 @@ import {
   MapPinIcon,
   CreditCardIcon,
   XMarkIcon,
+  QrCodeIcon,
+  ClockIcon,
   // Fitness icons
   ListBulletIcon,
   ClipboardDocumentListIcon
@@ -32,6 +34,8 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
     { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
     { name: 'Sedes', href: '/locations', icon: MapPinIcon, roles: ['super_admin', 'admin'] },
     { name: 'Contenido', href: '/content', icon: DocumentTextIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
+    { name: 'Check-in', href: '/check-in', icon: QrCodeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+    { name: 'Accesos', href: '/access-logs', icon: ClockIcon, roles: ['super_admin', 'admin'] },
   ]
 
   const fitnessNav = [

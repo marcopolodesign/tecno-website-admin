@@ -14,6 +14,7 @@ import Exercises from './components/Exercises'
 import Routines from './components/Routines'
 import CheckIn from './components/CheckIn'
 import MemberAccess from './components/MemberAccess'
+import AccessLogs from './components/AccessLogs'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { authService } from './services/authService'
@@ -100,7 +101,7 @@ function App() {
     if (role === 'super_admin' || role === 'admin') return true
 
     // Common restrictions for non-admins
-    if (['/sellers', '/coaches', '/locations', '/membership-plans'].includes(route)) return false
+    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs'].includes(route)) return false
 
     // Seller (Front Desk)
     if (role === 'front_desk') {
@@ -227,6 +228,10 @@ function AuthenticatedShell({
               )}
               {canSeeFitness && (
                 <Route path="/routines" element={<Routines />} />
+              )}
+
+              {canAccess('/access-logs') && (
+                <Route path="/access-logs" element={<AccessLogs />} />
               )}
 
               {/* Check-in also accessible while authenticated */}
