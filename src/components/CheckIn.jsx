@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 
-const RESET_DELAY = 4000
+const RESET_DELAY = 5000
 
 function playGranted() {
   try {
