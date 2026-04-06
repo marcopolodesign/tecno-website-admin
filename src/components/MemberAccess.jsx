@@ -448,7 +448,7 @@ export default function MemberAccess() {
         return
       }
 
-      // Create auth account (admin.createUser confirms email immediately)
+      // Create auth account, or update password if account already exists
       const { data: created, error: createErr } =
         await supabase.auth.admin.createUser({
           email: realEmail,
@@ -456,11 +456,32 @@ export default function MemberAccess() {
           email_confirm: true,
         })
 
-      if (createErr && !createErr.message?.toLowerCase().includes('already')) {
-        throw createErr
+      if (createErr) {
+        // 422 = user already registered — update their password instead
+        if (createErr.status === 422 || createErr.message?.toLowerCase().includes('already')) {
+          const { data: userRow } = await supabase
+            .from('users').select('auth_user_id').eq('id', member.id).single()
+
+          const existingAuthId = userRow?.auth_user_id
+
+          if (existingAuthId) {
+            const { error: updateErr } = await supabase.auth.admin.updateUserById(
+              existingAuthId, { password }
+            )
+            if (updateErr) throw updateErr
+          } else {
+            // auth_user_id not set yet — look it up via admin API by email
+            const { data: { users: authUsers } } = await supabase.auth.admin.listUsers()
+            const authUser = authUsers?.find(u => u.email?.toLowerCase() === realEmail.toLowerCase())
+            if (!authUser) throw new Error('No se encontró la cuenta. Hablá con recepción.')
+            await supabase.auth.admin.updateUserById(authUser.id, { password })
+          }
+        } else {
+          throw createErr
+        }
       }
 
-      // Sign in
+      // Sign in with the new password
       const { data: signInData, error: signInErr } =
         await supabase.auth.signInWithPassword({ email: realEmail, password })
       if (signInErr) throw signInErr
@@ -482,7 +503,7 @@ export default function MemberAccess() {
       // Fetch fresh member data
       const { data: freshUser } = await supabase
         .from('users')
-        .select('id, first_name, last_name, membership_status')
+        .select('id, first_name, last_name, membership_status, membership_end_date, membership_type')
         .eq('id', member.id)
         .single()
 
