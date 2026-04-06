@@ -122,9 +122,21 @@ function ScannerView({ onBack }) {
         () => {}
       )
       scannerRef.current = scanner
-    } catch (err) {
-      setCameraError('No se pudo acceder a la cámara. Verificá los permisos.')
-      console.error('Camera error:', err)
+    } catch {
+      // Try front camera as fallback
+      try {
+        const scanner = new Html5Qrcode('member-access-qr-reader')
+        await scanner.start(
+          { facingMode: 'user' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          () => {}
+        )
+        scannerRef.current = scanner
+      } catch (err2) {
+        setCameraError('No se pudo acceder a la cámara. Verificá los permisos.')
+        console.error('Camera error:', err2)
+      }
     }
   }
 
@@ -144,8 +156,20 @@ function ScannerView({ onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const onScanSuccess = async (uuid) => {
-    await stopScanner()
+  const onScanSuccess = async (raw) => {
+    // Pause immediately to prevent duplicate scans
+    try { scannerRef.current?.pause() } catch {}
+
+    // Extract UUID — handle both raw UUID and full URLs (/acceso?session=… or member QR)
+    const uuidMatch = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    const uuid = uuidMatch?.[0]
+
+    if (!uuid) {
+      setResult({ granted: false, member: null, reason: 'Código no reconocido' })
+      setTimeout(() => { setResult(null); try { scannerRef.current?.resume() } catch {} }, 4000)
+      return
+    }
+
     const today = new Date().toISOString().slice(0, 10)
     const { data: user, error } = await supabase
       .from('users')
@@ -163,9 +187,9 @@ function ScannerView({ onBack }) {
       setResult({ granted: false, member: user, reason: 'Membresía vencida' })
     }
 
-    setTimeout(async () => {
+    setTimeout(() => {
       setResult(null)
-      await startScanner()
+      try { scannerRef.current?.resume() } catch {}
     }, 4000)
   }
 
