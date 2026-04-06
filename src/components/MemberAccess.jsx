@@ -246,26 +246,28 @@ async function lookupAndLinkUser(authUserId, email) {
 }
 
 // Broadcast a check-in event to the /check-in kiosk screen
-async function broadcastCheckIn(sessionId, memberInfo) {
-  if (!sessionId) return
-  try {
+function broadcastCheckIn(sessionId, memberInfo) {
+  if (!sessionId) return Promise.resolve()
+  return new Promise((resolve) => {
     const channel = supabase.channel(`checkin:${sessionId}`)
-    await channel.subscribe()
-    await channel.send({
-      type: 'broadcast',
-      event: 'checkin',
-      payload: {
-        first_name: memberInfo.first_name,
-        last_name: memberInfo.last_name,
-        membership_status: memberInfo.membership_status,
-        membership_end_date: memberInfo.membership_end_date ?? null,
-        membership_type: memberInfo.membership_type ?? null,
-      },
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.send({
+          type: 'broadcast',
+          event: 'checkin',
+          payload: {
+            first_name: memberInfo.first_name,
+            last_name: memberInfo.last_name,
+            membership_status: memberInfo.membership_status,
+            membership_end_date: memberInfo.membership_end_date ?? null,
+            membership_type: memberInfo.membership_type ?? null,
+          },
+        })
+        supabase.removeChannel(channel)
+        resolve()
+      }
     })
-    supabase.removeChannel(channel)
-  } catch (err) {
-    console.error('Check-in broadcast error:', err)
-  }
+  })
 }
 
 export default function MemberAccess() {
