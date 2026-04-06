@@ -20,7 +20,7 @@ function maskEmail(email) {
 
 // ─── Hub (post-login landing screen) ─────────────────────────────────────────
 
-function Hub({ member, onShowQR, onScanQR }) {
+function Hub({ member, onShowQR, onScanQR, checkInDone }) {
   const statusActive = member?.membership_status === 'active'
 
   return (
@@ -28,6 +28,11 @@ function Hub({ member, onShowQR, onScanQR }) {
       <div style={styles.card}>
         <div style={styles.logo}>T</div>
         <h1 style={styles.title}>Hola, {member?.first_name || 'socio'}</h1>
+        {checkInDone && (
+          <div style={styles.checkInBanner}>
+            ✓ Ingreso registrado
+          </div>
+        )}
 
         <div
           style={{
@@ -220,13 +225,40 @@ function ScannerView({ onBack }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// Broadcast a check-in event to the /check-in kiosk screen
+async function broadcastCheckIn(sessionId, memberInfo) {
+  if (!sessionId) return
+  try {
+    const channel = supabase.channel(`checkin:${sessionId}`)
+    await channel.subscribe()
+    await channel.send({
+      type: 'broadcast',
+      event: 'checkin',
+      payload: {
+        first_name: memberInfo.first_name,
+        last_name: memberInfo.last_name,
+        membership_status: memberInfo.membership_status,
+        membership_end_date: memberInfo.membership_end_date ?? null,
+        membership_type: memberInfo.membership_type ?? null,
+      },
+    })
+    supabase.removeChannel(channel)
+  } catch (err) {
+    console.error('Check-in broadcast error:', err)
+  }
+}
+
 export default function MemberAccess() {
   const [step, setStep] = useState('loading') // check session first
-  const [member, setMember] = useState(null)  // { id, first_name, last_name, membership_status, email_masked? }
+  const [member, setMember] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showQR, setShowQR] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
+  const [checkInDone, setCheckInDone] = useState(false)
+
+  // Read ?session= from URL (set by /check-in QR)
+  const sessionId = new URLSearchParams(window.location.search).get('session')
 
   // Form state
   const [dni, setDni] = useState('')
@@ -242,21 +274,24 @@ export default function MemberAccess() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        // Fetch member data from users table
         const { data: user } = await supabase
           .from('users')
-          .select('id, first_name, last_name, membership_status')
+          .select('id, first_name, last_name, membership_status, membership_end_date, membership_type')
           .eq('auth_user_id', session.user.id)
           .single()
         if (user) {
           setMember(user)
+          if (sessionId) {
+            await broadcastCheckIn(sessionId, user)
+            setCheckInDone(true)
+          }
           setStep('hub')
           return
         }
       }
       setStep('dni')
     })
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Step 1: DNI lookup ───────────────────────────────────────────────────────
   const handleDniSubmit = async (e) => {
@@ -301,6 +336,10 @@ export default function MemberAccess() {
 
       if (user) {
         setMember(user)
+        if (sessionId) {
+          await broadcastCheckIn(sessionId, user)
+          setCheckInDone(true)
+        }
         setStep('hub')
       } else {
         setError('No encontramos tu perfil. Hablá con recepción.')
@@ -437,6 +476,10 @@ export default function MemberAccess() {
         .single()
 
       setMember(freshUser)
+      if (sessionId) {
+        await broadcastCheckIn(sessionId, freshUser)
+        setCheckInDone(true)
+      }
       setStep('hub')
     } catch (err) {
       setError(err.message || 'Error al crear la cuenta. Intentá de nuevo.')
@@ -464,6 +507,7 @@ export default function MemberAccess() {
           member={member}
           onShowQR={() => setShowQR(true)}
           onScanQR={() => setShowScanner(true)}
+          checkInDone={checkInDone}
         />
         {showQR && <QRModal member={member} onClose={() => setShowQR(false)} />}
       </>
@@ -922,5 +966,13 @@ const styles = {
     borderTopColor: 'transparent',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
+  },
+  checkInBanner: {
+    background: '#dcfce7',
+    color: '#166534',
+    borderRadius: 999,
+    padding: '8px 20px',
+    fontSize: 14,
+    fontWeight: 600,
   },
 }

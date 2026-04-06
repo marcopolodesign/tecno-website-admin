@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import { useEffect, useState, useCallback } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 
-const RESET_DELAY = 4000 // ms before returning to idle
+const RESET_DELAY = 4000
 
 function playGranted() {
   try {
@@ -45,93 +45,13 @@ function formatDate(dateStr) {
 }
 
 export default function CheckIn() {
-  const scannerRef = useRef(null)
-  const scannerDivId = 'checkin-qr-reader'
-  const resetTimerRef = useRef(null)
-
-  // state: 'idle' | 'granted' | 'denied'
-  const [state, setState] = useState('idle')
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
+  const [state, setState] = useState('idle') // 'idle' | 'granted' | 'denied'
   const [memberData, setMemberData] = useState(null)
   const [deniedReason, setDeniedReason] = useState('')
   const [progress, setProgress] = useState(100)
-  const [cameraError, setCameraError] = useState('')
 
-  const onScanSuccess = async (uuid) => {
-    if (scannerRef.current?.isScanning) {
-      await scannerRef.current.stop().catch(() => {})
-    }
-
-    const today = new Date().toISOString().slice(0, 10)
-
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('first_name, last_name, membership_status, membership_end_date, membership_type')
-      .eq('id', uuid)
-      .single()
-
-    if (error || !user) {
-      setMemberData(null)
-      setDeniedReason('Código no reconocido')
-      setState('denied')
-      playDenied()
-    } else if (user.membership_status === 'active' && user.membership_end_date >= today) {
-      setMemberData(user)
-      setState('granted')
-      playGranted()
-    } else if (user.membership_status === 'cancelled') {
-      setMemberData(user)
-      setDeniedReason('Membresía cancelada')
-      setState('denied')
-      playDenied()
-    } else {
-      setMemberData(user)
-      setDeniedReason('Membresía vencida')
-      setState('denied')
-      playDenied()
-    }
-
-    startCountdown()
-    resetTimerRef.current = setTimeout(resetToIdle, RESET_DELAY)
-  }
-
-  const startScanner = async () => {
-    if (scannerRef.current) return
-    setCameraError('')
-    try {
-      const scanner = new Html5Qrcode(scannerDivId)
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        onScanSuccess,
-        () => {} // suppress per-frame errors
-      )
-      scannerRef.current = scanner
-    } catch (err) {
-      setCameraError('No se pudo acceder a la cámara. Verificá los permisos.')
-      console.error('Camera error:', err)
-    }
-  }
-
-  const stopScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        if (scannerRef.current.isScanning) await scannerRef.current.stop()
-        scannerRef.current.clear()
-      } catch {}
-      scannerRef.current = null
-    }
-  }
-
-  const resetToIdle = async () => {
-    setState('idle')
-    setMemberData(null)
-    setDeniedReason('')
-    setProgress(100)
-    await stopScanner()
-    setTimeout(() => startScanner(), 50)
-  }
-
-  const startCountdown = () => {
+  const startCountdown = useCallback(() => {
     setProgress(100)
     const startTime = Date.now()
     const tick = () => {
@@ -141,18 +61,51 @@ export default function CheckIn() {
       if (remaining > 0) requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
-  }
-
-  useEffect(() => {
-    startScanner()
-    return () => {
-      stopScanner()
-      if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ─── Granted ───────────────────────────────────────────
+  const resetToIdle = useCallback(() => {
+    setState('idle')
+    setMemberData(null)
+    setDeniedReason('')
+    setProgress(100)
+    setSessionId(crypto.randomUUID()) // new QR on each reset
+  }, [])
+
+  // Subscribe to realtime broadcast for this session
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const channel = supabase.channel(`checkin:${sessionId}`)
+
+    channel.on('broadcast', { event: 'checkin' }, ({ payload }) => {
+      const { membership_status, membership_end_date } = payload
+
+      if (membership_status === 'active' && membership_end_date >= today) {
+        setMemberData(payload)
+        setState('granted')
+        playGranted()
+      } else if (membership_status === 'cancelled') {
+        setMemberData(payload)
+        setDeniedReason('Membresía cancelada')
+        setState('denied')
+        playDenied()
+      } else {
+        setMemberData(payload)
+        setDeniedReason('Membresía vencida')
+        setState('denied')
+        playDenied()
+      }
+
+      startCountdown()
+      setTimeout(resetToIdle, RESET_DELAY)
+    })
+
+    channel.subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [sessionId, startCountdown, resetToIdle])
+
+  const qrUrl = `${window.location.origin}/acceso?session=${sessionId}`
+
+  // ─── Granted ──────────────────────────────────────────────────────────────
 
   if (state === 'granted') {
     return (
@@ -160,7 +113,7 @@ export default function CheckIn() {
         <div style={styles.resultCard}>
           <div style={{ ...styles.iconCircle, background: 'rgba(255,255,255,0.25)' }}>
             <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-              <path d="M16 40L32 56L64 24" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 40L32 56L64 24" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <h1 style={styles.resultTitle}>ACCESO PERMITIDO</h1>
@@ -179,7 +132,7 @@ export default function CheckIn() {
     )
   }
 
-  // ─── Denied ────────────────────────────────────────────
+  // ─── Denied ───────────────────────────────────────────────────────────────
 
   if (state === 'denied') {
     return (
@@ -187,7 +140,7 @@ export default function CheckIn() {
         <div style={styles.resultCard}>
           <div style={{ ...styles.iconCircle, background: 'rgba(255,255,255,0.25)' }}>
             <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-              <path d="M24 24L56 56M56 24L24 56" stroke="white" strokeWidth="8" strokeLinecap="round"/>
+              <path d="M24 24L56 56M56 24L24 56" stroke="white" strokeWidth="8" strokeLinecap="round" />
             </svg>
           </div>
           <h1 style={styles.resultTitle}>ACCESO DENEGADO</h1>
@@ -203,25 +156,19 @@ export default function CheckIn() {
     )
   }
 
-  // ─── Idle / Scanning ───────────────────────────────────
+  // ─── Idle: show QR ────────────────────────────────────────────────────────
 
   return (
     <div style={overlay('#111827')}>
       <div style={styles.idleContent}>
         <div style={styles.header}>
           <div style={styles.logo}>T</div>
-          <h1 style={styles.headerTitle}>TecnoFit — Control de Acceso</h1>
+          <h1 style={styles.headerTitle}>Escaneá para ingresar</h1>
         </div>
-        <div style={styles.scannerContainer}>
-          <div id={scannerDivId} style={styles.scannerDiv} />
+        <div style={styles.qrContainer}>
+          <QRCodeSVG value={qrUrl} size={260} bgColor="#ffffff" fgColor="#111827" />
         </div>
-        {cameraError ? (
-          <p style={{ color: '#fca5a5', fontSize: 14, textAlign: 'center', margin: 0 }}>
-            {cameraError}
-          </p>
-        ) : (
-          <p style={styles.scanHint}>Apuntá la cámara al código QR del socio</p>
-        )}
+        <p style={styles.scanHint}>Apuntá la cámara de tu celular al código</p>
       </div>
     </div>
   )
@@ -300,24 +247,22 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 32,
-    width: '100%',
-    maxWidth: 480,
+    gap: 40,
     padding: '0 24px',
   },
   header: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   logo: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
+    width: 64,
+    height: 64,
+    borderRadius: 16,
     background: '#F45F37',
     color: 'white',
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 800,
     display: 'flex',
     alignItems: 'center',
@@ -325,24 +270,20 @@ const styles = {
   },
   headerTitle: {
     color: 'white',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 700,
     margin: 0,
     textAlign: 'center',
   },
-  scannerContainer: {
-    width: '100%',
-    border: '3px solid #F45F37',
-    borderRadius: 16,
-    overflow: 'hidden',
-    background: '#1f2937',
-  },
-  scannerDiv: {
-    width: '100%',
+  qrContainer: {
+    background: 'white',
+    padding: 24,
+    borderRadius: 20,
+    boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
   },
   scanHint: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
     textAlign: 'center',
     margin: 0,
   },
