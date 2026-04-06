@@ -12,7 +12,9 @@ function maskEmail(email) {
   const at = email.indexOf('@')
   const local = email.slice(0, at)
   const domain = email.slice(at + 1)
-  return `${local.slice(0, Math.min(3, local.length))}***@${domain}`
+  const visible = local.slice(0, Math.min(3, local.length))
+  const hidden = '*'.repeat(local.length - visible.length)
+  return `${visible}${hidden}@${domain}`
 }
 
 // ─── Hub (post-login landing screen) ─────────────────────────────────────────
