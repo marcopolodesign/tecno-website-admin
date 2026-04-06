@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '../lib/supabase'
 
 // ─── Step machine ─────────────────────────────────────────────────────────────
@@ -97,32 +98,49 @@ function QRModal({ member, onClose }) {
   )
 }
 
-// ─── Scanner (reuses CheckIn logic inline) ────────────────────────────────────
+// ─── Scanner ──────────────────────────────────────────────────────────────────
 
 function ScannerView({ onBack }) {
-  const ref = useRef(null)
   const scannerRef = useRef(null)
   const [result, setResult] = useState(null) // null | { granted, member, reason }
+  const [cameraError, setCameraError] = useState('')
+
+  const startScanner = async () => {
+    if (scannerRef.current) return
+    setCameraError('')
+    try {
+      const scanner = new Html5Qrcode('member-access-qr-reader')
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        () => {}
+      )
+      scannerRef.current = scanner
+    } catch (err) {
+      setCameraError('No se pudo acceder a la cámara. Verificá los permisos.')
+      console.error('Camera error:', err)
+    }
+  }
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) await scannerRef.current.stop()
+        scannerRef.current.clear()
+      } catch {}
+      scannerRef.current = null
+    }
+  }
 
   useEffect(() => {
-    let scanner
-    import('html5-qrcode').then(({ Html5QrcodeScanner }) => {
-      scanner = new Html5QrcodeScanner(
-        'member-access-qr-reader',
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      )
-      scanner.render(onScanSuccess, () => {})
-      scannerRef.current = scanner
-    })
-    return () => {
-      scannerRef.current?.clear().catch(() => {})
-    }
+    startScanner()
+    return () => { stopScanner() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const onScanSuccess = async (uuid) => {
-    scannerRef.current?.clear().catch(() => {})
+    await stopScanner()
     const today = new Date().toISOString().slice(0, 10)
     const { data: user, error } = await supabase
       .from('users')
@@ -140,18 +158,9 @@ function ScannerView({ onBack }) {
       setResult({ granted: false, member: user, reason: 'Membresía vencida' })
     }
 
-    setTimeout(() => {
+    setTimeout(async () => {
       setResult(null)
-      // restart scanner
-      import('html5-qrcode').then(({ Html5QrcodeScanner }) => {
-        const scanner = new Html5QrcodeScanner(
-          'member-access-qr-reader',
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          false
-        )
-        scanner.render(onScanSuccess, () => {})
-        scannerRef.current = scanner
-      })
+      await startScanner()
     }, 4000)
   }
 
@@ -192,14 +201,18 @@ function ScannerView({ onBack }) {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <button style={styles.backBtn} onClick={onBack}>
-          ← Volver
-        </button>
+        <button style={styles.backBtn} onClick={onBack}>← Volver</button>
         <h2 style={{ ...styles.title, marginBottom: 24 }}>Escanear QR</h2>
-        <div ref={ref} id="member-access-qr-reader" style={{ width: '100%' }} />
-        <p style={{ color: '#6b7280', fontSize: 14, textAlign: 'center', marginTop: 16 }}>
-          Apuntá la cámara al código QR del socio
-        </p>
+        <div id="member-access-qr-reader" style={{ width: '100%' }} />
+        {cameraError ? (
+          <p style={{ color: '#dc2626', fontSize: 14, textAlign: 'center', marginTop: 16 }}>
+            {cameraError}
+          </p>
+        ) : (
+          <p style={{ color: '#6b7280', fontSize: 14, textAlign: 'center', marginTop: 16 }}>
+            Apuntá la cámara al código QR del socio
+          </p>
+        )}
       </div>
     </div>
   )
@@ -218,6 +231,8 @@ export default function MemberAccess() {
   // Form state
   const [dni, setDni] = useState('')
   const [fallbackEmail, setFallbackEmail] = useState('')
+  const [signInEmail, setSignInEmail] = useState('')
+  const [signInPassword, setSignInPassword] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newEmail2, setNewEmail2] = useState('')
   const [password, setPassword] = useState('')
@@ -261,6 +276,37 @@ export default function MemberAccess() {
       }
     } catch {
       setError('Error de conexión. Intentá de nuevo.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ── Sign in (returning members) ─────────────────────────────────────────────
+  const handleSignIn = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: signInEmail.trim(),
+        password: signInPassword,
+      })
+      if (signInErr) throw signInErr
+
+      const { data: user } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, membership_status')
+        .eq('auth_user_id', data.user.id)
+        .single()
+
+      if (user) {
+        setMember(user)
+        setStep('hub')
+      } else {
+        setError('No encontramos tu perfil. Hablá con recepción.')
+      }
+    } catch (err) {
+      setError(err.message || 'Email o contraseña incorrectos.')
     } finally {
       setLoading(false)
     }
@@ -446,6 +492,44 @@ export default function MemberAccess() {
       <div style={styles.card}>
         <div style={styles.logo}>T</div>
 
+        {/* ── Sign in ── */}
+        {step === 'sign_in' && (
+          <>
+            <h1 style={styles.title}>Iniciar sesión</h1>
+            <p style={styles.subtitle}>Ingresá con tu email y contraseña</p>
+            <form style={styles.form} onSubmit={handleSignIn}>
+              <input
+                style={styles.input}
+                type="email"
+                placeholder="tu@email.com"
+                value={signInEmail}
+                onChange={(e) => setSignInEmail(e.target.value)}
+                required
+                autoFocus
+              />
+              <input
+                style={styles.input}
+                type="password"
+                placeholder="Contraseña"
+                value={signInPassword}
+                onChange={(e) => setSignInPassword(e.target.value)}
+                required
+              />
+              {error && <p style={styles.error}>{error}</p>}
+              <button style={styles.btn} type="submit" disabled={loading}>
+                {loading ? 'Entrando...' : 'Entrar'}
+              </button>
+              <button
+                type="button"
+                style={styles.backBtn}
+                onClick={() => { setStep('dni'); setError('') }}
+              >
+                ← Volver
+              </button>
+            </form>
+          </>
+        )}
+
         {/* ── Email fallback ── */}
         {step === 'fallback_email' && (
           <>
@@ -497,6 +581,13 @@ export default function MemberAccess() {
                 {loading ? 'Buscando...' : 'Continuar'}
               </button>
             </form>
+            <button
+              type="button"
+              style={{ ...styles.backBtn, marginTop: 8 }}
+              onClick={() => { setStep('sign_in'); setError('') }}
+            >
+              Ya tengo cuenta →
+            </button>
           </>
         )}
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Html5QrcodeScanner } from 'html5-qrcode'
+import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '../lib/supabase'
 
 const RESET_DELAY = 4000 // ms before returning to idle
@@ -54,50 +54,12 @@ export default function CheckIn() {
   const [memberData, setMemberData] = useState(null)
   const [deniedReason, setDeniedReason] = useState('')
   const [progress, setProgress] = useState(100)
-
-  const startScanner = () => {
-    if (scannerRef.current) return
-    const scanner = new Html5QrcodeScanner(
-      scannerDivId,
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
-    )
-    scanner.render(onScanSuccess, onScanError)
-    scannerRef.current = scanner
-  }
-
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.clear().catch(() => {})
-      scannerRef.current = null
-    }
-  }
-
-  const resetToIdle = () => {
-    setState('idle')
-    setMemberData(null)
-    setDeniedReason('')
-    setProgress(100)
-    // give DOM a tick to re-render the div before reinitialising
-    setTimeout(() => startScanner(), 50)
-  }
-
-  const startCountdown = () => {
-    setProgress(100)
-    const startTime = Date.now()
-    const tick = () => {
-      const elapsed = Date.now() - startTime
-      const remaining = Math.max(0, 100 - (elapsed / RESET_DELAY) * 100)
-      setProgress(remaining)
-      if (remaining > 0) {
-        requestAnimationFrame(tick)
-      }
-    }
-    requestAnimationFrame(tick)
-  }
+  const [cameraError, setCameraError] = useState('')
 
   const onScanSuccess = async (uuid) => {
-    stopScanner()
+    if (scannerRef.current?.isScanning) {
+      await scannerRef.current.stop().catch(() => {})
+    }
 
     const today = new Date().toISOString().slice(0, 10)
 
@@ -132,8 +94,53 @@ export default function CheckIn() {
     resetTimerRef.current = setTimeout(resetToIdle, RESET_DELAY)
   }
 
-  const onScanError = () => {
-    // suppress per-frame errors
+  const startScanner = async () => {
+    if (scannerRef.current) return
+    setCameraError('')
+    try {
+      const scanner = new Html5Qrcode(scannerDivId)
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        () => {} // suppress per-frame errors
+      )
+      scannerRef.current = scanner
+    } catch (err) {
+      setCameraError('No se pudo acceder a la cámara. Verificá los permisos.')
+      console.error('Camera error:', err)
+    }
+  }
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) await scannerRef.current.stop()
+        scannerRef.current.clear()
+      } catch {}
+      scannerRef.current = null
+    }
+  }
+
+  const resetToIdle = async () => {
+    setState('idle')
+    setMemberData(null)
+    setDeniedReason('')
+    setProgress(100)
+    await stopScanner()
+    setTimeout(() => startScanner(), 50)
+  }
+
+  const startCountdown = () => {
+    setProgress(100)
+    const startTime = Date.now()
+    const tick = () => {
+      const elapsed = Date.now() - startTime
+      const remaining = Math.max(0, 100 - (elapsed / RESET_DELAY) * 100)
+      setProgress(remaining)
+      if (remaining > 0) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
   }
 
   useEffect(() => {
@@ -185,9 +192,7 @@ export default function CheckIn() {
           </div>
           <h1 style={styles.resultTitle}>ACCESO DENEGADO</h1>
           {memberData ? (
-            <p style={styles.memberName}>
-              {memberData.first_name} {memberData.last_name}
-            </p>
+            <p style={styles.memberName}>{memberData.first_name} {memberData.last_name}</p>
           ) : (
             <p style={styles.memberName}>Socio no encontrado</p>
           )}
@@ -210,7 +215,13 @@ export default function CheckIn() {
         <div style={styles.scannerContainer}>
           <div id={scannerDivId} style={styles.scannerDiv} />
         </div>
-        <p style={styles.scanHint}>Apuntá la cámara al código QR del socio</p>
+        {cameraError ? (
+          <p style={{ color: '#fca5a5', fontSize: 14, textAlign: 'center', margin: 0 }}>
+            {cameraError}
+          </p>
+        ) : (
+          <p style={styles.scanHint}>Apuntá la cámara al código QR del socio</p>
+        )}
       </div>
     </div>
   )
@@ -219,13 +230,7 @@ export default function CheckIn() {
 function ProgressBar({ progress, color }) {
   return (
     <div style={styles.progressTrack}>
-      <div
-        style={{
-          ...styles.progressBar,
-          width: `${progress}%`,
-          background: color,
-        }}
-      />
+      <div style={{ ...styles.progressBar, width: `${progress}%`, background: color }} />
     </div>
   )
 }
@@ -291,7 +296,6 @@ const styles = {
     transition: 'width 0.05s linear',
     borderRadius: 3,
   },
-  // Idle
   idleContent: {
     display: 'flex',
     flexDirection: 'column',
