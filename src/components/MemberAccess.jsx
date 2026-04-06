@@ -173,16 +173,11 @@ function ScannerView({ onBack, member }) {
     // ── Kiosk QR: scanned value contains "session=" → broadcast to kiosk ──────
     if (raw.includes('session=') && member) {
       const memberStatus = member.membership_status
-      if (memberStatus === 'active') {
-        await broadcastCheckIn(uuid, member)
-        setResult({ granted: true, member })
-      } else if (memberStatus === 'cancelled') {
-        await broadcastCheckIn(uuid, member)
-        setResult({ granted: false, member, reason: 'Membresía cancelada' })
-      } else {
-        await broadcastCheckIn(uuid, member)
-        setResult({ granted: false, member, reason: 'Membresía vencida' })
-      }
+      const granted = memberStatus === 'active'
+      const reason = memberStatus === 'cancelled' ? 'Membresía cancelada' : granted ? null : 'Membresía vencida'
+      await broadcastCheckIn(uuid, member)
+      logAccess(member.id, { granted, reason, method: 'kiosk_qr' })
+      setResult({ granted, member, reason })
       setTimeout(() => { setResult(null); try { scannerRef.current?.resume() } catch {} }, 5000)
       return
     }
@@ -190,17 +185,20 @@ function ScannerView({ onBack, member }) {
     // ── Member QR: bare UUID → look up user in Supabase (staff scanning member) ─
     const { data: user, error } = await supabase
       .from('users')
-      .select('first_name, last_name, membership_status, membership_end_date, membership_type')
+      .select('id, first_name, last_name, membership_status, membership_end_date, membership_type')
       .eq('id', uuid)
       .single()
 
     if (error || !user) {
       setResult({ granted: false, member: null, reason: 'Código no reconocido' })
     } else if (user.membership_status === 'active') {
+      logAccess(user.id, { granted: true, method: 'member_qr' })
       setResult({ granted: true, member: user })
     } else if (user.membership_status === 'cancelled') {
+      logAccess(user.id, { granted: false, reason: 'Membresía cancelada', method: 'member_qr' })
       setResult({ granted: false, member: user, reason: 'Membresía cancelada' })
     } else {
+      logAccess(user.id, { granted: false, reason: 'Membresía vencida', method: 'member_qr' })
       setResult({ granted: false, member: user, reason: 'Membresía vencida' })
     }
 
@@ -311,6 +309,20 @@ function broadcastCheckIn(sessionId, memberInfo) {
   })
 }
 
+// Log an access event to Supabase access_logs
+function logAccess(userId, { granted, reason = null, method = 'kiosk_qr', sucursalId = 2 } = {}) {
+  if (!userId) return
+  supabase.from('access_logs').insert({
+    user_id: userId,
+    sucursal_id: sucursalId,
+    method,
+    granted,
+    denied_reason: reason ?? null,
+  }).then(({ error }) => {
+    if (error) console.error('access_logs insert error:', error)
+  })
+}
+
 export default function MemberAccess() {
   const [step, setStep] = useState('loading') // check session first
   const [member, setMember] = useState(null)
@@ -342,6 +354,7 @@ export default function MemberAccess() {
           setMember(user)
           if (sessionId) {
             await broadcastCheckIn(sessionId, user)
+            logAccess(user.id, { granted: user.membership_status === 'active', method: 'kiosk_qr' })
             setCheckInDone(true)
           }
           setStep('hub')
@@ -392,6 +405,7 @@ export default function MemberAccess() {
         setMember(user)
         if (sessionId) {
           await broadcastCheckIn(sessionId, user)
+          logAccess(user.id, { granted: user.membership_status === 'active', method: 'kiosk_qr' })
           setCheckInDone(true)
         }
         setStep('hub')
@@ -553,6 +567,7 @@ export default function MemberAccess() {
       setMember(freshUser)
       if (sessionId) {
         await broadcastCheckIn(sessionId, freshUser)
+        logAccess(freshUser.id, { granted: freshUser.membership_status === 'active', method: 'kiosk_qr' })
         setCheckInDone(true)
       }
       setStep('hub')
