@@ -215,6 +215,7 @@ export default function MemberAccess() {
 
   // Form state
   const [dni, setDni] = useState('')
+  const [fallbackEmail, setFallbackEmail] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newEmail2, setNewEmail2] = useState('')
   const [password, setPassword] = useState('')
@@ -251,9 +252,32 @@ export default function MemberAccess() {
         { body: { dni: dni.trim() } }
       )
       if (fnError || data?.error) {
-        setError(data?.error || 'No encontramos un socio con ese DNI. Hablá con recepción.')
+        setStep('fallback_email')
       } else {
         setMember(data) // { id, email_masked, first_name, membership_status }
+        setStep('confirm_email')
+      }
+    } catch {
+      setError('Error de conexión. Intentá de nuevo.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ── Step 1b: Email fallback ──────────────────────────────────────────────────
+  const handleEmailFallback = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(
+        'lookup-member-by-email',
+        { body: { email: fallbackEmail.trim(), pending_dni: dni.trim() } }
+      )
+      if (fnError || data?.error) {
+        setError(data?.error || 'No encontramos un socio con ese email. Hablá con recepción.')
+      } else {
+        setMember(data) // { id, email_masked, first_name, membership_status, source: 'email', pending_dni }
         setStep('confirm_email')
       }
     } catch {
@@ -343,10 +367,18 @@ export default function MemberAccess() {
         await supabase.auth.signInWithPassword({ email: realEmail, password })
       if (signInErr) throw signInErr
 
-      // Link auth_user_id to users record
+      // Link auth_user_id + sync DNI/central_cliente_id back to Supabase
       const authUserId = signInData.user?.id
-      if (authUserId) {
-        await supabase.from('users').update({ auth_user_id: authUserId }).eq('id', member.id)
+      if (authUserId && member.id) {
+        const updatePayload = { auth_user_id: authUserId }
+        if (member.source === 'central' && member.dni) {
+          updatePayload.dni = member.dni
+          if (member.central_cliente_id) updatePayload.central_cliente_id = member.central_cliente_id
+        }
+        if (member.source === 'email' && member.pending_dni) {
+          updatePayload.dni = member.pending_dni
+        }
+        await supabase.from('users').update(updatePayload).eq('id', member.id)
       }
 
       // Fetch fresh member data
@@ -411,6 +443,36 @@ export default function MemberAccess() {
     <div style={styles.page}>
       <div style={styles.card}>
         <div style={styles.logo}>T</div>
+
+        {/* ── Email fallback ── */}
+        {step === 'fallback_email' && (
+          <>
+            <h1 style={styles.title}>No encontramos tu DNI</h1>
+            <p style={styles.subtitle}>Ingresá el email con el que te registraste</p>
+            <form style={styles.form} onSubmit={handleEmailFallback}>
+              <input
+                style={styles.input}
+                type="email"
+                placeholder="tu@email.com"
+                value={fallbackEmail}
+                onChange={(e) => setFallbackEmail(e.target.value)}
+                required
+                autoFocus
+              />
+              {error && <p style={styles.error}>{error}</p>}
+              <button style={styles.btn} type="submit" disabled={loading}>
+                {loading ? 'Buscando...' : 'Continuar'}
+              </button>
+              <button
+                type="button"
+                style={styles.backBtn}
+                onClick={() => { setStep('dni'); setError(''); setFallbackEmail('') }}
+              >
+                ← Volver a DNI
+              </button>
+            </form>
+          </>
+        )}
 
         {/* ── DNI ── */}
         {step === 'dni' && (
