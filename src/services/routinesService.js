@@ -99,6 +99,7 @@ export const routinesService = {
               exercise_order,
               box_id,
               box_number,
+              is_cooldown,
               sets_reps,
               rest_time,
               repetition_time,
@@ -110,7 +111,7 @@ export const routinesService = {
                 name,
                 box_number
               ),
-              exercises (
+              exercises!session_exercises_exercise_id_fkey (
                 id,
                 name,
                 description,
@@ -218,6 +219,7 @@ export const routinesService = {
             exercise_order,
             box_id,
             box_number,
+            is_cooldown,
             sets_reps,
             rest_time,
             repetition_time,
@@ -229,7 +231,7 @@ export const routinesService = {
               name,
               box_number
             ),
-            exercises (
+            exercises!session_exercises_exercise_id_fkey (
               id,
               name,
               description,
