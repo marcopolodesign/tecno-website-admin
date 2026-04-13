@@ -15,6 +15,7 @@ import {
   ClockIcon,
   DocumentDuplicateIcon
 } from '@heroicons/react/24/outline'
+import * as Sentry from '@sentry/react'
 import routinesService from '../services/routinesService'
 import exercisesService from '../services/exercisesService'
 import { generateRoutineSessions } from '../services/routineGenerationService'
@@ -105,6 +106,7 @@ export default function Routines() {
       setBodyZones(zonesRes.data || [])
       setBoxes(boxesRes.data || [])
     } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error fetching data:' } })
       console.error('Error fetching data:', error)
       toast.error('Error al cargar datos', toastOptions)
     } finally {
@@ -123,6 +125,7 @@ export default function Routines() {
         setExpandedSessions({ [data.routineSessions[0].id]: true })
       }
     } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error fetching routine detail:' } })
       console.error('Error fetching routine detail:', error)
       toast.error('Error al cargar rutina', toastOptions)
     } finally {
@@ -216,6 +219,7 @@ export default function Routines() {
       setShowRoutineModal(false)
       fetchData()
     } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error saving routine:' } })
       console.error('Error saving routine:', error)
       toast.error('Error al guardar rutina', toastOptions)
     } finally {
@@ -244,6 +248,7 @@ export default function Routines() {
       toast.success('Rutina duplicada', toastOptions)
       fetchData()
     } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error duplicating routine:' } })
       console.error('Error duplicating routine:', error)
       toast.error('Error al duplicar rutina', toastOptions)
     } finally {
@@ -289,6 +294,7 @@ export default function Routines() {
       setShowSessionModal(false)
       fetchRoutineDetail(sessionForm.routineId)
     } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error saving session:' } })
       console.error('Error saving session:', error)
       toast.error('Error al guardar sesión', toastOptions)
     } finally {
@@ -371,6 +377,7 @@ export default function Routines() {
       setShowExerciseModal(false)
       fetchRoutineDetail(selectedRoutine.id)
     } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error saving exercise:' } })
       console.error('Error saving exercise:', error)
       toast.error('Error al guardar ejercicio', toastOptions)
     } finally {
@@ -404,6 +411,7 @@ export default function Routines() {
       fetchRoutineDetail(selectedRoutine.id)
       fetchData()
     } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error generating sessions:' } })
       console.error('Error generating sessions:', error)
       toast.error('Error al generar sesiones', toastOptions)
     } finally {

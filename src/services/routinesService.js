@@ -347,7 +347,7 @@ export const routinesService = {
             name,
             box_number
           ),
-          exercises (
+          exercises!session_exercises_exercise_id_fkey (
             id,
             name,
             description,
