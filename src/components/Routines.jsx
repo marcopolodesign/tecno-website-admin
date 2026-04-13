@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline'
 import routinesService from '../services/routinesService'
 import exercisesService from '../services/exercisesService'
+import { generateRoutineSessions } from '../services/routineGenerationService'
 import { supabase, toCamelCase } from '../lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
@@ -73,11 +74,13 @@ export default function Routines() {
     repetitionTime: '',
     weightKg: '',
     microPause: '',
-    notes: ''
+    notes: '',
+    isCooldown: false
   })
 
   // Expanded sessions
   const [expandedSessions, setExpandedSessions] = useState({})
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -305,11 +308,13 @@ export default function Routines() {
   }
 
   // Exercise Modal Handlers
-  const openExerciseModal = (sessionId, sessionExercise = null, boxNumber = null) => {
+  const openExerciseModal = (sessionId, sessionExercise = null, boxNumber = null, isCooldown = false) => {
     const session = selectedRoutine?.routineSessions?.find(s => s.id === sessionId)
-    const boxExercises = session?.sessionExercises?.filter(se => se.boxNumber === boxNumber) || []
+    const boxExercises = isCooldown
+      ? session?.sessionExercises?.filter(se => se.isCooldown) || []
+      : session?.sessionExercises?.filter(se => se.boxNumber === boxNumber && !se.isCooldown) || []
     const currentExercises = boxExercises.length
-    
+
     if (sessionExercise) {
       setEditingItem(sessionExercise)
       setExerciseForm({
@@ -323,7 +328,8 @@ export default function Routines() {
         repetitionTime: sessionExercise.repetitionTime || '',
         weightKg: sessionExercise.weightKg || '',
         microPause: sessionExercise.microPause || '',
-        notes: sessionExercise.notes || ''
+        notes: sessionExercise.notes || '',
+        isCooldown: sessionExercise.isCooldown || false
       })
     } else {
       const selectedBox = boxes.find(b => b.boxNumber === boxNumber)
@@ -331,15 +337,16 @@ export default function Routines() {
       setExerciseForm({
         sessionId: sessionId,
         exerciseId: '',
-        boxId: selectedBox?.id || '',
-        boxNumber: boxNumber || '',
+        boxId: isCooldown ? '' : (selectedBox?.id || ''),
+        boxNumber: isCooldown ? null : (boxNumber || ''),
         exerciseOrder: currentExercises + 1,
         setsReps: '3x12',
         restTime: '60s',
         repetitionTime: '',
         weightKg: '',
         microPause: '',
-        notes: ''
+        notes: '',
+        isCooldown: isCooldown
       })
     }
     setShowExerciseModal(true)
@@ -379,6 +386,28 @@ export default function Routines() {
       fetchRoutineDetail(selectedRoutine.id)
     } catch (error) {
       toast.error('Error al quitar', toastOptions)
+    }
+  }
+
+  const handleGenerateSessions = async () => {
+    if (!selectedRoutine) return
+    const templateSession = selectedRoutine.routineSessions?.find(s => s.sessionNumber === 1)
+    if (!templateSession) {
+      toast.error('Creá la Sesión 1 primero — es la plantilla base', toastOptions)
+      return
+    }
+    if (!confirm('Esto generará 30 sesiones basadas en la Sesión 1 como plantilla.\n\nLas sesiones 2–6 usarán ejercicios similares y las sesiones 7–30 rotarán entre las primeras 6.\n\n¿Continuar?')) return
+    try {
+      setGenerating(true)
+      await generateRoutineSessions(selectedRoutine.id, templateSession.id)
+      toast.success('30 sesiones generadas exitosamente', toastOptions)
+      fetchRoutineDetail(selectedRoutine.id)
+      fetchData()
+    } catch (error) {
+      console.error('Error generating sessions:', error)
+      toast.error('Error al generar sesiones', toastOptions)
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -579,14 +608,50 @@ export default function Routines() {
                 {/* Sessions */}
                 <div className="border-t border-border-default pt-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-medium text-text-primary">Sesiones</h3>
-                    <button
-                      onClick={() => openSessionModal(selectedRoutine.id)}
-                      className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1"
-                    >
-                      <PlusIcon className="h-3.5 w-3.5" />
-                      Agregar Sesión
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-medium text-text-primary">Sesiones</h3>
+                      {selectedRoutine.generationStatus === 'completed' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Auto-generada</span>
+                      )}
+                      {selectedRoutine.generationStatus === 'generating' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
+                          <span className="w-2 h-2 border border-blue-500 border-t-transparent rounded-full animate-spin inline-block" />
+                          Generando...
+                        </span>
+                      )}
+                      {selectedRoutine.generationStatus === 'failed' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Error en generación</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {(selectedRoutine.routineSessions?.length === 1 || !selectedRoutine.generationStatus || selectedRoutine.generationStatus === 'manual') && (
+                        <button
+                          onClick={handleGenerateSessions}
+                          disabled={generating}
+                          className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+                          title="Genera 30 sesiones basadas en la Sesión 1"
+                        >
+                          {generating ? (
+                            <>
+                              <span className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin" />
+                              Generando...
+                            </>
+                          ) : (
+                            <>
+                              <PlayIcon className="h-3.5 w-3.5" />
+                              Generar Sesiones
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openSessionModal(selectedRoutine.id)}
+                        className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1"
+                      >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                        Agregar Sesión
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -704,12 +769,12 @@ export default function Routines() {
                               })}
                             </div>
                             
-                            {/* Exercises without station (legacy/unassigned) */}
-                            {session.sessionExercises?.filter(se => !se.boxNumber).length > 0 && (
+                            {/* Exercises without station (legacy/unassigned, not cooldown) */}
+                            {session.sessionExercises?.filter(se => !se.boxNumber && !se.isCooldown).length > 0 && (
                               <div className="p-3 bg-yellow-50 border-t border-yellow-200">
                                 <p className="text-xs font-medium text-yellow-700 mb-2">Ejercicios sin estación asignada:</p>
                                 <div className="flex flex-wrap gap-2">
-                                  {session.sessionExercises?.filter(se => !se.boxNumber).sort((a, b) => a.exerciseOrder - b.exerciseOrder).map(se => (
+                                  {session.sessionExercises?.filter(se => !se.boxNumber && !se.isCooldown).sort((a, b) => a.exerciseOrder - b.exerciseOrder).map(se => (
                                     <div key={se.id} className="bg-white px-2 py-1 rounded text-xs flex items-center gap-2 border border-yellow-200">
                                       <span>{se.exercises?.name}</span>
                                       <button
@@ -723,6 +788,65 @@ export default function Routines() {
                                 </div>
                               </div>
                             )}
+
+                            {/* Cooldown Section */}
+                            {(() => {
+                              const cooldownExercises = session.sessionExercises
+                                ?.filter(se => se.isCooldown)
+                                ?.sort((a, b) => a.exerciseOrder - b.exerciseOrder) || []
+                              return (
+                                <div className="border-t border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50">
+                                  <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                                      <span className="text-xs font-semibold text-blue-700">Cooldown</span>
+                                      <span className="text-xs text-blue-400">({cooldownExercises.length} ejercicios)</span>
+                                    </div>
+                                    <button
+                                      onClick={() => openExerciseModal(session.id, null, null, true)}
+                                      className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
+                                    >
+                                      <PlusIcon className="h-3 w-3" />
+                                      Agregar
+                                    </button>
+                                  </div>
+                                  <div className="p-3">
+                                    {cooldownExercises.length > 0 ? (
+                                      <div className="flex flex-wrap gap-2">
+                                        {cooldownExercises.map((se, idx) => (
+                                          <div
+                                            key={se.id}
+                                            className="bg-white border border-blue-200 rounded px-2 py-1.5 text-xs group flex items-center gap-2"
+                                          >
+                                            <span className="text-blue-400 font-medium">{idx + 1}.</span>
+                                            <div>
+                                              <p className="font-medium text-text-primary">{se.exercises?.name}</p>
+                                              <p className="text-text-tertiary">{se.setsReps}{se.restTime && ` • ${se.restTime}`}</p>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button
+                                                onClick={() => openExerciseModal(session.id, se, null, true)}
+                                                className="p-0.5 text-blue-400 hover:text-blue-600"
+                                              >
+                                                <PencilIcon className="h-3 w-3" />
+                                              </button>
+                                              <button
+                                                onClick={() => removeExerciseFromSession(se.id)}
+                                                className="p-0.5 text-text-tertiary hover:text-error"
+                                              >
+                                                <TrashIcon className="h-3 w-3" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-blue-300 italic">Sin ejercicios de cooldown</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })()}
                           </div>
                         )}
                       </div>
@@ -931,11 +1055,11 @@ export default function Routines() {
               <div className="flex items-center justify-between p-4 border-b border-border-default">
                 <h2 className="text-lg font-semibold text-text-primary">
                   {editingItem ? 'Editar Ejercicio' : 'Agregar Ejercicio'}
-                  {exerciseForm.boxNumber && (
-                    <span className="ml-2 text-sm font-normal text-brand">
-                      - Estación {exerciseForm.boxNumber}
-                    </span>
-                  )}
+                  {exerciseForm.isCooldown ? (
+                    <span className="ml-2 text-sm font-normal text-blue-500">- Cooldown</span>
+                  ) : exerciseForm.boxNumber ? (
+                    <span className="ml-2 text-sm font-normal text-brand">- Estación {exerciseForm.boxNumber}</span>
+                  ) : null}
                 </h2>
                 <button onClick={() => setShowExerciseModal(false)} className="p-1 hover:bg-bg-surface rounded">
                   <XMarkIcon className="h-5 w-5 text-text-secondary" />
@@ -943,29 +1067,36 @@ export default function Routines() {
               </div>
               
               <form onSubmit={saveExerciseToSession} className="p-4 space-y-4">
-                {/* Station Selection */}
-                <div>
-                  <label className="form-label">Estación *</label>
-                  <select
-                    value={exerciseForm.boxNumber}
-                    onChange={(e) => {
-                      const boxNum = parseInt(e.target.value)
-                      const selectedBox = boxes.find(b => b.boxNumber === boxNum)
-                      setExerciseForm({ 
-                        ...exerciseForm, 
-                        boxNumber: boxNum, 
-                        boxId: selectedBox?.id || '' 
-                      })
-                    }}
-                    className="form-select"
-                    required
-                  >
-                    <option value="">Seleccionar estación...</option>
-                    {[1, 2, 3, 4, 5].map(num => (
-                      <option key={num} value={num}>Estación {num}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Station Selection (hidden for cooldown exercises) */}
+                {exerciseForm.isCooldown ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                    <span className="text-sm text-blue-700 font-medium">Ejercicio de Cooldown</span>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="form-label">Estación *</label>
+                    <select
+                      value={exerciseForm.boxNumber}
+                      onChange={(e) => {
+                        const boxNum = parseInt(e.target.value)
+                        const selectedBox = boxes.find(b => b.boxNumber === boxNum)
+                        setExerciseForm({
+                          ...exerciseForm,
+                          boxNumber: boxNum,
+                          boxId: selectedBox?.id || ''
+                        })
+                      }}
+                      className="form-select"
+                      required
+                    >
+                      <option value="">Seleccionar estación...</option>
+                      {[1, 2, 3, 4, 5].map(num => (
+                        <option key={num} value={num}>Estación {num}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="form-label">Ejercicio *</label>

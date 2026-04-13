@@ -402,6 +402,7 @@ async function generateSimilarSession(routineId, templateExercises, sessionNumbe
         micro_pause: te.micro_pause,
         weight_kg: te.weight_kg,
         is_auto_generated: true,
+        is_cooldown: te.is_cooldown || false,
         generation_source: exerciseId === te.exercise_id ? 'template' : 'similar'
       }])
   }
@@ -478,6 +479,7 @@ async function generateRandomSession(routineId, sessionNumber, userId) {
         micro_pause: selected.micro_pause,
         weight_kg: selected.weight_kg,
         is_auto_generated: true,
+        is_cooldown: selected.is_cooldown || false,
         generation_source: 'random'
       }])
   }

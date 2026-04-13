@@ -331,7 +331,8 @@ export const routinesService = {
         repetition_time: sessionExerciseData.repetitionTime || null,
         weight_kg: sessionExerciseData.weightKg || null,
         micro_pause: sessionExerciseData.microPause || 0,
-        notes: sessionExerciseData.notes || null
+        notes: sessionExerciseData.notes || null,
+        is_cooldown: sessionExerciseData.isCooldown || false
       }
 
       const { data, error } = await supabase
@@ -454,7 +455,8 @@ export const routinesService = {
             repetitionTime: exercise.repetitionTime,
             weightKg: exercise.weightKg,
             microPause: exercise.microPause,
-            notes: exercise.notes
+            notes: exercise.notes,
+            isCooldown: exercise.isCooldown || false
           })
         }
       }
