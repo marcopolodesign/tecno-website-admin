@@ -52,6 +52,8 @@ export const usersService = {
         last_name: data.lastName || '',
         email: data.email,
         phone: data.phone,
+        dni: data.dni || null,
+        date_of_birth: data.dateOfBirth || null,
         training_goal: data.trainingGoal,
         membership_type: data.membershipType,
         membership_status: 'active',

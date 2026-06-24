@@ -207,7 +207,8 @@ const Users = () => {
           user.firstName.toLowerCase().includes(search) ||
           user.lastName.toLowerCase().includes(search) ||
           user.email.toLowerCase().includes(search) ||
-          user.phone.includes(searchTerm)
+          user.phone.includes(searchTerm) ||
+          (user.dni && user.dni.includes(searchTerm))
         )
       })
     }
@@ -297,6 +298,8 @@ const Users = () => {
             lastName: existingUser.lastName || '',
             email: existingUser.email || '',
             phone: existingUser.phone || '',
+            dni: existingUser.dni || '',
+            dateOfBirth: existingUser.dateOfBirth || '',
             trainingGoal: existingUser.trainingGoal || '',
             membershipType: existingUser.membershipType || '',
             emergencyContact: existingUser.emergencyContact || '',
@@ -735,6 +738,20 @@ const Users = () => {
               editable: false
             },
             {
+              field: 'dni',
+              headerName: 'DNI',
+              width: 120,
+              editable: false,
+              valueGetter: (value) => value || '-'
+            },
+            {
+              field: 'dateOfBirth',
+              headerName: 'F. Nacimiento',
+              width: 130,
+              editable: false,
+              valueFormatter: (value) => formatDateSafe(value)
+            },
+            {
               field: 'phone',
               headerName: 'Teléfono',
               width: 150,
@@ -819,6 +836,8 @@ const Users = () => {
               lastName: params.row.lastName || '',
               email: params.row.email || '',
               phone: params.row.phone || '',
+              dni: params.row.dni || '',
+              dateOfBirth: params.row.dateOfBirth || '',
               emergencyContact: params.row.emergencyContact || '',
               emergencyPhone: params.row.emergencyPhone || '',
               medicalNotes: params.row.medicalNotes || '',
@@ -935,6 +954,26 @@ const Users = () => {
                     className="form-input"
                     value={editFormData.phone}
                     onChange={(e) => handleFormChange('phone', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">DNI</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editFormData.dni}
+                    onChange={(e) => handleFormChange('dni', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Fecha de Nacimiento</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={editFormData.dateOfBirth}
+                    onChange={(e) => handleFormChange('dateOfBirth', e.target.value)}
                   />
                 </div>
 
@@ -1237,6 +1276,28 @@ const Users = () => {
                         value={createFormData.phone}
                         onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
                         placeholder="+54 9 11 1234-5678"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="form-label">DNI</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={createFormData.dni || ''}
+                        onChange={(e) => setCreateFormData({...createFormData, dni: e.target.value})}
+                        placeholder="12345678"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Fecha de Nacimiento</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={createFormData.dateOfBirth || ''}
+                        onChange={(e) => setCreateFormData({...createFormData, dateOfBirth: e.target.value})}
                       />
                     </div>
                   </div>
