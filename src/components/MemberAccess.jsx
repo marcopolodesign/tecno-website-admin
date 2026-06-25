@@ -185,7 +185,7 @@ function ScannerView({ onBack, member }) {
     // ── Member QR: bare UUID → look up user in Supabase (staff scanning member) ─
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, first_name, last_name, membership_status, membership_end_date, membership_type')
+      .select('id, first_name, last_name, membership_status, membership_end_date, membership_type, dni, central_cliente_id')
       .eq('id', uuid)
       .single()
 
@@ -193,6 +193,8 @@ function ScannerView({ onBack, member }) {
       setResult({ granted: false, member: null, reason: 'Código no reconocido' })
     } else if (user.membership_status === 'active') {
       logAccess(user.id, { granted: true, method: 'member_qr' })
+      // Bridge: push client into local gym queue (fire-and-forget, only when VITE_LOCAL_GYM_URL is set)
+      pushToLocalQueue(user.dni, user.central_cliente_id, 'qr')
       setResult({ granted: true, member: user })
     } else if (user.membership_status === 'cancelled') {
       logAccess(user.id, { granted: false, reason: 'Membresía cancelada', method: 'member_qr' })
@@ -306,6 +308,30 @@ function broadcastCheckIn(sessionId, memberInfo) {
         resolve()
       }
     })
+  })
+}
+
+/**
+ * Bridge: push member into the local gym wait-list via the Laravel bridge endpoint.
+ * Fire-and-forget — never blocks the UX. Only fires when VITE_LOCAL_GYM_URL is set
+ * (local/gym builds). In production, VITE_LOCAL_GYM_URL is unset → call is skipped,
+ * so existing prod QR behavior is completely unchanged.
+ */
+function pushToLocalQueue(documento, centralClienteId, source = 'qr') {
+  const gymUrl = import.meta.env.VITE_LOCAL_GYM_URL
+  const secret = import.meta.env.VITE_INGRESO_APP_SECRET
+  if (!gymUrl || !documento) return
+  fetch(`${gymUrl}/api/v1/ingreso-desde-app`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      documento,
+      central_cliente_id: centralClienteId ?? null,
+      source,
+      secret: secret ?? '',
+    }),
+  }).catch((err) => {
+    console.warn('[QR bridge] Failed to push to local gym queue:', err)
   })
 }
 
