@@ -484,7 +484,7 @@ const Users = () => {
 
     try {
       const paymentData = {
-        amount: renewalFormData.paymentAmount,
+        amount: parseFloat(renewalFormData.paymentAmount) || 0,
         paymentMethod: renewalFormData.paymentMethod,
         paymentDate: new Date().toISOString(),
         notes: renewalFormData.paymentNotes || 'Renovación de membresía'
@@ -1158,7 +1158,7 @@ const Users = () => {
                       startDate: today.toISOString().split('T')[0],
                       endDate: endDate.toISOString().split('T')[0],
                       paymentMethod: 'efectivo',
-                      paymentAmount: calculatedPrice || '',
+                      paymentAmount: calculatedPrice ?? 0,
                       paymentNotes: ''
                     })
                     setShowRenewalModal(true)
