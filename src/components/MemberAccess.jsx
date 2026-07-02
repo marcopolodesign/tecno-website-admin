@@ -269,7 +269,7 @@ function ScannerView({ onBack, member }) {
 // Look up public.users by auth_user_id (fast path) or email (first login),
 // and link auth_user_id for future sessions.
 async function lookupAndLinkUser(authUserId, email) {
-  const SELECT = 'id, first_name, last_name, membership_status, membership_end_date, membership_type'
+  const SELECT = 'id, first_name, last_name, membership_status, membership_end_date, membership_type, dni, central_cliente_id'
 
   // Fast path — already linked
   const { data: byAuth } = await supabase
@@ -381,6 +381,9 @@ export default function MemberAccess() {
           if (sessionId) {
             await broadcastCheckIn(sessionId, user)
             logAccess(user.id, { granted: user.membership_status === 'active', method: 'kiosk_qr' })
+            if (user.membership_status === 'active') {
+              pushToLocalQueue(user.dni, user.central_cliente_id, 'qr')
+            }
             setCheckInDone(true)
           }
           setStep('hub')
@@ -432,6 +435,9 @@ export default function MemberAccess() {
         if (sessionId) {
           await broadcastCheckIn(sessionId, user)
           logAccess(user.id, { granted: user.membership_status === 'active', method: 'kiosk_qr' })
+          if (user.membership_status === 'active') {
+            pushToLocalQueue(user.dni, user.central_cliente_id, 'qr')
+          }
           setCheckInDone(true)
         }
         setStep('hub')

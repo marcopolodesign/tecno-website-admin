@@ -4,6 +4,14 @@ import { supabase } from '../lib/supabase'
 
 const RESET_DELAY = 5000
 
+function generateId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
+
 function playGranted() {
   try {
     const ctx = new AudioContext()
@@ -45,7 +53,7 @@ function formatDate(dateStr) {
 }
 
 export default function CheckIn() {
-  const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
+  const [sessionId, setSessionId] = useState(() => generateId())
   const [state, setState] = useState('idle') // 'idle' | 'granted' | 'denied'
   const [memberData, setMemberData] = useState(null)
   const [deniedReason, setDeniedReason] = useState('')
@@ -68,7 +76,7 @@ export default function CheckIn() {
     setMemberData(null)
     setDeniedReason('')
     setProgress(100)
-    setSessionId(crypto.randomUUID()) // new QR on each reset
+    setSessionId(generateId()) // new QR on each reset
   }, [])
 
   // Subscribe to realtime broadcast for this session

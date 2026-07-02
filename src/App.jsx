@@ -123,6 +123,7 @@ function App() {
       <Routes>
         {/* ─── Public standalone routes (no auth required) ─── */}
         <Route path="/check-in" element={<CheckIn />} />
+        <Route path="/checkin" element={<CheckIn />} />
         <Route path="/acceso" element={<MemberAccess />} />
 
         {/* ─── All other routes — behind auth wall ─── */}
