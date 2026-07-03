@@ -616,8 +616,20 @@ export default function MemberAccess() {
 
   if (step === 'loading') {
     return (
-      <div style={{ ...styles.page, justifyContent: 'center' }}>
-        <div style={styles.spinner} />
+      <div style={styles.page}>
+        <div style={styles.card}>
+          <div style={styles.logo}>T</div>
+          <div style={styles.spinner} />
+          <p style={{ ...styles.subtitle, marginTop: 4 }}>Verificando tu cuenta...</p>
+          {sessionId && (
+            <>
+              <div style={{ ...styles.qrWrapper, marginTop: 20 }}>
+                <QRCodeSVG value={`${window.location.origin}/acceso?session=${sessionId}`} size={140} />
+              </div>
+              <p style={styles.hint}>¿Se traba? Pedile a un recepcionista que escanee este código.</p>
+            </>
+          )}
+        </div>
       </div>
     )
   }
