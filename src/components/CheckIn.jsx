@@ -92,10 +92,6 @@ export default function CheckIn() {
         setMemberData(payload)
         setState('granted')
         playGranted()
-        // Fire-and-forget: decrement lista de espera on TV
-        supabase.functions.invoke('increment-lista-espera', {
-          body: { sucursal_id: Number(import.meta.env.VITE_LISTA_ESPERA_SUCURSAL_ID ?? 2) },
-        }).catch(() => {}) // never block the check-in flow
       } else if (membership_status === 'cancelled') {
         setMemberData(payload)
         setDeniedReason('Membresía cancelada')
