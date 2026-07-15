@@ -205,6 +205,54 @@ export const queueService = {
     }
   },
 
+  // ── Per-box routine display (TV) ────────────────────────────────────────
+  // session_exercises.box_number is "station 1-5 within the circuit" (CHECK
+  // 1..5 in the original fitness schema) — it means the SAME thing on both
+  // líneas (línea A's box 3 and línea B's box 3 are the same station in the
+  // circuit), so this must join against boxes.line_position, NOT the queue
+  // pipeline's global box_number (which runs 1-10 across two líneas).
+  async getCurrentExerciseForUser(userId, linePosition) {
+    if (!userId) return { data: null }
+    try {
+      const { data, error } = await supabase
+        .from('training_routines')
+        .select(
+          `id, routine_sessions (
+            id, session_number, status,
+            session_exercises (
+              id, exercise_id, box_number, is_cooldown, sets_reps, rest_time,
+              repetition_time, weight_kg, exercise_order,
+              exercises!session_exercises_exercise_id_fkey (id, name, description, video_url, video_thumbnail_url, video_platform, video_embed_id)
+            )
+          )`
+        )
+        .eq('client_id', userId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (error) throw error
+      const routine = data?.[0]
+      const sessions = routine?.routine_sessions || []
+      const sorted = [...sessions].sort((a, b) => a.session_number - b.session_number)
+      const session =
+        sorted.find((s) => s.status === 'available' || s.status === 'in_progress') ??
+        sorted.find((s) => s.status !== 'completed') ??
+        sorted[0] ??
+        null
+      if (!session) return { data: null }
+
+      const exerciseAtBox = (session.session_exercises || [])
+        .filter((se) => se.box_number === linePosition && !se.is_cooldown)
+        .sort((a, b) => a.exercise_order - b.exercise_order)[0]
+
+      return { data: exerciseAtBox || null }
+    } catch (error) {
+      console.error('Error fetching current exercise for user:', error)
+      return { data: null }
+    }
+  },
+
   // ── Realtime subscriptions ─────────────────────────────────────────────
   subscribeToLine(productionLineId, onChange) {
     const channel = supabase

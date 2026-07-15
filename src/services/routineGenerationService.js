@@ -351,6 +351,36 @@ export const generateRoutineSessions = async (routineId, templateSessionId) => {
   }
 }
 
+// Deterministic string hash (FNV-1a) — same inputs always produce the same
+// pick, so regenerating a routine is reproducible/auditable instead of
+// silently landing on a different exercise every run. Ported concept (not
+// code — his was PHP crc32) from Lucas Barral's RutinaMaterializerService.
+function seededIndex(seed, length) {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return Math.abs(hash) % length
+}
+
+// Weight carryover — reuse the client's last logged weight for this exact
+// exercise instead of leaving weight_kg null/default on every regeneration.
+// Ports Lucas's pesoPropuesto(): walks completed history, first non-null wins.
+async function getProposedWeight(userId, exerciseId) {
+  try {
+    const { data, error } = await supabase.rpc('get_proposed_weight', {
+      p_user_id: userId,
+      p_exercise_id: exerciseId,
+    })
+    if (error) throw error
+    return data ?? null
+  } catch (err) {
+    console.error('Error fetching proposed weight:', err)
+    return null
+  }
+}
+
 async function generateSimilarSession(routineId, templateExercises, sessionNumber, userId) {
   // Create the session
   const { data: session, error: sError } = await supabase
@@ -372,21 +402,28 @@ async function generateSimilarSession(routineId, templateExercises, sessionNumbe
   for (const te of templateExercises) {
     let exerciseId = te.exercise_id
     
-    // Try to find a similar exercise
+    // Try to find a similar exercise — deterministic seed so re-generating
+    // this exact session/box/position always lands on the same candidate
+    // set ordering (mirror rule: box A and box B at the same station share
+    // a seed unless the box number itself differs the pool via equipment).
+    const seed = `${userId}-${routineId}-${sessionNumber}-b${te.box_number}-o${te.exercise_order}`
     const { data: similar } = await supabase
       .rpc('get_similar_exercises', {
         p_exercise_id: te.exercise_id,
         p_user_id: userId,
         p_box_id: te.box_id,
-        p_exclude_ids: usedExerciseIds
+        p_exclude_ids: usedExerciseIds,
+        p_seed: seed
       })
-    
+
     if (similar && similar.length > 0) {
       exerciseId = similar[0].exercise_id
     }
-    
+
     usedExerciseIds.push(exerciseId)
-    
+
+    const proposedWeight = await getProposedWeight(userId, exerciseId)
+
     // Create the session exercise
     await supabase
       .from('session_exercises')
@@ -400,7 +437,7 @@ async function generateSimilarSession(routineId, templateExercises, sessionNumbe
         rest_time: te.rest_time,
         repetition_time: te.repetition_time,
         micro_pause: te.micro_pause,
-        weight_kg: te.weight_kg,
+        weight_kg: proposedWeight ?? te.weight_kg,
         is_auto_generated: true,
         is_cooldown: te.is_cooldown || false,
         generation_source: exerciseId === te.exercise_id ? 'template' : 'similar'
@@ -461,9 +498,13 @@ async function generateRandomSession(routineId, sessionNumber, userId) {
       candidates = exercises
     }
     
-    // Pick random
-    const selected = candidates[Math.floor(Math.random() * candidates.length)]
-    
+    // Deterministic pick — same routine/session/position always selects the
+    // same candidate instead of a fresh Math.random() roll every regenerate.
+    const seed = `${routineId}-${sessionNumber}-${key}`
+    const selected = candidates[seededIndex(seed, candidates.length)]
+
+    const proposedWeight = await getProposedWeight(userId, selected.exercise_id)
+
     // Create the session exercise
     await supabase
       .from('session_exercises')
@@ -477,7 +518,7 @@ async function generateRandomSession(routineId, sessionNumber, userId) {
         rest_time: selected.rest_time,
         repetition_time: selected.repetition_time,
         micro_pause: selected.micro_pause,
-        weight_kg: selected.weight_kg,
+        weight_kg: proposedWeight ?? selected.weight_kg,
         is_auto_generated: true,
         is_cooldown: selected.is_cooldown || false,
         generation_source: 'random'

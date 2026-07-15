@@ -2,12 +2,32 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { ArrowPathIcon, ClockIcon, UserIcon } from '@heroicons/react/24/outline'
 import { queueService, boxLabel } from '../services/queueService'
 
-function formatCountdown(advancesAt) {
-  if (!advancesAt) return null
-  const ms = new Date(advancesAt).getTime() - Date.now()
-  if (ms <= 0) return '0:00'
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+// Drift-free countdown driven off requestAnimationFrame + an absolute target
+// timestamp, only setState-ing on integer-second change — same pattern as
+// QueueTv.jsx (ported from Lucas Barral's box-display timer).
+function useCountdown(targetIso) {
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    targetIso ? Math.max(0, Math.ceil((new Date(targetIso).getTime() - Date.now()) / 1000)) : null
+  )
+
+  useEffect(() => {
+    if (!targetIso) {
+      setSecondsLeft(null)
+      return
+    }
+    const targetMs = new Date(targetIso).getTime()
+    let rafId
+    const loop = () => {
+      const remaining = Math.max(0, Math.ceil((targetMs - Date.now()) / 1000))
+      setSecondsLeft((prev) => (prev !== remaining ? remaining : prev))
+      rafId = window.requestAnimationFrame(loop)
+    }
+    rafId = window.requestAnimationFrame(loop)
+    return () => window.cancelAnimationFrame(rafId)
+  }, [targetIso])
+
+  if (secondsLeft == null) return ''
+  return `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
 }
 
 function formatWait(createdAt) {
@@ -16,14 +36,7 @@ function formatWait(createdAt) {
 }
 
 function BoxCard({ box, lineNumber, onFree }) {
-  const [countdown, setCountdown] = useState(() => formatCountdown(box.advances_at))
-
-  useEffect(() => {
-    if (box.status !== 'occupied') return
-    const id = setInterval(() => setCountdown(formatCountdown(box.advances_at)), 1000)
-    return () => clearInterval(id)
-  }, [box.status, box.advances_at])
-
+  const countdown = useCountdown(box.status === 'occupied' ? box.advances_at : null)
   const isOccupied = box.status === 'occupied'
 
   return (
