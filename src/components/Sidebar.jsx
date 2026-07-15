@@ -15,7 +15,10 @@ import {
   ClockIcon,
   // Fitness icons
   ListBulletIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  // Lista de espera icons
+  QueueListIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline'
 
 // Emails allowed to see fitness section (beta feature)
@@ -43,9 +46,19 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
     { name: 'Rutinas', href: '/routines', icon: ClipboardDocumentListIcon, roles: ['super_admin', 'admin', 'coach'] },
   ]
 
-  const allNavigation = [...managementNav, ...fitnessNav]
+  const queueNav = [
+    { name: 'Monitor', href: '/lista-espera', icon: QueueListIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+    { name: 'Configuración', href: '/lista-espera/config', icon: Cog6ToothIcon, roles: ['super_admin', 'admin'] },
+  ]
+
+  const allNavigation = [...managementNav, ...fitnessNav, ...queueNav]
 
   const navigation = managementNav.filter(item => {
+    if (!userRole) return false
+    return item.roles.includes(userRole)
+  })
+
+  const queueNavigation = queueNav.filter(item => {
     if (!userRole) return false
     return item.roles.includes(userRole)
   })
@@ -107,6 +120,26 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
           <>
             <div className="section-header mt-4">Fitness</div>
             {fitnessNavigation.map((item) => {
+              const isActive = location.pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={handleNavClick}
+                  className={isActive ? 'nav-item-active' : 'nav-item-inactive'}
+                >
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  <span>{item.name}</span>
+                </Link>
+              )
+            })}
+          </>
+        )}
+
+        {queueNavigation.length > 0 && (
+          <>
+            <div className="section-header mt-4">Lista de Espera</div>
+            {queueNavigation.map((item) => {
               const isActive = location.pathname === item.href
               return (
                 <Link
