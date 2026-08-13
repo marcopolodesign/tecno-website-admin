@@ -42,6 +42,7 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
   ]
 
   const fitnessNav = [
+    { name: 'Catálogo', href: '/catalogo', icon: ListBulletIcon, roles: ['super_admin', 'admin', 'coach'] },
     { name: 'Ejercicios', href: '/exercises', icon: ListBulletIcon, roles: ['super_admin', 'admin', 'coach'] },
     { name: 'Rutinas', href: '/routines', icon: ClipboardDocumentListIcon, roles: ['super_admin', 'admin', 'coach'] },
   ]

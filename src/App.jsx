@@ -11,6 +11,7 @@ import Locations from './components/Locations'
 import ContentManagement from './components/ContentManagement'
 import MembershipPlans from './components/MembershipPlans'
 import Exercises from './components/Exercises'
+import Catalogo from './components/Catalogo'
 import Routines from './components/Routines'
 import CheckIn from './components/CheckIn'
 import MemberAccess from './components/MemberAccess'
@@ -96,7 +97,7 @@ function App() {
     const role = userRole // 'super_admin', 'admin', 'front_desk', 'coach'
 
     // Fitness routes are restricted to specific emails
-    if (['/exercises', '/routines'].includes(route)) {
+    if (['/exercises', '/routines', '/catalogo'].includes(route)) {
       return canSeeFitness
     }
 
@@ -230,6 +231,9 @@ function AuthenticatedShell({
               {/* Fitness Routes */}
               {canSeeFitness && (
                 <Route path="/exercises" element={<Exercises />} />
+              )}
+              {canSeeFitness && (
+                <Route path="/catalogo" element={<Catalogo />} />
               )}
               {canSeeFitness && (
                 <Route path="/routines" element={<Routines />} />
