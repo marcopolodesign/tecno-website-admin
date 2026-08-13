@@ -24,7 +24,7 @@ import Header from './components/Header'
 import { authService } from './services/authService'
 
 // Emails allowed to see fitness section (beta feature)
-const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com']
+const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
