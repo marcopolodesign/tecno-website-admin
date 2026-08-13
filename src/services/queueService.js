@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { EXERCISE_MEDIA_FIELDS } from '../lib/exerciseMedia'
 
 // Líneas + boxes config (production_lines/boxes, reused from the Fitness module's
 // schema — see tecnofit-supabase/supabase/migrations/20260714120000_create_queue_engine.sql)
@@ -222,7 +223,7 @@ export const queueService = {
             session_exercises (
               id, exercise_id, box_number, is_cooldown, sets_reps, rest_time,
               repetition_time, weight_kg, exercise_order,
-              exercises!session_exercises_exercise_id_fkey (id, name, description, video_url, video_thumbnail_url, video_platform, video_embed_id)
+              exercises!session_exercises_exercise_id_fkey (${EXERCISE_MEDIA_FIELDS})
             )
           )`
         )

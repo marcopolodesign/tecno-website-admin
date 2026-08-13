@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
+import { exerciseMedia } from '../lib/exerciseMedia'
 
 // Drift-free countdown: derives remaining time from an absolute target
 // timestamp every animation frame instead of a setInterval tick, and only
@@ -44,31 +45,42 @@ function ExercisePanel({ exercise }) {
     )
   }
 
-  const ex = exercise.exercises
-  const isDirectVideo = ex?.video_platform === 'direct' && ex?.video_url
-  const isYoutube = ex?.video_platform === 'youtube' && ex?.video_embed_id
+  const ex = exercise
+  // The TV gets the TV rendition and the TV framing. Anything the gym has not filmed yet
+  // still falls back to whatever link the exercise was carrying.
+  const media = exerciseMedia(ex, 'tv')
 
   return (
     <div style={panelStyles.wrapper}>
       <div style={panelStyles.media}>
-        {isDirectVideo ? (
-          <video src={ex.video_url} autoPlay muted loop playsInline style={panelStyles.mediaEl} />
-        ) : isYoutube ? (
+        {media.kind === 'hosted' ? (
+          // The poster covers the moment before the first frame decodes, so a box that
+          // just changed exercise never shows black.
+          <video
+            src={media.src}
+            poster={media.poster || undefined}
+            autoPlay
+            muted
+            loop
+            playsInline
+            style={{ ...panelStyles.mediaEl, ...media.style }}
+          />
+        ) : media.kind === 'youtube' ? (
           <iframe
-            src={`https://www.youtube.com/embed/${ex.video_embed_id}?autoplay=1&mute=1&loop=1&controls=0&playlist=${ex.video_embed_id}`}
+            src={`https://www.youtube.com/embed/${media.embedId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${media.embedId}`}
             style={panelStyles.mediaEl}
             allow="autoplay; encrypted-media"
             title={ex?.name}
           />
-        ) : ex?.video_thumbnail_url ? (
-          <img src={ex.video_thumbnail_url} alt={ex?.name} style={panelStyles.mediaEl} />
+        ) : media.kind === 'image' ? (
+          <img src={media.src} alt={ex?.name} style={panelStyles.mediaEl} />
         ) : (
           <div style={{ ...panelStyles.mediaEl, background: 'rgba(255,255,255,0.06)' }} />
         )}
       </div>
       <span style={panelStyles.exerciseName}>{ex?.name ?? 'Ejercicio'}</span>
       <span style={panelStyles.exerciseMeta}>
-        {[exercise.sets_reps, exercise.rest_time ? `descanso ${exercise.rest_time}s` : null]
+        {[ex.sets_reps, ex.rest_time ? `descanso ${ex.rest_time}s` : null]
           .filter(Boolean)
           .join(' · ')}
       </span>
@@ -94,21 +106,9 @@ const panelStyles = {
 function BoxSlot({ box, lineNumber }) {
   const countdown = useCountdown(box.status === 'occupied' ? box.advances_at : null)
   const isOccupied = box.status === 'occupied'
-  const [exercise, setExercise] = useState(null)
-
-  useEffect(() => {
-    if (!isOccupied || !box.current_user_id) {
-      setExercise(null)
-      return
-    }
-    let cancelled = false
-    queueService.getCurrentExerciseForUser(box.current_user_id, box.boxes?.line_position).then(({ data }) => {
-      if (!cancelled) setExercise(data)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [isOccupied, box.current_user_id, box.boxes?.line_position])
+  // The exercise arrives with the box in a single payload — no per-box fetch, so five
+  // boxes changing at once is one request, not six.
+  const exercise = box.ejercicio
 
   return (
     <div
@@ -127,12 +127,12 @@ function BoxSlot({ box, lineNumber }) {
       }}
     >
       <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: 600, letterSpacing: 1 }}>
-        BOX {boxLabel(lineNumber, box.boxes?.line_position)}
+        BOX {boxLabel(lineNumber, box.line_position)}
       </span>
       {isOccupied ? (
         <>
           <span style={{ color: 'white', fontSize: 18, fontWeight: 700, textAlign: 'center' }}>
-            {box.users ? `${box.users.first_name} ${box.users.last_name?.[0] ?? ''}.` : 'Ocupado'}
+            {box.socio ?? 'Ocupado'}
           </span>
           <span style={{ color: '#F45F37', fontSize: 22, fontWeight: 800, fontFamily: 'monospace' }}>
             {countdown}
@@ -154,14 +154,16 @@ export default function QueueTv() {
   const [connected, setConnected] = useState(true)
   const unsubRef = useRef(null)
 
+  // One call for the whole screen. It is also the only way this page can read anything:
+  // the TV route is public and every underlying table is behind "authenticated", so the
+  // payload comes from a function that anon may call and the tables stay closed.
   const refresh = useCallback(async () => {
     try {
-      const [{ data: boxData }, { data: queueData }] = await Promise.all([
-        queueService.getLineBoxStatus(lineaId),
-        queueService.getQueueForLine(lineaId),
-      ])
-      setBoxes(boxData || [])
-      setConfirming((queueData || []).find((q) => q.status === 'confirming') || null)
+      const { data, error } = await supabase.rpc('tv_linea', { p_line_id: Number(lineaId) })
+      if (error) throw error
+      setLine(data?.linea ?? null)
+      setBoxes(data?.boxes ?? [])
+      setConfirming(data?.confirmando ?? null)
       setConnected(true)
     } catch (err) {
       console.error('Error refreshing TV screen:', err)
@@ -170,13 +172,6 @@ export default function QueueTv() {
   }, [lineaId])
 
   useEffect(() => {
-    supabase
-      .from('production_lines')
-      .select('id, name, line_number')
-      .eq('id', lineaId)
-      .single()
-      .then(({ data }) => setLine(data))
-
     refresh()
     unsubRef.current = queueService.subscribeToLine(lineaId, refresh)
 
@@ -233,7 +228,7 @@ export default function QueueTv() {
 
       <div style={{ display: 'flex', gap: 16, flex: 1 }}>
         {boxes.map((box) => (
-          <BoxSlot key={box.id} box={box} lineNumber={line?.line_number} />
+          <BoxSlot key={box.line_position} box={box} lineNumber={line?.line_number} />
         ))}
         {boxes.length === 0 && (
           <p style={{ color: 'rgba(255,255,255,0.4)', margin: 'auto' }}>Sin boxes configurados</p>
@@ -253,8 +248,7 @@ export default function QueueTv() {
           }}
         >
           <span style={{ color: 'white', fontSize: 22, fontWeight: 600 }}>
-            {confirming.users ? `${confirming.users.first_name} ${confirming.users.last_name?.[0] ?? ''}.` : 'Socio'}{' '}
-            — confirmá tu turno en la app
+            {confirming.socio ?? 'Socio'} — confirmá tu turno en la app
           </span>
         </div>
       )}
