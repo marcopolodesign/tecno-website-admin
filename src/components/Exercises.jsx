@@ -363,7 +363,13 @@ export default function Exercises() {
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Biblioteca de Ejercicios</h1>
           <p className="text-sm text-text-secondary mt-1">
-            {exercises.length} ejercicios en {categories.length} categorías
+            {/*
+              Count what this screen shows, not what the table holds. Saying "310 ejercicios"
+              above a list of 13 is what made the catalog look like it had lost the gym's
+              exercises — the other 297 are there, they just have no category and this view
+              lists by category.
+            */}
+            {exercises.filter(e => e.categoryId).length} ejercicios en {categories.length} categorías
           </p>
         </div>
         <button
@@ -412,6 +418,23 @@ export default function Exercises() {
       {/* Exercises Tab */}
       {activeTab === 'exercises' && (
         <>
+          {/*
+            This screen lists by zone → category, so it only ever shows exercises that carry a
+            category_id. The gym's own catalog is classified by facets instead and carries
+            none, so it is invisible here — which is exactly what it looked like when the
+            catalog "was missing exercises". Say so, rather than let the list read as the
+            whole truth.
+          */}
+          <div className="card p-4 border-l-4 border-brand bg-bg-surface">
+            <p className="text-sm text-text-secondary">
+              El catálogo completo de TecnoFit —con su clasificación por patrón, rol y
+              material, y con los videos— vive en{' '}
+              <a href="/catalogo" className="text-brand font-semibold hover:underline">Catálogo</a>.
+              Ahí se cargan y se editan los ejercicios. Esta pantalla es la taxonomía vieja por
+              zona y categoría, que todavía usa el generador de rutinas.
+            </p>
+          </div>
+
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">

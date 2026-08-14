@@ -2,15 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { mediaUrl } from '../lib/exerciseMedia'
 import EncuadreEditor from './EncuadreEditor'
+import EjercicioEditor from './EjercicioEditor'
 
-// The exercise catalog the gym actually classified: 296 movements described by pattern,
-// role, muscle and the equipment they need.
+// The exercise catalog: every movement the gym can prescribe, described by pattern, role,
+// muscle and the equipment it needs.
 //
-// Two questions this screen exists to answer. "Where is the exercise I am thinking of" —
-// which is never one filter, it is a name half-remembered plus a muscle plus what is free
-// in the room. And "what is still missing" — which is the whole point of a coverage view:
-// filming is the slow part, and knowing what to film next is worth more than knowing how
-// many clips exist.
+// This is the only screen for exercises. It used to be a reader over an import — the
+// classified base came from the catalogador and the video from the filming pipeline — which
+// left the gym unable to touch its own catalog: no way to add the movement invented on a
+// Tuesday, no way to fix a classification, and no way to reach the rows that predate the
+// catalog and carry no facets at all. Those rows were the visible symptom: they were in the
+// list the whole time, but with no muscle and no pattern every filter hid them and their
+// cards had nothing on them, so the catalog looked like it was missing what the gym had.
+//
+// Two questions this screen answers. "Where is the exercise I am thinking of" — which is
+// never one filter, it is a name half-remembered plus a muscle plus what is free in the
+// room. And "what is still missing" — both what is unfilmed and what is unclassified,
+// because filming and classifying are the two slow parts and knowing what is left is worth
+// more than knowing how much is done.
 //
 // The filtering runs in the database, not here. Same question, same answer, whether it is
 // asked by this screen, the app, or whatever comes next.
@@ -27,16 +36,24 @@ export default function Catalogo() {
   const [elementos, setElementos] = useState([])
   const [estadoVideo, setEstadoVideo] = useState('')
   const [soloConVideo, setSoloConVideo] = useState(false)
+  const [sinClasificar, setSinClasificar] = useState(false)
 
   const [opcionesMusculo, setOpcionesMusculo] = useState([])
   const [opcionesElemento, setOpcionesElemento] = useState([])
+  const [pendientes, setPendientes] = useState(0)
 
   const [resultados, setResultados] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
   const [seleccionado, setSeleccionado] = useState(null)
+  const [pestana, setPestana] = useState('ficha')
   const [verCobertura, setVerCobertura] = useState(false)
   const [cobertura, setCobertura] = useState([])
+
+  const cargarPendientes = useCallback(async () => {
+    const { data } = await supabase.rpc('contar_sin_clasificar')
+    setPendientes(data ?? 0)
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -47,7 +64,8 @@ export default function Catalogo() {
       setOpcionesElemento((els || []).map((e) => e.nombre))
       setOpcionesMusculo([...new Set((cat || []).map((r) => r.musculo))].sort())
     })()
-  }, [])
+    cargarPendientes()
+  }, [cargarPendientes])
 
   const buscar = useCallback(async () => {
     setCargando(true)
@@ -58,6 +76,7 @@ export default function Catalogo() {
         musculos: musculos.length ? musculos : null,
         elementos_any: elementos.length ? elementos : null,
         solo_con_video: soloConVideo,
+        sin_clasificar: sinClasificar,
         limite: LIMITE,
       })
       if (err) throw err
@@ -70,7 +89,7 @@ export default function Catalogo() {
     } finally {
       setCargando(false)
     }
-  }, [q, musculos, elementos, soloConVideo, estadoVideo])
+  }, [q, musculos, elementos, soloConVideo, estadoVideo, sinClasificar])
 
   // Typing should feel like filtering, not like submitting a form.
   useEffect(() => {
@@ -101,12 +120,31 @@ export default function Catalogo() {
   const alternar = (lista, setLista, valor) =>
     setLista(lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor])
 
-  const hayFiltros = q || musculos.length || elementos.length || estadoVideo || soloConVideo
+  const hayFiltros = q || musculos.length || elementos.length || estadoVideo || soloConVideo || sinClasificar
 
   const resumen = useMemo(() => {
     const listos = resultados.filter((r) => r.processing_status === 'ready').length
     return { total: resultados.length, listos }
   }, [resultados])
+
+  // Saving can change whether a row is classified, whether it matches the filters in force,
+  // and — for a row that never had one — its code. Rather than guess, put the row the
+  // database returned where it belongs and re-read the pending count.
+  const alGuardar = (fila, eraNuevo) => {
+    setResultados((rs) => (eraNuevo ? [fila, ...rs] : rs.map((r) => (r.id === fila.id ? fila : r))))
+    setSeleccionado(fila)
+    cargarPendientes()
+    if (fila.musculo && !opcionesMusculo.includes(fila.musculo)) {
+      setOpcionesMusculo((ms) => [...ms, fila.musculo].sort())
+    }
+  }
+
+  const abrir = (ejercicio) => {
+    setSeleccionado(ejercicio)
+    // The frame editor is only meaningful once there is footage, and most of the catalog has
+    // none yet — so the card opens on the thing that is always editable.
+    setPestana('ficha')
+  }
 
   return (
     <div style={e.pagina}>
@@ -121,10 +159,24 @@ export default function Catalogo() {
                 : `${resumen.total}${resumen.total === LIMITE ? '+' : ''} ejercicios · ${resumen.listos} con video listo`}
           </p>
         </div>
-        <button onClick={() => setVerCobertura((v) => !v)} style={e.botonSecundario}>
-          {verCobertura ? 'Ver lista' : 'Ver qué falta filmar'}
-        </button>
+        <div style={e.accionesEncabezado}>
+          <button onClick={() => setVerCobertura((v) => !v)} style={e.botonSecundario}>
+            {verCobertura ? 'Ver lista' : 'Ver qué falta filmar'}
+          </button>
+          <button onClick={() => abrir({})} style={e.botonPrimario}>
+            Nuevo ejercicio
+          </button>
+        </div>
       </div>
+
+      {!verCobertura && pendientes > 0 && !sinClasificar && (
+        <button onClick={() => setSinClasificar(true)} style={e.pendientes}>
+          Hay <strong>{pendientes}</strong>{' '}
+          {pendientes === 1 ? 'ejercicio sin clasificar' : 'ejercicios sin clasificar'} — sin
+          patrón o sin músculo no los encuentra ningún filtro ni los sirve el motor de rutinas.
+          Verlos →
+        </button>
+      )}
 
       {!verCobertura && (
         <>
@@ -162,6 +214,12 @@ export default function Catalogo() {
                 Sólo reproducibles
               </Chip>
             </Grupo>
+
+            <Grupo titulo="Clasificación">
+              <Chip activo={sinClasificar} onClick={() => setSinClasificar((v) => !v)}>
+                Sin clasificar{pendientes > 0 ? ` (${pendientes})` : ''}
+              </Chip>
+            </Grupo>
           </div>
 
           {hayFiltros && (
@@ -172,6 +230,7 @@ export default function Catalogo() {
                 setElementos([])
                 setEstadoVideo('')
                 setSoloConVideo(false)
+                setSinClasificar(false)
               }}
               style={e.limpiar}
             >
@@ -183,7 +242,7 @@ export default function Catalogo() {
 
           <div style={e.grilla}>
             {resultados.map((ex) => (
-              <button key={ex.id} onClick={() => setSeleccionado(ex)} style={e.tarjeta}>
+              <button key={ex.id} onClick={() => abrir(ex)} style={e.tarjeta}>
                 <div style={e.miniatura}>
                   {ex.poster_path ? (
                     <img src={mediaUrl(ex.poster_path)} alt="" style={e.miniaturaImg} />
@@ -192,9 +251,15 @@ export default function Catalogo() {
                   )}
                 </div>
                 <span style={e.nombre}>{ex.name}</span>
-                <span style={e.meta}>
-                  {[ex.code, ex.musculo, ex.patron].filter(Boolean).join(' · ')}
-                </span>
+                {ex.patron && ex.musculo ? (
+                  <span style={e.meta}>
+                    {[ex.code, ex.musculo, ex.patron].filter(Boolean).join(' · ')}
+                  </span>
+                ) : (
+                  // Named rather than left blank: an empty line under the name reads as a
+                  // broken card, and what it actually is is work nobody has done yet.
+                  <span style={e.faltaClasificar}>Sin clasificar</span>
+                )}
                 {ex.elementos?.length > 0 && (
                   <span style={e.elementos}>{ex.elementos.join(', ')}</span>
                 )}
@@ -236,8 +301,8 @@ export default function Catalogo() {
             </tbody>
           </table>
           <p style={e.nota}>
-            Falta cruzar esto por box: el mapa de qué material hay en cada box todavía no
-            está cargado en la base, vive en el catalogador.
+            Sólo cuenta lo que ya está clasificado: un ejercicio sin patrón no entra en
+            ninguna fila de esta tabla{pendientes > 0 ? ` — hoy quedan ${pendientes} así` : ''}.
           </p>
         </div>
       )}
@@ -245,14 +310,44 @@ export default function Catalogo() {
       {seleccionado && (
         <div style={e.fondo} onClick={() => setSeleccionado(null)}>
           <div style={e.panel} onClick={(ev) => ev.stopPropagation()}>
-            <EncuadreEditor
-              ejercicio={seleccionado}
-              onCerrar={() => setSeleccionado(null)}
-              onGuardado={(actualizado) => {
-                setSeleccionado(actualizado)
-                setResultados((rs) => rs.map((r) => (r.id === actualizado.id ? { ...r, ...actualizado } : r)))
-              }}
-            />
+            {seleccionado.id && (
+              <div style={e.pestanas}>
+                <button
+                  onClick={() => setPestana('ficha')}
+                  style={{ ...e.pestana, ...(pestana === 'ficha' ? e.pestanaActiva : {}) }}
+                >
+                  Ficha
+                </button>
+                <button
+                  onClick={() => setPestana('video')}
+                  style={{ ...e.pestana, ...(pestana === 'video' ? e.pestanaActiva : {}) }}
+                >
+                  Encuadre del video
+                  {!seleccionado.tv_path && <span style={e.pestanaNota}>sin filmar</span>}
+                </button>
+              </div>
+            )}
+
+            {pestana === 'video' && seleccionado.id ? (
+              <EncuadreEditor
+                ejercicio={seleccionado}
+                onCerrar={() => setSeleccionado(null)}
+                onGuardado={(actualizado) => {
+                  setSeleccionado(actualizado)
+                  setResultados((rs) => rs.map((r) => (r.id === actualizado.id ? { ...r, ...actualizado } : r)))
+                }}
+              />
+            ) : (
+              <EjercicioEditor
+                ejercicio={seleccionado.id ? seleccionado : null}
+                opcionesElemento={opcionesElemento}
+                onElementoNuevo={(nombre) =>
+                  setOpcionesElemento((els) => (els.includes(nombre) ? els : [...els, nombre].sort()))
+                }
+                onGuardado={alGuardar}
+                onCerrar={() => setSeleccionado(null)}
+              />
+            )}
           </div>
         </div>
       )}
@@ -312,6 +407,7 @@ const e = {
   sinVideo: { fontSize: 12, color: '#9ca3af' },
   nombre: { fontSize: 14, fontWeight: 600, color: '#111827', lineHeight: 1.3 },
   meta: { fontSize: 12, color: '#6b7280' },
+  faltaClasificar: { fontSize: 12, color: '#92400E', fontWeight: 600 },
   elementos: { fontSize: 11, color: '#9ca3af' },
   vacio: { gridColumn: '1 / -1', textAlign: 'center', color: '#9ca3af', padding: 32 },
   error: { padding: '10px 12px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: 13 },
@@ -325,11 +421,29 @@ const e = {
     alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50,
   },
   panel: {
-    background: 'white', borderRadius: 18, padding: 20, width: 'min(560px, 100%)',
+    background: 'white', borderRadius: 18, padding: 20, width: 'min(720px, 100%)',
     maxHeight: '90vh', overflowY: 'auto',
   },
   botonSecundario: {
     padding: '10px 16px', borderRadius: 10, border: '1px solid #e5e7eb', background: 'white',
     color: '#374151', fontWeight: 600, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap',
   },
+  botonPrimario: {
+    padding: '10px 16px', borderRadius: 10, border: 'none', background: '#F45F37',
+    color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap',
+  },
+  accionesEncabezado: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  pendientes: {
+    textAlign: 'left', padding: '10px 12px', borderRadius: 10, background: '#FFFBEB',
+    border: '1px solid #FDE68A', color: '#92400E', fontSize: 13, lineHeight: 1.45,
+    cursor: 'pointer', width: '100%',
+  },
+  pestanas: { display: 'flex', gap: 8, marginBottom: 16 },
+  pestana: {
+    flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid #e5e7eb',
+    background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  pestanaActiva: { background: '#FFF1ED', borderColor: '#F45F37', color: '#B33204' },
+  pestanaNota: { fontSize: 11, color: '#9ca3af', fontWeight: 400 },
 }
