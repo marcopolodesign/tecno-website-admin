@@ -26,6 +26,7 @@ import { toastOptions } from '../lib/themeStyles'
 import SelectorEjercicio from './SelectorEjercicio'
 import SelectorFormato from './SelectorFormato'
 import PanelSustitutos from './PanelSustitutos'
+import PesoSugerido from './PesoSugerido'
 
 export default function Routines() {
   const [routines, setRoutines] = useState([])
@@ -1268,6 +1269,15 @@ export default function Routines() {
                     />
                   </div>
                 </div>
+
+                {/* Full width: the sentence wraps to four words a line inside a third of the row. */}
+                <PesoSugerido
+                  clientId={selectedRoutine?.clientId}
+                  exerciseId={exerciseForm.exerciseId}
+                  valorActual={exerciseForm.weightKg}
+                  onUsar={(kg) => setExerciseForm({ ...exerciseForm, weightKg: kg })}
+                />
+
 
                 <div>
                   <label className="form-label">Notas</label>
