@@ -116,23 +116,47 @@ export default function Equipamiento() {
 const etiqueta = (box) =>
   box.line_number ? boxLabel(box.line_number, box.line_position) : box.name
 
+// The materials are the card. Someone checking this screen is standing on the floor comparing
+// it to what is in front of them, item by item — the exercise count is the consequence, and a
+// consequence belongs under the thing that causes it.
 function Tarjeta({ box, onAbrir }) {
   const vacio = box.elementos.length === 0
   return (
     <button onClick={onAbrir} style={{ ...e.tarjeta, ...(vacio ? e.tarjetaVacia : {}) }}>
-      <span style={e.nombre}>{etiqueta(box)}</span>
-      <span style={{ ...e.cuenta, ...(vacio ? e.cuentaVacia : {}) }}>
-        {box.ejercicios_posibles} ejercicios
-      </span>
-      <span style={e.materiales}>
-        {vacio ? 'Sin material cargado' : box.elementos.join(', ')}
-      </span>
+      <div style={e.tarjetaEncabezado}>
+        <span style={e.nombre}>{etiqueta(box)}</span>
+        <span style={e.cantidad}>
+          {vacio ? 'sin material' : `${box.elementos.length} materiales`}
+        </span>
+      </div>
+
+      {vacio ? (
+        <span style={e.sinMaterial}>Sin material cargado</span>
+      ) : (
+        <ul style={e.listaMateriales}>
+          {box.elementos.map((m) => (
+            <li key={m} style={e.material}>{m}</li>
+          ))}
+        </ul>
+      )}
+
+      <div style={e.pie}>
+        <span style={{ ...e.cuenta, ...(vacio ? e.cuentaVacia : {}) }}>
+          {box.ejercicios_posibles} ejercicios
+        </span>
+        {box.equipamiento_independiente ? (
+          <span style={e.sello}>equipamiento propio</span>
+        ) : box.desincronizado ? (
+          <span style={e.selloAlerta}>distinto a su par</span>
+        ) : null}
+      </div>
     </button>
   )
 }
 
 function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
   const [impacto, setImpacto] = useState([])
+  const [cambiandoSync, setCambiandoSync] = useState(false)
   const [seleccion, setSeleccion] = useState(box.elementos)
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
@@ -147,10 +171,16 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
 
   useEffect(() => {
     setSeleccion(box.elementos)
-    setGuardado(false)
     setError(null)
     cargarImpacto()
   }, [box.id, box.elementos, cargarImpacto])
+
+  // Saving reloads the whole screen, because it may have written the sibling box too. That
+  // reload arrives as a new `box` prop and used to wipe the confirmation with it — so the one
+  // question the coach has after pressing the button, did it save, had no answer on screen.
+  useEffect(() => {
+    setGuardado(false)
+  }, [box.id])
 
   const alternar = (nombre) => {
     setSeleccion((s) => (s.includes(nombre) ? s.filter((n) => n !== nombre) : [...s, nombre]))
@@ -173,7 +203,11 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
       })
       if (err) throw err
       setGuardado(true)
+      // The save may have written more than this box, so the whole screen is re-read rather
+      // than patching the one row: showing A1 updated and B1 stale would be worse than a
+      // reload.
       onGuardado?.({ id: box.id, elementos: [...seleccion].sort(), ejercicios_posibles: data })
+      if (!box.equipamiento_independiente) onCopiado?.()
       // The worth of every other material moved with the save, so the list has to be re-asked
       // rather than patched: what a polea unlocks depends on what else is in the box.
       cargarImpacto()
@@ -181,6 +215,26 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
       setError(err.message || String(err))
     } finally {
       setGuardando(false)
+    }
+  }
+
+  const cambiarSync = async () => {
+    setCambiandoSync(true)
+    setError(null)
+    try {
+      const { error: err } = await supabase.rpc('marcar_equipamiento_independiente', {
+        p_box_id: box.id,
+        p_independiente: !box.equipamiento_independiente,
+      })
+      if (err) throw err
+      // Rejoining the sync rewrites this box's equipment from its station, so the screen has
+      // to be re-read rather than assumed.
+      onCopiado?.()
+      onCerrar?.()
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setCambiandoSync(false)
     }
   }
 
@@ -217,6 +271,21 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
           </span>
         </div>
         <button onClick={onCerrar} style={e.cerrar} aria-label="Cerrar">✕</button>
+      </div>
+
+      <div style={box.equipamiento_independiente ? e.syncPropio : e.syncEspejo}>
+        <span style={e.syncTexto}>
+          {box.equipamiento_independiente
+            ? 'Este box tiene equipamiento propio: lo que cambies acá no toca a su par en la otra línea, y lo que cambien allá no lo toca a él.'
+            : `Lo que guardes acá se copia a la estación ${box.line_position} de la otra línea. Las dos tienen el mismo material.`}
+        </span>
+        <button type="button" onClick={cambiarSync} disabled={cambiandoSync} style={e.syncBoton}>
+          {cambiandoSync
+            ? 'Cambiando…'
+            : box.equipamiento_independiente
+              ? 'Volver a sincronizar'
+              : 'Darle equipamiento propio'}
+        </button>
       </div>
 
       <Campo etiqueta="Tiene" ayuda="El número es cuántos ejercicios se perderían si lo sacás.">
@@ -318,7 +387,26 @@ const e = {
   nombre: { fontSize: 15, fontWeight: 700, color: '#111827' },
   cuenta: { fontSize: 13, fontWeight: 600, color: '#065F46' },
   cuentaVacia: { color: '#92400E' },
-  materiales: { fontSize: 11, color: '#9ca3af', lineHeight: 1.4 },
+  tarjetaEncabezado: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
+  cantidad: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
+  listaMateriales: {
+    listStyle: 'none', margin: '2px 0 0', padding: 0, display: 'flex', flexDirection: 'column',
+    gap: 1,
+  },
+  material: { fontSize: 13, color: '#374151', lineHeight: 1.4 },
+  sinMaterial: { fontSize: 13, color: '#92400E', fontWeight: 600 },
+  pie: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+    marginTop: 6, paddingTop: 6, borderTop: '1px solid #f3f4f6',
+  },
+  sello: {
+    fontSize: 10, fontWeight: 700, color: '#92400E', background: '#FFFBEB',
+    border: '1px solid #FDE68A', borderRadius: 999, padding: '2px 7px',
+  },
+  selloAlerta: {
+    fontSize: 10, fontWeight: 700, color: '#B91C1C', background: '#FEF2F2',
+    border: '1px solid #FECACA', borderRadius: 999, padding: '2px 7px',
+  },
   contenedor: { display: 'flex', flexDirection: 'column', gap: 16 },
   panelEncabezado: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   titulo: { margin: 0, fontSize: 18, fontWeight: 700, color: '#111827' },
@@ -337,6 +425,19 @@ const e = {
   chipNota: { fontSize: 11, color: '#B91C1C', fontWeight: 600 },
   chipNotaSuma: { fontSize: 11, color: '#059669', fontWeight: 600 },
   vacio: { margin: 0, fontSize: 13, color: '#9ca3af' },
+  syncEspejo: {
+    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10,
+    background: '#EFF6FF', border: '1px solid #BFDBFE',
+  },
+  syncPropio: {
+    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10,
+    background: '#FFFBEB', border: '1px solid #FDE68A',
+  },
+  syncTexto: { flex: 1, fontSize: 12, color: '#374151', lineHeight: 1.45 },
+  syncBoton: {
+    border: '1px solid #e5e7eb', background: 'white', borderRadius: 8, padding: '6px 10px',
+    fontSize: 12, fontWeight: 700, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap',
+  },
   select: {
     padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb', background: 'white',
     fontSize: 14, color: '#374151', cursor: 'pointer',
