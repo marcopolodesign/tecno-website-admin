@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { mediaUrl, cropStyle } from '../lib/exerciseMedia'
+import ReemplazarVideo from './ReemplazarVideo'
 
 // Reframing an exercise for each screen.
 //
@@ -161,9 +162,14 @@ export default function EncuadreEditor({ ejercicio, onGuardado, onCerrar }) {
   }
 
   if (!src) {
+    // No footage means nothing to frame — which is exactly the moment uploading matters most,
+    // so the way in is here rather than behind a message that only says no.
     return (
-      <div style={estilos.vacio}>
-        Este ejercicio todavía no tiene video cargado, así que no hay nada que encuadrar.
+      <div style={estilos.contenedor}>
+        <p style={estilos.vacio}>
+          Este ejercicio todavía no tiene video, así que no hay nada que encuadrar.
+        </p>
+        <ReemplazarVideo ejercicio={ejercicio} onListo={() => onGuardado?.({ ...ejercicio })} />
       </div>
     )
   }
@@ -252,6 +258,10 @@ export default function EncuadreEditor({ ejercicio, onGuardado, onCerrar }) {
         Se aplica al instante en la pantalla y en la app. No se vuelve a subir ni a procesar
         el video, así que se puede cambiar todas las veces que haga falta.
       </p>
+
+      {/* Next to the framing on purpose: it is the same clip and the same question — does this
+          read right on the wall. When the answer is "no, we filmed it badly", the fix is here. */}
+      <ReemplazarVideo ejercicio={ejercicio} onListo={() => onGuardado?.({ ...ejercicio })} />
     </div>
   )
 }
