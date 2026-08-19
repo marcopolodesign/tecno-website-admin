@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
 import { exerciseMedia } from '../lib/exerciseMedia'
+import { esPorTiempo, faseDelFormato, comoTexto } from '../lib/formatos'
 
 // Drift-free countdown: derives remaining time from an absolute target
 // timestamp every animation frame instead of a setInterval tick, and only
@@ -36,7 +37,58 @@ function useCountdown(targetIso) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function ExercisePanel({ exercise }) {
+// Work/rest inside the station, for a timed format.
+//
+// Derived from when the member entered the box, second by second, never counted: a screen on a
+// wall is a background tab to the browser, and a Tabata that drifts is a Tabata that tells the
+// member to stop at the wrong moment eight times.
+function useFase(entradaIso, formato) {
+  const [fase, setFase] = useState(null)
+
+  useEffect(() => {
+    if (!entradaIso || !esPorTiempo(formato?.formato)) {
+      setFase(null)
+      return
+    }
+    const inicioMs = new Date(entradaIso).getTime()
+    let rafId
+    const loop = () => {
+      const transcurrido = Math.floor((Date.now() - inicioMs) / 1000)
+      const f = faseDelFormato(Math.max(0, transcurrido), formato)
+      setFase((prev) =>
+        prev && f && prev.fase === f.fase && prev.ronda === f.ronda && prev.restanteSeg === f.restanteSeg
+          ? prev
+          : f
+      )
+      rafId = window.requestAnimationFrame(loop)
+    }
+    rafId = window.requestAnimationFrame(loop)
+    return () => window.cancelAnimationFrame(rafId)
+  }, [entradaIso, formato?.formato, formato?.rondas, formato?.trabajoSeg, formato?.descansoSeg])
+
+  return fase
+}
+
+function RelojFormato({ fase, formato }) {
+  if (!fase) return null
+  const trabajando = fase.fase === 'trabajo'
+  const color = fase.terminado ? 'rgba(255,255,255,0.45)' : trabajando ? '#4ADE80' : '#FBBF24'
+  return (
+    <div style={{ ...panelStyles.formato, borderColor: color }}>
+      <span style={{ ...panelStyles.formatoFase, color }}>
+        {fase.terminado ? 'Terminado' : trabajando ? 'TRABAJO' : 'DESCANSO'}
+      </span>
+      <span style={{ ...panelStyles.formatoSeg, color }}>{fase.restanteSeg}</span>
+      <span style={panelStyles.formatoRonda}>
+        {formato.formato === 'AMRAP'
+          ? 'las vueltas que entren'
+          : `ronda ${fase.ronda} de ${formato.rondas}`}
+      </span>
+    </div>
+  )
+}
+
+function ExercisePanel({ exercise, entradaIso }) {
   if (!exercise) {
     return (
       <div style={panelStyles.empty}>
@@ -46,6 +98,13 @@ function ExercisePanel({ exercise }) {
   }
 
   const ex = exercise
+  const formato = {
+    formato: ex.formato,
+    rondas: ex.rondas,
+    trabajoSeg: ex.trabajo_seg,
+    descansoSeg: ex.descanso_seg,
+  }
+  const fase = useFase(entradaIso, formato)
   // The TV gets the TV rendition and the TV framing. Anything the gym has not filmed yet
   // still falls back to whatever link the exercise was carrying.
   const media = exerciseMedia(ex, 'tv')
@@ -79,11 +138,20 @@ function ExercisePanel({ exercise }) {
         )}
       </div>
       <span style={panelStyles.exerciseName}>{ex?.name ?? 'Ejercicio'}</span>
-      <span style={panelStyles.exerciseMeta}>
-        {[ex.sets_reps, ex.rest_time ? `descanso ${ex.rest_time}s` : null]
-          .filter(Boolean)
-          .join(' · ')}
-      </span>
+      {fase ? (
+        <>
+          <RelojFormato fase={fase} formato={formato} />
+          <span style={panelStyles.exerciseMeta}>
+            {[comoTexto(ex.formato, formato), ex.sets_reps].filter(Boolean).join(' · ')}
+          </span>
+        </>
+      ) : (
+        <span style={panelStyles.exerciseMeta}>
+          {[ex.sets_reps, ex.rest_time ? `descanso ${ex.rest_time}s` : null]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+      )}
     </div>
   )
 }
@@ -101,6 +169,15 @@ const panelStyles = {
   mediaEl: { width: '100%', height: '100%', objectFit: 'cover', border: 0 },
   exerciseName: { color: 'white', fontSize: 15, fontWeight: 700, textAlign: 'center' },
   exerciseMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' },
+  formato: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
+    border: '2px solid', borderRadius: 14, padding: '6px 14px', minWidth: 110,
+  },
+  formatoFase: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5 },
+  // The seconds are the biggest thing on the box, because from the floor that is the only
+  // part anyone reads.
+  formatoSeg: { fontSize: 40, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1 },
+  formatoRonda: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
 }
 
 function BoxSlot({ box, lineNumber }) {
@@ -137,7 +214,7 @@ function BoxSlot({ box, lineNumber }) {
           <span style={{ color: '#F45F37', fontSize: 22, fontWeight: 800, fontFamily: 'monospace' }}>
             {countdown}
           </span>
-          <ExercisePanel exercise={exercise} />
+          <ExercisePanel exercise={exercise} entradaIso={box.entered_at} />
         </>
       ) : (
         <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>Libre</span>

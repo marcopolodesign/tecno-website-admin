@@ -24,6 +24,7 @@ import { supabase, toCamelCase } from '../lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
 import SelectorEjercicio from './SelectorEjercicio'
+import SelectorFormato from './SelectorFormato'
 import PanelSustitutos from './PanelSustitutos'
 
 export default function Routines() {
@@ -79,16 +80,34 @@ export default function Routines() {
     weightKg: '',
     microPause: '',
     notes: '',
-    isCooldown: false
+    isCooldown: false,
+    formato: 'Series',
+    rondas: null,
+    trabajoSeg: null,
+    descansoSeg: null
   })
 
   // Expanded sessions
   const [expandedSessions, setExpandedSessions] = useState({})
   const [generating, setGenerating] = useState(false)
   const [sustituyendo, setSustituyendo] = useState(null)
+  // How long a member actually stays in a box, read from the queue rather than assumed: it is
+  // what decides whether a Tabata fits, and a wrong number here is worse than no warning.
+  const [turnoSeg, setTurnoSeg] = useState(0)
 
   useEffect(() => {
     fetchData()
+    supabase
+      .from('line_box_status')
+      .select('entered_at, advances_at')
+      .not('advances_at', 'is', null)
+      .limit(20)
+      .then(({ data }) => {
+        const turnos = (data || [])
+          .map((r) => Math.round((new Date(r.advances_at) - new Date(r.entered_at)) / 1000))
+          .filter((n) => n > 0)
+        if (turnos.length) setTurnoSeg(turnos.sort((a, b) => a - b)[Math.floor(turnos.length / 2)])
+      })
   }, [])
 
   const fetchData = async () => {
@@ -341,7 +360,11 @@ export default function Routines() {
         weightKg: sessionExercise.weightKg || '',
         microPause: sessionExercise.microPause || '',
         notes: sessionExercise.notes || '',
-        isCooldown: sessionExercise.isCooldown || false
+        isCooldown: sessionExercise.isCooldown || false,
+        formato: sessionExercise.formato || 'Series',
+        rondas: sessionExercise.rondas ?? null,
+        trabajoSeg: sessionExercise.trabajoSeg ?? null,
+        descansoSeg: sessionExercise.descansoSeg ?? null
       })
     } else {
       const selectedBox = boxes.find(b => b.boxNumber === boxNumber)
@@ -358,7 +381,11 @@ export default function Routines() {
         weightKg: '',
         microPause: '',
         notes: '',
-        isCooldown: isCooldown
+        isCooldown: isCooldown,
+        formato: 'Series',
+        rondas: null,
+        trabajoSeg: null,
+        descansoSeg: null
       })
     }
     setShowExerciseModal(true)
@@ -1157,6 +1184,20 @@ export default function Routines() {
                     esperaEstacion={!exerciseForm.isCooldown}
                     value={exerciseForm.exerciseId}
                     onChange={(id) => setExerciseForm({ ...exerciseForm, exerciseId: id })}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Cómo se mide el trabajo</label>
+                  <SelectorFormato
+                    valor={{
+                      formato: exerciseForm.formato,
+                      rondas: exerciseForm.rondas,
+                      trabajoSeg: exerciseForm.trabajoSeg,
+                      descansoSeg: exerciseForm.descansoSeg,
+                    }}
+                    onChange={(v) => setExerciseForm({ ...exerciseForm, ...v })}
+                    turnoSeg={turnoSeg}
                   />
                 </div>
 

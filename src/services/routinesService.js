@@ -334,7 +334,13 @@ export const routinesService = {
         weight_kg: sessionExerciseData.weightKg || null,
         micro_pause: sessionExerciseData.microPause || 0,
         notes: sessionExerciseData.notes || null,
-        is_cooldown: sessionExerciseData.isCooldown || false
+        is_cooldown: sessionExerciseData.isCooldown || false,
+        // Series leaves these null on purpose — the CHECK on session_exercises rejects a timed
+        // format with no duration, and rejects Series carrying one.
+        formato: sessionExerciseData.formato || 'Series',
+        rondas: sessionExerciseData.rondas || null,
+        trabajo_seg: sessionExerciseData.trabajoSeg || null,
+        descanso_seg: sessionExerciseData.descansoSeg ?? null
       }
 
       const { data, error } = await supabase
