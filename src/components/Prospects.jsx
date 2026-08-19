@@ -389,11 +389,11 @@ const Prospects = () => {
       {showSidePanel && selectedProspect && (
         <>
           <div 
-            className="fixed inset-0 bg-black/30 z-40 animate-fade-in"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-40 animate-fade-in"
             onClick={() => setShowSidePanel(false)}
           />
           
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-bg-secondary border-l border-border-default z-50 flex flex-col animate-slide-in-right">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full max-w-md bg-white sm:rounded-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-border-default">
               <h3 className="text-lg font-semibold text-text-primary">

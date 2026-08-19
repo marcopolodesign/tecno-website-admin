@@ -892,12 +892,12 @@ const Users = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/30 z-40 animate-fade-in"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-40 animate-fade-in"
             onClick={() => setShowSidePanel(false)}
           />
           
           {/* Side Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-bg-secondary border-l border-border-default z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-xl bg-white sm:rounded-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header - Fixed */}
             <div className="p-6 border-b border-border-default shrink-0">
               <div className="flex items-center justify-between">
@@ -1190,10 +1190,10 @@ const Users = () => {
       {showReasonModal && (
         <>
           <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-[70]"
             onClick={() => setShowReasonModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-md bg-white sm:rounded-2xl z-[70] flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5 p-6">
             <h3 className="text-lg font-bold text-text-primary mb-4">
               ¿Por qué no renueva?
             </h3>
@@ -1229,10 +1229,10 @@ const Users = () => {
       {showCreateModal && (
         <>
           <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-[70]"
             onClick={() => setShowCreateModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] w-full max-w-3xl max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-3xl bg-white sm:rounded-2xl z-[70] flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header - Fixed */}
             <div className="p-6 border-b border-border-default shrink-0">
               <h3 className="text-xl font-bold text-text-primary">
@@ -1547,10 +1547,10 @@ const Users = () => {
       {showRenewalModal && (
         <>
           <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-[70]"
             onClick={() => setShowRenewalModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-2xl bg-white sm:rounded-2xl z-[70] flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5 p-6 overflow-y-auto">
             <h3 className="text-xl font-bold text-text-primary mb-6">
               Renovar Membresía
             </h3>

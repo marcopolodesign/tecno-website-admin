@@ -361,3 +361,13 @@
 @utility animate-fade-in {
   animation: fadeIn 0.15s ease-out;
 }
+
+/* Para quien pidió menos movimiento, el panel simplemente está: entra sin barrido y sin fade.
+   La animación es decoración; que el panel aparezca donde tiene que aparecer, no. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-in-right,
+  .animate-slide-in-left,
+  .animate-fade-in {
+    animation: none;
+  }
+}
