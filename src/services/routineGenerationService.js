@@ -323,6 +323,110 @@ async function getProposedWeight(userId, exerciseId) {
 }
 
 /**
+ * Which timed formats a given exercise can be run as.
+ *
+ * The three formats are not interchangeable, and the difference is the exercise, not the taste
+ * of whoever wrote the session:
+ *
+ *   EMOM   — reps inside a 60s window; the rest is whatever is left over, so the member paces
+ *            themselves and the pause is forced. Tolerates anything. Always allowed.
+ *   Tabata — 20s all-out, eight times. Only works on something you can do fast without thinking.
+ *   AMRAP  — eight continuous minutes. Nothing forces a pause, so it needs a movement you can
+ *            still hold together while tired.
+ *
+ * The two catalog fields answer two different questions, and mixing them up is what makes a
+ * generated session look wrong to a coach:
+ *
+ *   complejidad_tecnica  — can this be done fast at all? A coordination-ladder drill cannot,
+ *                          at any intensity. Complejidad 3 gets EMOM and nothing else.
+ *   intensidad_relativa  — can this be sustained for eight minutes? Burpees are the textbook
+ *                          Tabata and a terrible AMRAP; that is intensidad 3, not complexity.
+ *
+ * Both are 1-3 and filled in for 298 of the 310 exercises. Missing means EMOM only — the
+ * conservative one — rather than a guess made from an empty field.
+ */
+async function perfilesDeEsfuerzo() {
+  // The whole catalog in one query rather than a lookup per generated station: a month of five
+  // stations is 125 of them, and this is 310 rows of two smallint columns.
+  const { data } = await supabase
+    .from('exercises')
+    .select('id, complejidad_tecnica, intensidad_relativa')
+    .eq('is_active', true)
+  return new Map((data || []).map((e) => [e.id, e]))
+}
+
+function formatosPosibles(ejercicio) {
+  const posibles = ['EMOM']
+  const complejidad = ejercicio?.complejidad_tecnica
+  const intensidad = ejercicio?.intensidad_relativa
+  if (complejidad == null || intensidad == null) return posibles
+
+  if (complejidad <= 2) posibles.push('Tabata')
+  if (complejidad <= 2 && intensidad <= 2) posibles.push('AMRAP')
+  return posibles
+}
+
+/**
+ * Turn a station's timed work into a different format of the same length.
+ *
+ * The station keeps its slot in the line — a member spends the same minutes at box 3 whether it
+ * is an EMOM, an AMRAP or a Tabata — so the queue and the rest of the line are untouched. What
+ * changes is how those minutes are spent, which is the whole point: without this, box 3 is EMOM
+ * for the entire month because that is what the coach happened to write in session 1.
+ *
+ * Rounds are derived from the template's total so the time budget survives the swap, and the
+ * pick is seeded, so regenerating lands on the same month.
+ */
+function variarFormato(plantilla, ejercicio, semilla) {
+  // Series is a prescription of load and reps — the coach decided this station is strength work.
+  // Rotating it into a Tabata would change what the station is for, not just how it is measured.
+  if (!plantilla.formato || plantilla.formato === 'Series') return null
+
+  const total =
+    (plantilla.rondas ?? 0) * ((plantilla.trabajo_seg ?? 0) + (plantilla.descanso_seg ?? 0))
+  if (total <= 0) return null
+
+  const posibles = formatosPosibles(ejercicio)
+  const formato = posibles[seededIndex(semilla, posibles.length)]
+
+  const acotar = (v, min, max) => Math.max(min, Math.min(max, v))
+  switch (formato) {
+    case 'Tabata': {
+      // 30s cycles. Eight of them is the classic four minutes; longer stations get more rounds.
+      const rondas = acotar(Math.round(total / 30), 4, 16)
+      return { formato, rondas, trabajo_seg: 20, descanso_seg: 10, sets_reps: 'máx por ronda' }
+    }
+    case 'AMRAP': {
+      // One round against the clock. The cap is the station's whole turn.
+      const cap = acotar(total, 180, 1200)
+      return {
+        formato, rondas: 1, trabajo_seg: cap, descanso_seg: 0,
+        sets_reps: `máx en ${Math.round(cap / 60)} min`,
+      }
+    }
+    default: {
+      const rondas = acotar(Math.round(total / 60), 4, 20)
+      return {
+        formato: 'EMOM', rondas, trabajo_seg: 60, descanso_seg: 0,
+        sets_reps: `${rondas}x${repsPorRonda(plantilla)}`,
+      }
+    }
+  }
+}
+
+/**
+ * How many reps go in each round of an EMOM.
+ *
+ * Taken from the template when it was already an EMOM — that number is the coach's dose for this
+ * station and should survive. When the template was a Tabata or an AMRAP there is no rep count to
+ * inherit ("máx por ronda" is not a number), so it falls back to ten.
+ */
+function repsPorRonda(plantilla) {
+  const m = plantilla.formato === 'EMOM' && /(\d+)\s*x\s*(\d+)/i.exec(plantilla.sets_reps || '')
+  return m ? m[2] : 10
+}
+
+/**
  * Generate the rest of the month from the sessions the coach wrote by hand.
  *
  * The gym's flow: the first few sessions are written by a person, the rest are the engine's job.
@@ -377,12 +481,18 @@ export const generateRoutineSessions = async (routineId) => {
       await supabase.from('routine_sessions').delete().in('id', viejas.map((s) => s.id))
     }
 
-    let anterior = []
+    const perfiles = await perfilesDeEsfuerzo()
+
+    // What the last hand-written session used. Without this the first generated session is the
+    // only one in the month that does not know what came the day before, and it can repeat it —
+    // which is exactly what it did: session 5 finished with squats and session 6 opened with them.
+    const ultima = conEjercicios[conEjercicios.length - 1]
+    let anterior = (ultima.session_exercises || []).map((se) => se.exercise_id)
     for (let n = aMano + 1; n <= totalSessions; n++) {
       // Rotate through the hand-made sessions so the month keeps their variety instead of
       // orbiting one of them.
       const base = conEjercicios[(n - aMano - 1) % conEjercicios.length]
-      anterior = await generarSesion(routineId, routine.client_id, base, n, anterior)
+      anterior = await generarSesion(routineId, routine.client_id, base, n, anterior, perfiles)
     }
 
     await supabase
@@ -401,7 +511,7 @@ export const generateRoutineSessions = async (routineId) => {
 }
 
 /** One generated session. Returns the exercise ids it used, for the next one to avoid. */
-async function generarSesion(routineId, clientId, base, sessionNumber, evitar) {
+async function generarSesion(routineId, clientId, base, sessionNumber, evitar, perfiles) {
   const { data: session, error: sError } = await supabase
     .from('routine_sessions')
     .insert([{
@@ -453,22 +563,35 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar) {
 
     const peso = await getProposedWeight(clientId, exerciseId)
 
+    // The station's format rotates too. Without this, whatever the coach wrote in the first
+    // session is what box 3 does for the whole month.
+    const trabajo =
+      variarFormato(te, perfiles?.get(exerciseId), `${routineId}-${sessionNumber}-f${te.box_number}`) ?? {
+        formato: te.formato || 'Series',
+        rondas: te.rondas,
+        trabajo_seg: te.trabajo_seg,
+        descanso_seg: te.descanso_seg,
+        sets_reps: te.sets_reps,
+      }
+
     await supabase.from('session_exercises').insert([{
       session_id: session.id,
       exercise_id: exerciseId,
       box_id: te.box_id,
       box_number: te.box_number,
       exercise_order: orden,
-      sets_reps: te.sets_reps,
+      // The rep prescription belongs to the format: carrying "8x10" into an AMRAP reads as a
+      // contradiction on the box screen.
+      sets_reps: trabajo.sets_reps,
       rest_time: te.rest_time,
       repetition_time: te.repetition_time,
       micro_pause: te.micro_pause,
       weight_kg: peso ?? te.weight_kg,
-      // The timed formats travel with the shape — an EMOM station stays an EMOM station.
-      formato: te.formato || 'Series',
-      rondas: te.rondas,
-      trabajo_seg: te.trabajo_seg,
-      descanso_seg: te.descanso_seg,
+      // Same minutes at the station, a different way of spending them.
+      formato: trabajo.formato,
+      rondas: trabajo.rondas,
+      trabajo_seg: trabajo.trabajo_seg,
+      descanso_seg: trabajo.descanso_seg,
       is_auto_generated: true,
       is_cooldown: te.is_cooldown || false,
       generation_source: fuente,

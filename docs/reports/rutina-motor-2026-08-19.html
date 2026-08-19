@@ -1,0 +1,1358 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TecnoFit — Rutina generada por el motor</title>
+<style>
+  :root {
+    --fondo: #ffffff; --papel: #ffffff; --texto: #111827; --suave: #6b7280;
+    --linea: #e5e7eb; --acento: #F45F37; --mano: #fff7ed; --motor: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #0b0f14; --papel: #131922; --texto: #e5e7eb; --suave: #9aa4b2;
+      --linea: #232c38; --mano: #1c1710; --motor: #131922;
+    }
+  }
+  :root[data-theme="light"] {
+    --fondo: #ffffff; --papel: #ffffff; --texto: #111827; --suave: #6b7280;
+    --linea: #e5e7eb; --mano: #fff7ed; --motor: #ffffff;
+  }
+  :root[data-theme="dark"] {
+    --fondo: #0b0f14; --papel: #131922; --texto: #e5e7eb; --suave: #9aa4b2;
+    --linea: #232c38; --mano: #1c1710; --motor: #131922;
+  }
+  body {
+    margin: 0; background: var(--fondo); color: var(--texto);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .sub { color: var(--suave); margin: 0 0 28px; }
+  h2 { font-size: 18px; margin: 40px 0 12px; }
+  h3 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: baseline; gap: 10px; }
+  .origen {
+    font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--suave); border: 1px solid var(--linea); border-radius: 999px; padding: 2px 8px;
+  }
+  .mano .origen { color: var(--acento); border-color: var(--acento); }
+  .cifras { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 8px; }
+  .cifra {
+    flex: 1 1 150px; background: var(--papel); border: 1px solid var(--linea);
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .cifra b { display: block; font-size: 24px; letter-spacing: -0.02em; }
+  .cifra span { color: var(--suave); font-size: 13px; }
+  .nota {
+    background: var(--papel); border: 1px solid var(--linea); border-left: 3px solid var(--acento);
+    border-radius: 10px; padding: 14px 18px; margin: 18px 0;
+  }
+  .nota p { margin: 6px 0; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+  .sesion table { min-width: 620px; }
+  th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--suave); font-weight: 600; padding: 0 10px 6px; white-space: nowrap;
+  }
+  td { padding: 9px 10px; border-top: 1px solid var(--linea); vertical-align: top; }
+  .sesion {
+    background: var(--motor); border: 1px solid var(--linea); border-radius: 14px;
+    padding: 16px 18px; margin: 0 0 14px;
+  }
+  .sesion.mano { background: var(--mano); }
+  .est { width: 34px; color: var(--suave); font-variant-numeric: tabular-nums; }
+  .nombre { font-weight: 500; }
+  .meta { color: var(--suave); font-size: 12px; }
+  .presc { color: var(--suave); }
+  .dur, .peso { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .badge, .chip {
+    display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .03em;
+    color: var(--c); border: 1px solid var(--c); border-radius: 999px;
+    padding: 2px 9px; white-space: nowrap;
+  }
+  .chip { margin: 2px 4px 2px 0; }
+  footer { color: var(--suave); font-size: 13px; margin-top: 44px; }
+</style>
+<div class="wrap">
+  <h1>Un mes de entrenamiento armado por el motor</h1>
+  <p class="sub">Línea A, cinco estaciones · socio de prueba · generado el 19 de agosto de 2026</p>
+
+  <div class="cifras">
+    <div class="cifra"><b>5</b><span>sesiones escritas por el coach</span></div>
+    <div class="cifra"><b>15</b><span>sesiones armadas por el motor</span></div>
+    <div class="cifra"><b>37</b><span>ejercicios distintos en las generadas</span></div>
+    <div class="cifra"><b>0</b><span>ejercicios repetidos de un día al siguiente</span></div>
+  </div>
+
+  <div class="nota">
+    <p><strong>Cómo funciona.</strong> El coach escribe las primeras cinco sesiones. El motor toma
+    cada una como forma —las mismas estaciones, la misma prescripción, el mismo tiempo por
+    estación— y cambia dos cosas: <strong>qué ejercicio</strong> se hace en cada estación y
+    <strong>bajo qué formato</strong> se trabaja.</p>
+    <p>El ejercicio se reemplaza por otro del mismo patrón de movimiento, que se pueda hacer con
+    el equipamiento de esa estación y que el socio no tenga contraindicado.</p>
+  </div>
+
+  <h2>Variedad de formato, estación por estación</h2>
+  <div class="nota">
+    <p>Las estaciones 1 y 2 son de carga: el coach prescribió series y repeticiones, y eso no se
+    toca. Las estaciones 3, 4 y 5 son a tiempo, y ahí el formato rota — <strong>la estación 3 ya
+    no es EMOM todo el mes</strong>.</p>
+    <p><strong>La duración no cambia nunca.</strong> Sea EMOM, Tabata o AMRAP, el socio pasa los
+    mismos ocho minutos en la estación, así que la línea sigue rotando igual.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Est.</th><th>Formatos en las 15 sesiones generadas</th><th></th></tr></thead>
+      <tbody><tr><td class="est">1</td><td><span class="chip" style="--c:#6b7280">Series ×15</span></td><td class="dur">1 formato</td></tr><tr><td class="est">2</td><td><span class="chip" style="--c:#6b7280">Series ×15</span></td><td class="dur">1 formato</td></tr><tr><td class="est">3</td><td><span class="chip" style="--c:#2563eb">EMOM ×6</span> <span class="chip" style="--c:#c2410c">Tabata ×2</span> <span class="chip" style="--c:#15803d">AMRAP ×7</span></td><td class="dur">3 formatos</td></tr><tr><td class="est">4</td><td><span class="chip" style="--c:#2563eb">EMOM ×6</span> <span class="chip" style="--c:#c2410c">Tabata ×5</span> <span class="chip" style="--c:#15803d">AMRAP ×4</span></td><td class="dur">3 formatos</td></tr><tr><td class="est">5</td><td><span class="chip" style="--c:#2563eb">EMOM ×10</span> <span class="chip" style="--c:#c2410c">Tabata ×2</span> <span class="chip" style="--c:#15803d">AMRAP ×3</span></td><td class="dur">3 formatos</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="nota">
+    <p><strong>Por qué algunas estaciones rotan más que otras.</strong> No todo movimiento admite
+    todo formato, y eso lo decide la clasificación del ejercicio en el catálogo:</p>
+    <p><strong>EMOM</strong> — las repeticiones entran en una ventana de 60 s y el descanso es lo
+    que sobra. Sirve para todo, incluso lo técnico y lo pesado.<br>
+    <strong>Tabata</strong> — 20 s a fondo. Sólo para movimientos que se puedan hacer rápido sin
+    pensarlos: si la complejidad técnica es alta, queda afuera.<br>
+    <strong>AMRAP</strong> — ocho minutos continuos. Nada obliga a frenar, así que queda afuera lo
+    de intensidad alta.</p>
+    <p>Por eso la estación 5 (locomoción) cae más veces en EMOM: buena parte de esos ejercicios
+    son escaleras de coordinación y saltos con arnés, que no se hacen a fondo contra el reloj.</p>
+  </div>
+
+  <div class="nota">
+    <p><strong>Una para revisar, Lucas.</strong> El motor rota por patrón de movimiento, así que
+    lo que dice el catálogo es lo que termina apareciendo en la estación. Hay dos ejercicios de
+    glúteo cargados como empuje horizontal — <strong>EJ0014</strong> (abductores en colchoneta con
+    tobillera) y <strong>EJ0203</strong> (glúteos patada en polea baja)—, y por eso pueden salir
+    como alternativa de unas flexiones de brazos. Cambiando el patrón en el catálogo se acomoda
+    solo, sin tocar la rutina.</p>
+  </div>
+
+  <h2>El mes completo</h2>
+  
+    <section class="sesion mano">
+      <h3>Sesión 1 <span class="origen">Escrita por el coach</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Flexiones de brazos</div>
+            <div class="meta">EJ0172 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla completa sin carga</div>
+            <div class="meta">EJ0247 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo con mancuerna a un bb</div>
+            <div class="meta">EJ0146 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Planchas colchoneta</div>
+            <div class="meta">EJ0281 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Trote en el lugar</div>
+            <div class="meta">EJ0090 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion mano">
+      <h3>Sesión 2 <span class="origen">Escrita por el coach</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Flexiones de brazos con apoyo de pies sobre fitball</div>
+            <div class="meta">EJ0171 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla media profundidad sin carga</div>
+            <div class="meta">EJ0248 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x12 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo parado ambos bb con banda elastica</div>
+            <div class="meta">EJ0145 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Vizagras alternos colchoneta</div>
+            <div class="meta">EJ0283 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Jumping jump</div>
+            <div class="meta">EJ0086 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion mano">
+      <h3>Sesión 3 <span class="origen">Escrita por el coach</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Aperturas con banda elastica parado</div>
+            <div class="meta">EJ0175 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadillas laterales con sand bag</div>
+            <div class="meta">EJ0222 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo bajo polea baja sentado en piso</div>
+            <div class="meta">EJ0149 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Plancha con toque de hombros</div>
+            <div class="meta">EJ0006 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Skiping</div>
+            <div class="meta">EJ0088 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion mano">
+      <h3>Sesión 4 <span class="origen">Escrita por el coach</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Flexiones de brazos</div>
+            <div class="meta">EJ0172 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadillas laterales con keteball</div>
+            <div class="meta">EJ0223 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo al menton con mancuerna</div>
+            <div class="meta">EJ0112 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Vizagras colchoneta</div>
+            <div class="meta">EJ0284 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Talon a la cola</div>
+            <div class="meta">EJ0087 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion mano">
+      <h3>Sesión 5 <span class="origen">Escrita por el coach</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Flexiones de brazos con apoyo de pies sobre fitball</div>
+            <div class="meta">EJ0171 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Squats</div>
+            <div class="meta">EJ0308 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo al menton con banda elastica</div>
+            <div class="meta">EJ0099 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Planchas con apoyo de palmas de manos bb estirados y adelante colchoneta</div>
+            <div class="meta">EJ0278 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Trote rodilla arriba</div>
+            <div class="meta">EJ0089 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 6 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
+            <div class="meta">EJ0014 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla + Biceps con banda elastica</div>
+            <div class="meta">EJ0192 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo a un bb con banda elastica derecho</div>
+            <div class="meta">EJ0194 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Superiores cortitos con rodillas suspendidas a 90 grados colchoneta</div>
+            <div class="meta">EJ0294 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Jumping jump</div>
+            <div class="meta">EJ0086 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 7 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Push-ups</div>
+            <div class="meta">EJ0306 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla completa sin carga</div>
+            <div class="meta">EJ0247 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x12 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Sentadilla + remo con polea baja</div>
+            <div class="meta">EJ0028 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Completos con flexion de rodillas cruzados colchoneta</div>
+            <div class="meta">EJ0285 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">4:00 continuos · máx en 4 min</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
+            <div class="meta">EJ0077 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 8 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
+            <div class="meta">EJ0014 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla + Biceps con banda elastica</div>
+            <div class="meta">EJ0192 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo parado ambos bb con banda elastica</div>
+            <div class="meta">EJ0145 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Planchas + crunch de rodillas por fuera colchoneta</div>
+            <div class="meta">EJ0279 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">4 rondas · 60s por ronda · 4x10</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Sentadilla profunda mas salto</div>
+            <div class="meta">EJ0242 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 9 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Aperturas con banda elastica parado</div>
+            <div class="meta">EJ0175 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla + extension de hombros con sandbag</div>
+            <div class="meta">EJ0017 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo con mancuerna a un bb</div>
+            <div class="meta">EJ0146 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Espinales con elevacion de pp alternas colchoneta</div>
+            <div class="meta">EJ0257 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">4 rondas · 60s por ronda · 4x10</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Trote con banda arnes hacia delante volviendo suave</div>
+            <div class="meta">EJ0083 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 10 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Push-ups</div>
+            <div class="meta">EJ0306 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadillas sobre bozu con sng bag</div>
+            <div class="meta">EJ0224 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo parado ambos bb con banda elastica</div>
+            <div class="meta">EJ0145 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Vizagras alternos colchoneta</div>
+            <div class="meta">EJ0283 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Estocadas alternas + salto</div>
+            <div class="meta">EJ0234 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 11 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Aperturas con banda elastica parado</div>
+            <div class="meta">EJ0175 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla sobre bozu</div>
+            <div class="meta">EJ0009 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo al menton en polea baja con barra</div>
+            <div class="meta">EJ0111 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Espinales con elevacion de pp alternas colchoneta</div>
+            <div class="meta">EJ0257 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">4 rondas · 60s por ronda · 4x10</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
+            <div class="meta">EJ0077 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 12 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Push-ups</div>
+            <div class="meta">EJ0306 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadillas laterales con sand bag</div>
+            <div class="meta">EJ0222 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x12 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo a un bb con banda elastica derecho</div>
+            <div class="meta">EJ0194 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Planchas + crunch de rodillas por fuera colchoneta</div>
+            <div class="meta">EJ0279 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">4 rondas · 60s por ronda · 4x10</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Saltos a un pp con banda arnes</div>
+            <div class="meta">EJ0080 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 13 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Flexiones de brazos</div>
+            <div class="meta">EJ0172 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla completa sin carga</div>
+            <div class="meta">EJ0247 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo parado ambos bb con banda elastica</div>
+            <div class="meta">EJ0145 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Inferiores con agarre, elevacion de pp rodillas flexionadas mas cadera colchoneta</div>
+            <div class="meta">EJ0267 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">4 rondas · 60s por ronda · 4x10</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Sentadilla profunda mas salto</div>
+            <div class="meta">EJ0242 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 14 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Push-ups</div>
+            <div class="meta">EJ0306 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadillas sobre bozu + hombros con keteball</div>
+            <div class="meta">EJ0030 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Sentadilla + Remo con banda elastica</div>
+            <div class="meta">EJ0193 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Completos con flexion de rodillas cruzados colchoneta</div>
+            <div class="meta">EJ0285 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">4 rondas · 60s por ronda · 4x10</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
+            <div class="meta">EJ0077 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 15 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
+            <div class="meta">EJ0014 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadillas sobre bozu con keteball</div>
+            <div class="meta">EJ0225 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo cerrucho polea baja con barra</div>
+            <div class="meta">EJ0148 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Plancha con toque de hombros</div>
+            <div class="meta">EJ0006 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Jumping jump</div>
+            <div class="meta">EJ0086 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 16 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Aperturas con banda elastica parado</div>
+            <div class="meta">EJ0175 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla + extension de hombros con sandbag</div>
+            <div class="meta">EJ0017 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo a un bb con banda elastica derecho</div>
+            <div class="meta">EJ0194 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Superiores cortitos con pp apoyados en piso colchoneta</div>
+            <div class="meta">EJ0296 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Burpees</div>
+            <div class="meta">EJ0299 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 17 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Push-ups</div>
+            <div class="meta">EJ0306 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadillas sobre bozu + hombros con keteball</div>
+            <div class="meta">EJ0030 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x12 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo con mancuerna a un bb</div>
+            <div class="meta">EJ0146 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Superiores cortitos con rodillas suspendidas a 90 grados colchoneta</div>
+            <div class="meta">EJ0294 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Trote con banda arnes hacia delante volviendo suave</div>
+            <div class="meta">EJ0083 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">8:00 continuos · máx en 8 min</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 18 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Flexiones de brazos</div>
+            <div class="meta">EJ0172 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla completa sin carga</div>
+            <div class="meta">EJ0247 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x10 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo al menton en polea baja con barra</div>
+            <div class="meta">EJ0111 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Completos con plantas de pies apoyadas colchoneta</div>
+            <div class="meta">EJ0287 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">4:00 continuos · máx en 4 min</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Estocadas alternas + salto</div>
+            <div class="meta">EJ0234 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 19 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
+            <div class="meta">EJ0014 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x10 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla sobre bozu</div>
+            <div class="meta">EJ0009 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 75s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Remo a un bb con polea baja</div>
+            <div class="meta">EJ0151 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Espinales con elevacion de pp alternas colchoneta</div>
+            <div class="meta">EJ0257 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">4:00 continuos · máx en 4 min</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Trote en el lugar</div>
+            <div class="meta">EJ0090 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+    <section class="sesion motor">
+      <h3>Sesión 20 <span class="origen">Generada por el motor</span></h3>
+      <div class="scroll"><table>
+        <colgroup>
+          <col style="width:44px"><col style="width:38%"><col style="width:86px">
+          <col style="width:auto"><col style="width:62px">
+        </colgroup>
+        <thead><tr><th>Est.</th><th>Ejercicio</th><th>Formato</th><th>Prescripción</th><th>Dura</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="est">1</td>
+          <td>
+            <div class="nombre">Aperturas con banda elastica parado</div>
+            <div class="meta">EJ0175 · Empuje horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">3x12 · descanso 60s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">2</td>
+          <td>
+            <div class="nombre">Sentadilla + Biceps con banda elastica</div>
+            <div class="meta">EJ0192 · Rodilla dominante</div>
+          </td>
+          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td class="presc">4x15 · descanso 45s</td>
+          <td class="dur">—</td>
+        </tr>
+        <tr>
+          <td class="est">3</td>
+          <td>
+            <div class="nombre">Sentadilla + Remo con banda elastica</div>
+            <div class="meta">EJ0193 · Tracción horizontal</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr>
+        <tr>
+          <td class="est">4</td>
+          <td>
+            <div class="nombre">Completos con plantas de pies apoyadas colchoneta</div>
+            <div class="meta">EJ0287 · Core anti-extensión</div>
+          </td>
+          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td class="presc">4:00 continuos · máx en 4 min</td>
+          <td class="dur">4:00</td>
+        </tr>
+        <tr>
+          <td class="est">5</td>
+          <td>
+            <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
+            <div class="meta">EJ0077 · Locomoción</div>
+          </td>
+          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td class="presc">8 rondas · 60s por ronda · 8x10</td>
+          <td class="dur">8:00</td>
+        </tr></tbody>
+      </table></div>
+    </section>
+
+  <footer>Todo esto está en el entorno de prueba, sobre un socio sin historial: por eso las
+  sesiones todavía no traen peso sugerido. En cuanto el socio tenga sesiones hechas, cada estación
+  arrastra el peso de la última vez que hizo ese movimiento o uno de su misma familia.</footer>
+</div>
