@@ -435,22 +435,23 @@ export default function Routines() {
 
   const handleGenerateSessions = async () => {
     if (!selectedRoutine) return
-    const templateSession = selectedRoutine.routineSessions?.find(s => s.sessionNumber === 1)
-    if (!templateSession) {
-      toast.error('Creá la Sesión 1 primero — es la plantilla base', toastOptions)
+    // The engine builds from whatever the coach wrote by hand; it only needs one to start.
+    const aMano = selectedRoutine.routineSessions?.filter(s => s.sessionNumber <= 5) || []
+    if (aMano.length === 0) {
+      toast.error('Cargá al menos la Sesión 1 antes de generar — el motor construye a partir de las que armás vos', toastOptions)
       return
     }
-    if (!confirm('Esto generará 30 sesiones basadas en la Sesión 1 como plantilla.\n\nLas sesiones 2–6 usarán ejercicios similares y las sesiones 7–30 rotarán entre las primeras 6.\n\n¿Continuar?')) return
+    if (!confirm('El motor va a completar el mes usando las sesiones que cargaste a mano como base.\n\nCada sesión generada rota el ejercicio de cada estación por otro del mismo patrón de movimiento, que la estación pueda correr y que el socio pueda hacer.\n\nLo que ya estaba generado se reemplaza; lo que cargaste a mano no se toca.\n\n¿Continuar?')) return
     try {
       setGenerating(true)
-      await generateRoutineSessions(selectedRoutine.id, templateSession.id)
-      toast.success('30 sesiones generadas exitosamente', toastOptions)
+      const { generadas } = await generateRoutineSessions(selectedRoutine.id)
+      toast.success(`${generadas} sesiones generadas`, toastOptions)
       fetchRoutineDetail(selectedRoutine.id)
       fetchData()
     } catch (error) {
       Sentry.captureException(error, { extra: { context: 'Error generating sessions:' } })
       console.error('Error generating sessions:', error)
-      toast.error('Error al generar sesiones', toastOptions)
+      toast.error(error?.message || 'Error al generar sesiones', toastOptions)
     } finally {
       setGenerating(false)
     }

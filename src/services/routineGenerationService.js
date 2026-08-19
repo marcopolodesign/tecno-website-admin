@@ -8,6 +8,9 @@ import { supabase } from '../lib/supabase'
 // EXERCISE GROUPS
 // =====================================================
 
+// Cuántas sesiones escribe el coach a mano antes de que el motor siga solo.
+const SESIONES_A_MANO = 5
+
 export const getExerciseGroups = async () => {
   const { data, error } = await supabase
     .from('exercise_groups')
@@ -289,243 +292,190 @@ export const getExercisesForBox = async (boxId, userId) => {
   return exercises
 }
 
-/**
- * Generate remaining sessions based on template (Class 1)
- * This is a simplified version - the full logic would be in a backend function
- */
-export const generateRoutineSessions = async (routineId, templateSessionId) => {
-  // Get the template session exercises
-  const { data: templateExercises, error: teError } = await supabase
-    .from('session_exercises')
-    .select('*')
-    .eq('session_id', templateSessionId)
-    .order('box_number')
-    .order('exercise_order')
-  
-  if (teError) throw teError
-  
-  // Get routine info
-  const { data: routine, error: rError } = await supabase
-    .from('training_routines')
-    .select('*, users (id, fitness_capacity, fitness_intensity, age_category_id)')
-    .eq('id', routineId)
-    .single()
-  
-  if (rError) throw rError
-  
-  // Mark routine as generating
-  await supabase
-    .from('training_routines')
-    .update({ generation_status: 'generating' })
-    .eq('id', routineId)
-  
-  try {
-    const totalSessions = routine.total_sessions || 30
-    const templateSessions = routine.template_sessions || 6
-    
-    // Generate sessions 2 through templateSessions (similar exercises)
-    for (let sessionNum = 2; sessionNum <= templateSessions; sessionNum++) {
-      await generateSimilarSession(routineId, templateExercises, sessionNum, routine.client_id)
-    }
-    
-    // Generate sessions templateSessions+1 through totalSessions (random from first 6)
-    for (let sessionNum = templateSessions + 1; sessionNum <= totalSessions; sessionNum++) {
-      await generateRandomSession(routineId, sessionNum, routine.client_id)
-    }
-    
-    // Mark as completed
-    await supabase
-      .from('training_routines')
-      .update({ generation_status: 'completed' })
-      .eq('id', routineId)
-    
-    return true
-  } catch (error) {
-    // Mark as failed
-    await supabase
-      .from('training_routines')
-      .update({ generation_status: 'failed' })
-      .eq('id', routineId)
-    
-    throw error
-  }
-}
-
-// Deterministic string hash (FNV-1a) — same inputs always produce the same
-// pick, so regenerating a routine is reproducible/auditable instead of
-// silently landing on a different exercise every run. Ported concept (not
-// code — his was PHP crc32) from Lucas Barral's RutinaMaterializerService.
+// Deterministic string hash (FNV-1a) — same inputs always produce the same pick, so
+// regenerating a routine is reproducible instead of silently landing on a different exercise
+// every run. Concept ported (not code — his was PHP crc32) from Lucas Barral's
+// RutinaMaterializerService.
 function seededIndex(seed, length) {
   let hash = 0x811c9dc5
   for (let i = 0; i < seed.length; i++) {
     hash ^= seed.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193)
+    hash = Math.imul(hash, 0x01000193) >>> 0
   }
-  return Math.abs(hash) % length
+  return length > 0 ? hash % length : 0
 }
 
-// Weight carryover — reuse the client's last logged weight for this exact
-// exercise instead of leaving weight_kg null/default on every regeneration.
-// Ports Lucas's pesoPropuesto(): walks completed history, first non-null wins.
+/**
+ * What to put in the weight field of a generated exercise.
+ *
+ * Uses peso_sugerido, which falls back to the exercise's family when the member has no history
+ * on this one — which is most of the time here, since the whole point of generating is that the
+ * exercise is new to them. The old helper only matched the exact exercise, so a generated month
+ * came out with every weight blank.
+ */
 async function getProposedWeight(userId, exerciseId) {
+  if (!userId || !exerciseId) return null
+  const { data } = await supabase.rpc('peso_sugerido', {
+    p_user_id: userId,
+    p_exercise_id: exerciseId,
+  })
+  return data?.[0]?.kg ?? null
+}
+
+/**
+ * Generate the rest of the month from the sessions the coach wrote by hand.
+ *
+ * The gym's flow: the first few sessions are written by a person, the rest are the engine's job.
+ * Each generated session takes one of the hand-made ones as its shape — same stations, same sets
+ * and reps, same rest — and swaps every exercise for one that shares its movement pattern, that
+ * the station can actually run, and that the member is not contraindicated for.
+ *
+ * Deterministic on purpose. Regenerating a routine has to land on the same month, or nobody can
+ * tell whether a change they made did anything.
+ */
+export const generateRoutineSessions = async (routineId) => {
+  const { data: routine, error: rError } = await supabase
+    .from('training_routines')
+    .select('*, users (id)')
+    .eq('id', routineId)
+    .single()
+  if (rError) throw rError
+
+  const totalSessions = routine.total_sessions || 30
+  // The hand-made ones. Five is what the gym writes; a routine can say otherwise.
+  const aMano = routine.template_sessions || SESIONES_A_MANO
+
+  const { data: plantillas, error: pError } = await supabase
+    .from('routine_sessions')
+    .select('id, session_number, session_exercises (*)')
+    .eq('routine_id', routineId)
+    .lte('session_number', aMano)
+    .order('session_number')
+  if (pError) throw pError
+
+  const conEjercicios = (plantillas || []).filter((s) => (s.session_exercises || []).length > 0)
+  if (conEjercicios.length === 0) {
+    throw new Error(
+      `No hay ninguna sesión cargada a mano para usar de base. Armá al menos la Sesión 1 antes de generar.`
+    )
+  }
+
+  await supabase
+    .from('training_routines')
+    .update({ generation_status: 'generating' })
+    .eq('id', routineId)
+
   try {
-    const { data, error } = await supabase.rpc('get_proposed_weight', {
-      p_user_id: userId,
-      p_exercise_id: exerciseId,
-    })
-    if (error) throw error
-    return data ?? null
-  } catch (err) {
-    console.error('Error fetching proposed weight:', err)
-    return null
+    // Anything previously generated is replaced. Regenerating after fixing a station should not
+    // leave the old month interleaved with the new one.
+    const { data: viejas } = await supabase
+      .from('routine_sessions')
+      .select('id')
+      .eq('routine_id', routineId)
+      .gt('session_number', aMano)
+    if (viejas?.length) {
+      await supabase.from('routine_sessions').delete().in('id', viejas.map((s) => s.id))
+    }
+
+    let anterior = []
+    for (let n = aMano + 1; n <= totalSessions; n++) {
+      // Rotate through the hand-made sessions so the month keeps their variety instead of
+      // orbiting one of them.
+      const base = conEjercicios[(n - aMano - 1) % conEjercicios.length]
+      anterior = await generarSesion(routineId, routine.client_id, base, n, anterior)
+    }
+
+    await supabase
+      .from('training_routines')
+      .update({ generation_status: 'completed' })
+      .eq('id', routineId)
+
+    return { generadas: totalSessions - aMano, desde: conEjercicios.length }
+  } catch (error) {
+    await supabase
+      .from('training_routines')
+      .update({ generation_status: 'failed' })
+      .eq('id', routineId)
+    throw error
   }
 }
 
-async function generateSimilarSession(routineId, templateExercises, sessionNumber, userId) {
-  // Create the session
+/** One generated session. Returns the exercise ids it used, for the next one to avoid. */
+async function generarSesion(routineId, clientId, base, sessionNumber, evitar) {
   const { data: session, error: sError } = await supabase
     .from('routine_sessions')
     .insert([{
       routine_id: routineId,
       title: `Sesión ${sessionNumber}`,
       session_number: sessionNumber,
-      status: 'locked'
+      status: 'locked',
     }])
     .select()
     .single()
-  
   if (sError) throw sError
-  
-  const usedExerciseIds = []
-  
-  // For each template exercise, find a similar one
-  for (const te of templateExercises) {
+
+  const usados = []
+  // exercise_order is UNIQUE per session, so it is numbered across the session and not per
+  // station — the same constraint that used to make the admin's own form collide.
+  let orden = 0
+
+  const ejercicios = [...(base.session_exercises || [])].sort(
+    (a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0)
+  )
+
+  for (const te of ejercicios) {
+    orden += 1
     let exerciseId = te.exercise_id
-    
-    // Try to find a similar exercise — deterministic seed so re-generating
-    // this exact session/box/position always lands on the same candidate
-    // set ordering (mirror rule: box A and box B at the same station share
-    // a seed unless the box number itself differs the pool via equipment).
-    const seed = `${userId}-${routineId}-${sessionNumber}-b${te.box_number}-o${te.exercise_order}`
-    const { data: similar } = await supabase
-      .rpc('get_similar_exercises', {
+    let fuente = 'template'
+
+    // A cooldown has no station, so there is nothing to rotate it against — it carries over.
+    if (!te.is_cooldown && te.box_number) {
+      const { data: candidatos } = await supabase.rpc('sustitutos_para_ejercicio', {
         p_exercise_id: te.exercise_id,
-        p_user_id: userId,
-        p_box_id: te.box_id,
-        p_exclude_ids: usedExerciseIds,
-        p_seed: seed
+        p_line_position: te.box_number,
+        p_user_id: clientId,
+        // Never twice in the same session, and not what yesterday already had.
+        p_excluir: [...new Set([...usados, ...evitar])],
+        p_limite: 8,
       })
 
-    if (similar && similar.length > 0) {
-      exerciseId = similar[0].exercise_id
+      if (candidatos?.length) {
+        // The engine's own order is the same every time for a given member and station, so the
+        // session number is what makes session 7 differ from session 12. seededIndex keeps it
+        // reproducible: same routine, same month, every time.
+        const semilla = `${routineId}-${sessionNumber}-b${te.box_number}-o${te.exercise_order}`
+        exerciseId = candidatos[seededIndex(semilla, candidatos.length)].id
+        fuente = 'similar'
+      }
     }
 
-    usedExerciseIds.push(exerciseId)
+    usados.push(exerciseId)
 
-    const proposedWeight = await getProposedWeight(userId, exerciseId)
+    const peso = await getProposedWeight(clientId, exerciseId)
 
-    // Create the session exercise
-    await supabase
-      .from('session_exercises')
-      .insert([{
-        session_id: session.id,
-        exercise_id: exerciseId,
-        box_id: te.box_id,
-        box_number: te.box_number,
-        exercise_order: te.exercise_order,
-        sets_reps: te.sets_reps,
-        rest_time: te.rest_time,
-        repetition_time: te.repetition_time,
-        micro_pause: te.micro_pause,
-        weight_kg: proposedWeight ?? te.weight_kg,
-        is_auto_generated: true,
-        is_cooldown: te.is_cooldown || false,
-        generation_source: exerciseId === te.exercise_id ? 'template' : 'similar'
-      }])
-  }
-  
-  return session
-}
-
-async function generateRandomSession(routineId, sessionNumber, userId) {
-  // Get exercises from first 6 sessions to pick randomly
-  const { data: existingExercises, error } = await supabase
-    .from('session_exercises')
-    .select(`
-      *,
-      routine_sessions!inner (routine_id, session_number)
-    `)
-    .eq('routine_sessions.routine_id', routineId)
-    .lte('routine_sessions.session_number', 6)
-  
-  if (error) throw error
-  
-  // Group by box_number and order
-  const exercisesByBoxAndOrder = {}
-  existingExercises.forEach(ex => {
-    const key = `${ex.box_number}-${ex.exercise_order}`
-    if (!exercisesByBoxAndOrder[key]) {
-      exercisesByBoxAndOrder[key] = []
-    }
-    exercisesByBoxAndOrder[key].push(ex)
-  })
-  
-  // Create the session
-  const { data: session, error: sError } = await supabase
-    .from('routine_sessions')
-    .insert([{
-      routine_id: routineId,
-      title: `Sesión ${sessionNumber}`,
-      session_number: sessionNumber,
-      status: 'locked'
+    await supabase.from('session_exercises').insert([{
+      session_id: session.id,
+      exercise_id: exerciseId,
+      box_id: te.box_id,
+      box_number: te.box_number,
+      exercise_order: orden,
+      sets_reps: te.sets_reps,
+      rest_time: te.rest_time,
+      repetition_time: te.repetition_time,
+      micro_pause: te.micro_pause,
+      weight_kg: peso ?? te.weight_kg,
+      // The timed formats travel with the shape — an EMOM station stays an EMOM station.
+      formato: te.formato || 'Series',
+      rondas: te.rondas,
+      trabajo_seg: te.trabajo_seg,
+      descanso_seg: te.descanso_seg,
+      is_auto_generated: true,
+      is_cooldown: te.is_cooldown || false,
+      generation_source: fuente,
     }])
-    .select()
-    .single()
-  
-  if (sError) throw sError
-  
-  // For each position, pick a random exercise (avoiding previous session)
-  const previousSessionNum = sessionNumber - 1
-  
-  for (const [key, exercises] of Object.entries(exercisesByBoxAndOrder)) {
-    // Filter out exercises from previous session
-    let candidates = exercises.filter(ex => 
-      ex.routine_sessions.session_number !== previousSessionNum
-    )
-    
-    // If no candidates, use all
-    if (candidates.length === 0) {
-      candidates = exercises
-    }
-    
-    // Deterministic pick — same routine/session/position always selects the
-    // same candidate instead of a fresh Math.random() roll every regenerate.
-    const seed = `${routineId}-${sessionNumber}-${key}`
-    const selected = candidates[seededIndex(seed, candidates.length)]
-
-    const proposedWeight = await getProposedWeight(userId, selected.exercise_id)
-
-    // Create the session exercise
-    await supabase
-      .from('session_exercises')
-      .insert([{
-        session_id: session.id,
-        exercise_id: selected.exercise_id,
-        box_id: selected.box_id,
-        box_number: selected.box_number,
-        exercise_order: selected.exercise_order,
-        sets_reps: selected.sets_reps,
-        rest_time: selected.rest_time,
-        repetition_time: selected.repetition_time,
-        micro_pause: selected.micro_pause,
-        weight_kg: proposedWeight ?? selected.weight_kg,
-        is_auto_generated: true,
-        is_cooldown: selected.is_cooldown || false,
-        generation_source: 'random'
-      }])
   }
-  
-  return session
+
+  return usados
 }
 
 // =====================================================
