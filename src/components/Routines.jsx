@@ -13,7 +13,8 @@ import {
   PlayIcon,
   CheckCircleIcon,
   ClockIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline'
 import * as Sentry from '@sentry/react'
 import routinesService from '../services/routinesService'
@@ -23,6 +24,7 @@ import { supabase, toCamelCase } from '../lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
 import SelectorEjercicio from './SelectorEjercicio'
+import PanelSustitutos from './PanelSustitutos'
 
 export default function Routines() {
   const [routines, setRoutines] = useState([])
@@ -83,6 +85,7 @@ export default function Routines() {
   // Expanded sessions
   const [expandedSessions, setExpandedSessions] = useState({})
   const [generating, setGenerating] = useState(false)
+  const [sustituyendo, setSustituyendo] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -752,6 +755,13 @@ export default function Routines() {
                                             </div>
                                             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                               <button
+                                                onClick={() => setSustituyendo({ fila: se, estacion: boxNum })}
+                                                className="p-0.5 text-text-tertiary hover:text-brand"
+                                                title="Cambiar por otro del mismo patrón"
+                                              >
+                                                <ArrowPathIcon className="h-3 w-3" />
+                                              </button>
+                                              <button
                                                 onClick={() => openExerciseModal(session.id, se, boxNum)}
                                                 className="p-0.5 text-text-tertiary hover:text-brand"
                                               >
@@ -1054,6 +1064,28 @@ export default function Routines() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Substitution panel */}
+      {sustituyendo && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setSustituyendo(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-5">
+              <PanelSustitutos
+                filaId={sustituyendo.fila.id}
+                ejercicioActual={sustituyendo.fila.exercises}
+                estacion={sustituyendo.estacion}
+                onSustituido={() => {
+                  setSustituyendo(null)
+                  toast.success('Ejercicio cambiado', toastOptions)
+                  fetchRoutineDetail(selectedRoutine.id)
+                }}
+                onCerrar={() => setSustituyendo(null)}
+              />
             </div>
           </div>
         </>
