@@ -1,80 +1,193 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TecnoFit — Rutina generada por el motor</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TecnoFit · Rutina generada por el motor</title>
 <style>
+/* Marco Polo — hoja de estilo de documentos de cara al cliente.
+ *
+ * Fuente: los documentos de sprint de TecnoFit (`docs/cierre-sprint-1.html`,
+ * `docs/reports/tf-weekly-sprint2-2026-08-13.html`), que son el estilo que Mateo definió como
+ * el de la marca el 2026-08-19.
+ *
+ * CÓMO SE USA: se copia adentro de un <style> en el HTML, no se linkea. Los entregables tienen
+ * que abrirse sin conexión y sin depender de ningún archivo al lado.
+ *
+ * EL ACENTO ES DEL CLIENTE. --brand se pisa por documento con el color de la marca del cliente
+ * (TecnoFit #F45F37, Healthier, Senda, el que sea). Lo que pone Marco Polo es el formato: el
+ * papel cálido, el eyebrow con la insignia, la regla corta, los títulos de sección en
+ * versalitas, las tarjetas y el pie firmado. Cuando no hay color de cliente, el de Marco Polo
+ * es #E66065.
+ */
+
+:root {
+  --paper: #FBF9F6; --ink: #191410; --ink-soft: #4A4139; --muted: #8A8178;
+  --brand: #E66065; --brand-deep: #C13A0E; --brand-wash: #FDEEE8;
+  --line: #EBE4DC; --surface: #FFFFFF;
+  --good: #2E7A57; --good-wash: #E7F1EB;
+  --pend: #B0743A; --pend-wash: #FBF0E3;
+  --stop: #9A4A6B; --stop-wash: #F7E9EE;
+  --shadow: 0 1px 2px rgba(25,20,16,.04), 0 6px 24px rgba(25,20,16,.05);
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* El documento se lee en el tema del que lo abre: se manda por WhatsApp y se abre en cualquier
+ * lado. El data-theme gana sobre la preferencia del sistema para poder forzarlo. */
+@media (prefers-color-scheme: dark) {
   :root {
-    --fondo: #ffffff; --papel: #ffffff; --texto: #111827; --suave: #6b7280;
-    --linea: #e5e7eb; --acento: #F45F37; --mano: #fff7ed; --motor: #ffffff;
+    --paper: #141110; --ink: #F1ECE5; --ink-soft: #C7BFB5; --muted: #948A7F;
+    --brand: #FF7B80; --brand-deep: #FF8A66; --brand-wash: #2A1710;
+    --line: #2C2721; --surface: #1D1915;
+    --good: #5FB98C; --good-wash: #16241D;
+    --pend: #D69A5E; --pend-wash: #241A10;
+    --stop: #D98CAE; --stop-wash: #2A1620;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 30px rgba(0,0,0,.35);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --fondo: #0b0f14; --papel: #131922; --texto: #e5e7eb; --suave: #9aa4b2;
-      --linea: #232c38; --mano: #1c1710; --motor: #131922;
-    }
-  }
-  :root[data-theme="light"] {
-    --fondo: #ffffff; --papel: #ffffff; --texto: #111827; --suave: #6b7280;
-    --linea: #e5e7eb; --mano: #fff7ed; --motor: #ffffff;
-  }
-  :root[data-theme="dark"] {
-    --fondo: #0b0f14; --papel: #131922; --texto: #e5e7eb; --suave: #9aa4b2;
-    --linea: #232c38; --mano: #1c1710; --motor: #131922;
-  }
-  body {
-    margin: 0; background: var(--fondo); color: var(--texto);
-    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 20px 80px; }
-  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
-  .sub { color: var(--suave); margin: 0 0 28px; }
-  h2 { font-size: 18px; margin: 40px 0 12px; }
-  h3 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: baseline; gap: 10px; }
-  .origen {
-    font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-    color: var(--suave); border: 1px solid var(--linea); border-radius: 999px; padding: 2px 8px;
-  }
-  .mano .origen { color: var(--acento); border-color: var(--acento); }
-  .cifras { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 8px; }
-  .cifra {
-    flex: 1 1 150px; background: var(--papel); border: 1px solid var(--linea);
-    border-radius: 12px; padding: 14px 16px;
-  }
-  .cifra b { display: block; font-size: 24px; letter-spacing: -0.02em; }
-  .cifra span { color: var(--suave); font-size: 13px; }
-  .nota {
-    background: var(--papel); border: 1px solid var(--linea); border-left: 3px solid var(--acento);
-    border-radius: 10px; padding: 14px 18px; margin: 18px 0;
-  }
-  .nota p { margin: 6px 0; }
-  .scroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
-  .sesion table { min-width: 620px; }
-  th {
-    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--suave); font-weight: 600; padding: 0 10px 6px; white-space: nowrap;
-  }
-  td { padding: 9px 10px; border-top: 1px solid var(--linea); vertical-align: top; }
-  .sesion {
-    background: var(--motor); border: 1px solid var(--linea); border-radius: 14px;
-    padding: 16px 18px; margin: 0 0 14px;
-  }
-  .sesion.mano { background: var(--mano); }
-  .est { width: 34px; color: var(--suave); font-variant-numeric: tabular-nums; }
-  .nombre { font-weight: 500; }
-  .meta { color: var(--suave); font-size: 12px; }
-  .presc { color: var(--suave); }
-  .dur, .peso { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .badge, .chip {
-    display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .03em;
-    color: var(--c); border: 1px solid var(--c); border-radius: 999px;
-    padding: 2px 9px; white-space: nowrap;
-  }
-  .chip { margin: 2px 4px 2px 0; }
-  footer { color: var(--suave); font-size: 13px; margin-top: 44px; }
+}
+:root[data-theme="light"] {
+  --paper: #FBF9F6; --ink: #191410; --ink-soft: #4A4139; --muted: #8A8178;
+  --brand: #E66065; --brand-deep: #C13A0E; --brand-wash: #FDEEE8;
+  --line: #EBE4DC; --surface: #FFFFFF; --good: #2E7A57; --good-wash: #E7F1EB;
+  --pend: #B0743A; --pend-wash: #FBF0E3; --stop: #9A4A6B; --stop-wash: #F7E9EE;
+  --shadow: 0 1px 2px rgba(25,20,16,.04), 0 6px 24px rgba(25,20,16,.05);
+}
+:root[data-theme="dark"] {
+  --paper: #141110; --ink: #F1ECE5; --ink-soft: #C7BFB5; --muted: #948A7F;
+  --brand: #FF7B80; --brand-deep: #FF8A66; --brand-wash: #2A1710;
+  --line: #2C2721; --surface: #1D1915; --good: #5FB98C; --good-wash: #16241D;
+  --pend: #D69A5E; --pend-wash: #241A10; --stop: #D98CAE; --stop-wash: #2A1620;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 30px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box }
+html { -webkit-text-size-adjust: 100% }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 16px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 880px; margin: 0 auto; padding: 48px 24px 80px }
+
+/* Encabezado --------------------------------------------------------------------------- */
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--brand-deep); margin: 0 0 14px; display: flex; align-items: center; gap: 10px;
+}
+.eyebrow .mark {
+  width: 22px; height: 22px; border-radius: 6px; background: var(--brand); color: #fff;
+  font-weight: 800; font-size: 13px; display: inline-flex; align-items: center;
+  justify-content: center; flex: none;
+}
+h1 {
+  font-size: clamp(30px, 5.5vw, 46px); line-height: 1.04; letter-spacing: -.02em;
+  font-weight: 800; margin: 0 0 14px; text-wrap: balance;
+}
+.lede { font-size: 18px; color: var(--ink-soft); margin: 0; max-width: 62ch }
+.rule { height: 3px; background: var(--brand); width: 64px; border: 0; margin: 26px 0 0; border-radius: 2px }
+
+/* Secciones ---------------------------------------------------------------------------- */
+h2 {
+  font-size: 12.5px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--muted); margin: 52px 0 16px; padding-bottom: 9px; border-bottom: 1px solid var(--line);
+}
+h3 { font-size: 16.5px; font-weight: 700; margin: 0 }
+p { margin: 0 0 14px }
+a { color: var(--brand-deep) }
+code {
+  font-family: var(--mono); font-size: 12.5px; background: var(--brand-wash);
+  color: var(--brand-deep); padding: 1px 6px; border-radius: 5px;
+}
+
+/* Piezas ------------------------------------------------------------------------------- */
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px; box-shadow: var(--shadow);
+}
+.callout {
+  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--brand);
+  border-radius: 10px; padding: 16px 18px; margin: 0 0 16px;
+}
+.callout p:last-child { margin-bottom: 0 }
+.cifras { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 16px }
+.cifra {
+  flex: 1 1 160px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow);
+}
+.cifra b { display: block; font-size: 26px; letter-spacing: -.02em; line-height: 1.1 }
+.cifra span { color: var(--muted); font-size: 13px }
+.pill {
+  display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+}
+.p-done { background: var(--good-wash); color: var(--good) }
+.p-todo { background: var(--brand-wash); color: var(--brand-deep) }
+.p-pend { background: var(--pend-wash); color: var(--pend) }
+.p-stop { background: var(--stop-wash); color: var(--stop) }
+
+/* Tablas: siempre dentro de un .scroll, para que el ancho no rompa la página en el teléfono */
+.scroll { overflow-x: auto }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px }
+th {
+  text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--brand-deep); padding: 10px 12px; border-bottom: 2px solid var(--brand-wash);
+  white-space: nowrap;
+}
+td { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft); vertical-align: top }
+
+/* Pie: la firma. No es opcional — es lo que hace que el documento sea de Marco Polo. */
+footer {
+  margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 13px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: space-between;
+}
+footer .firma { display: flex; align-items: center; gap: 9px; color: var(--ink-soft) }
+footer .firma svg { height: 15px; width: auto; display: block }
+
+:root{--brand:#F45F37;--brand-deep:#C13A0E;--brand-wash:#FDEEE8}
+:root[data-theme="light"]{--brand:#F45F37;--brand-deep:#C13A0E;--brand-wash:#FDEEE8}
+@media (prefers-color-scheme:dark){:root{--brand:#FF6E45;--brand-deep:#FF8A66;--brand-wash:#2A1710}}
+:root[data-theme="dark"]{--brand:#FF6E45;--brand-deep:#FF8A66;--brand-wash:#2A1710}
+
+/* Lo propio de este documento: las sesiones y las etiquetas de formato. Todo lo demás
+   (papel, encabezado, tarjetas, tablas, pie) sale del sistema de marca. */
+/* La regla corta necesita aire antes de las cifras, o se lee como si colgara de la primera. */
+.rule + .cifras { margin-top: 34px }
+.sesion { background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px 18px; margin: 0 0 14px; box-shadow: var(--shadow) }
+.sesion.mano { background: var(--brand-wash); border-color: var(--brand-wash) }
+.sesion h3 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 10px }
+.origen { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+          color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px }
+.mano .origen { color: var(--brand-deep); border-color: var(--brand-deep) }
+.sesion table { min-width: 620px; table-layout: fixed }
+.sesion th { padding: 0 10px 6px; border-bottom: 0; color: var(--muted) }
+.sesion td { padding: 9px 10px; border-top: 1px solid var(--line); border-bottom: 0 }
+.sesion tr:first-child td { border-top: 0 }
+.est { color: var(--muted); font-variant-numeric: tabular-nums }
+.nombre { font-weight: 600; color: var(--ink) }
+.meta { color: var(--muted); font-size: 12px }
+.dur, .peso { font-variant-numeric: tabular-nums; white-space: nowrap }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+         color: var(--c); border: 1px solid var(--c); border-radius: 999px; padding: 2px 9px;
+         white-space: nowrap; margin: 2px 4px 2px 0 }
+.f-series { --c: #8A8178 } .f-emom { --c: #2E6F8E }
+.f-tabata { --c: #C13A0E } .f-amrap { --c: #2E7A57 }
+@media (prefers-color-scheme: dark) {
+  .f-series { --c: #948A7F } .f-emom { --c: #6FB6D6 }
+  .f-tabata { --c: #FF8A66 } .f-amrap { --c: #5FB98C }
+}
+:root[data-theme="dark"] .f-series { --c: #948A7F }
+:root[data-theme="dark"] .f-emom { --c: #6FB6D6 }
+:root[data-theme="dark"] .f-tabata { --c: #FF8A66 }
+:root[data-theme="dark"] .f-amrap { --c: #5FB98C }
+
 </style>
 <div class="wrap">
+  <p class="eyebrow"><span class="mark">T</span> TecnoFit · Sprint 2 · Motor de rutinas</p>
   <h1>Un mes de entrenamiento armado por el motor</h1>
-  <p class="sub">Línea A, cinco estaciones · socio de prueba · generado el 19 de agosto de 2026</p>
+  <p class="lede">El coach escribe las primeras cinco sesiones y el motor construye el resto del
+  mes: cambia el ejercicio de cada estación y también el formato de trabajo, sin mover un minuto
+  de la rotación de la línea.</p>
+  <hr class="rule">
 
   <div class="cifras">
     <div class="cifra"><b>5</b><span>sesiones escritas por el coach</span></div>
@@ -83,51 +196,50 @@
     <div class="cifra"><b>0</b><span>ejercicios repetidos de un día al siguiente</span></div>
   </div>
 
-  <div class="nota">
-    <p><strong>Cómo funciona.</strong> El coach escribe las primeras cinco sesiones. El motor toma
-    cada una como forma —las mismas estaciones, la misma prescripción, el mismo tiempo por
-    estación— y cambia dos cosas: <strong>qué ejercicio</strong> se hace en cada estación y
-    <strong>bajo qué formato</strong> se trabaja.</p>
-    <p>El ejercicio se reemplaza por otro del mismo patrón de movimiento, que se pueda hacer con
-    el equipamiento de esa estación y que el socio no tenga contraindicado.</p>
+  <h2>Cómo funciona</h2>
+  <div class="callout">
+    <p>El motor toma cada sesión escrita a mano como forma —las mismas estaciones, la misma
+    prescripción, el mismo tiempo por estación— y cambia dos cosas: <b>qué ejercicio</b> se hace en
+    cada estación y <b>bajo qué formato</b> se trabaja.</p>
+    <p>El ejercicio se reemplaza por otro del mismo patrón de movimiento, que se pueda hacer con el
+    equipamiento de esa estación y que el socio no tenga contraindicado.</p>
   </div>
 
   <h2>Variedad de formato, estación por estación</h2>
-  <div class="nota">
+  <div class="callout">
     <p>Las estaciones 1 y 2 son de carga: el coach prescribió series y repeticiones, y eso no se
-    toca. Las estaciones 3, 4 y 5 son a tiempo, y ahí el formato rota — <strong>la estación 3 ya
-    no es EMOM todo el mes</strong>.</p>
-    <p><strong>La duración no cambia nunca.</strong> Sea EMOM, Tabata o AMRAP, el socio pasa los
-    mismos ocho minutos en la estación, así que la línea sigue rotando igual.</p>
+    toca. Las 3, 4 y 5 son a tiempo, y ahí el formato rota — <b>la estación 3 ya no es EMOM todo el
+    mes</b>.</p>
+    <p><b>La duración no cambia nunca.</b> Sea EMOM, Tabata o AMRAP, el socio pasa los mismos ocho
+    minutos en la estación, así que la línea sigue rotando igual.</p>
   </div>
   <div class="scroll">
     <table>
       <thead><tr><th>Est.</th><th>Formatos en las 15 sesiones generadas</th><th></th></tr></thead>
-      <tbody><tr><td class="est">1</td><td><span class="chip" style="--c:#6b7280">Series ×15</span></td><td class="dur">1 formato</td></tr><tr><td class="est">2</td><td><span class="chip" style="--c:#6b7280">Series ×15</span></td><td class="dur">1 formato</td></tr><tr><td class="est">3</td><td><span class="chip" style="--c:#2563eb">EMOM ×6</span> <span class="chip" style="--c:#c2410c">Tabata ×2</span> <span class="chip" style="--c:#15803d">AMRAP ×7</span></td><td class="dur">3 formatos</td></tr><tr><td class="est">4</td><td><span class="chip" style="--c:#2563eb">EMOM ×6</span> <span class="chip" style="--c:#c2410c">Tabata ×5</span> <span class="chip" style="--c:#15803d">AMRAP ×4</span></td><td class="dur">3 formatos</td></tr><tr><td class="est">5</td><td><span class="chip" style="--c:#2563eb">EMOM ×10</span> <span class="chip" style="--c:#c2410c">Tabata ×2</span> <span class="chip" style="--c:#15803d">AMRAP ×3</span></td><td class="dur">3 formatos</td></tr></tbody>
+      <tbody><tr><td class="est">1</td><td><span class="badge f-series">Series ×15</span></td><td class="dur">1 formato</td></tr><tr><td class="est">2</td><td><span class="badge f-series">Series ×15</span></td><td class="dur">1 formato</td></tr><tr><td class="est">3</td><td><span class="badge f-emom">EMOM ×6</span> <span class="badge f-tabata">Tabata ×2</span> <span class="badge f-amrap">AMRAP ×7</span></td><td class="dur">3 formatos</td></tr><tr><td class="est">4</td><td><span class="badge f-emom">EMOM ×6</span> <span class="badge f-tabata">Tabata ×5</span> <span class="badge f-amrap">AMRAP ×4</span></td><td class="dur">3 formatos</td></tr><tr><td class="est">5</td><td><span class="badge f-emom">EMOM ×10</span> <span class="badge f-tabata">Tabata ×2</span> <span class="badge f-amrap">AMRAP ×3</span></td><td class="dur">3 formatos</td></tr></tbody>
     </table>
   </div>
 
-  <div class="nota">
-    <p><strong>Por qué algunas estaciones rotan más que otras.</strong> No todo movimiento admite
-    todo formato, y eso lo decide la clasificación del ejercicio en el catálogo:</p>
-    <p><strong>EMOM</strong> — las repeticiones entran en una ventana de 60 s y el descanso es lo
-    que sobra. Sirve para todo, incluso lo técnico y lo pesado.<br>
-    <strong>Tabata</strong> — 20 s a fondo. Sólo para movimientos que se puedan hacer rápido sin
-    pensarlos: si la complejidad técnica es alta, queda afuera.<br>
-    <strong>AMRAP</strong> — ocho minutos continuos. Nada obliga a frenar, así que queda afuera lo
-    de intensidad alta.</p>
-    <p>Por eso la estación 5 (locomoción) cae más veces en EMOM: buena parte de esos ejercicios
-    son escaleras de coordinación y saltos con arnés, que no se hacen a fondo contra el reloj.</p>
+  <h2>Por qué algunas estaciones rotan más que otras</h2>
+  <p>No todo movimiento admite todo formato, y eso lo decide la clasificación del ejercicio en el
+  catálogo:</p>
+  <div class="callout">
+    <p><b>EMOM</b> — las repeticiones entran en una ventana de 60 s y el descanso es lo que sobra.
+    Sirve para todo, incluso lo técnico y lo pesado.</p>
+    <p><b>Tabata</b> — 20 s a fondo. Sólo para movimientos que se puedan hacer rápido sin pensarlos:
+    si la complejidad técnica es alta, queda afuera.</p>
+    <p><b>AMRAP</b> — ocho minutos continuos. Nada obliga a frenar, así que queda afuera lo de
+    intensidad alta.</p>
   </div>
+  <p>Por eso la estación 5 (locomoción) cae más veces en EMOM: buena parte de esos ejercicios son
+  escaleras de coordinación y saltos con arnés, que no se hacen a fondo contra el reloj.</p>
 
-  <div class="nota">
-    <p><strong>Una para revisar, Lucas.</strong> El motor rota por patrón de movimiento, así que
-    lo que dice el catálogo es lo que termina apareciendo en la estación. Hay dos ejercicios de
-    glúteo cargados como empuje horizontal — <strong>EJ0014</strong> (abductores en colchoneta con
-    tobillera) y <strong>EJ0203</strong> (glúteos patada en polea baja)—, y por eso pueden salir
-    como alternativa de unas flexiones de brazos. Cambiando el patrón en el catálogo se acomoda
-    solo, sin tocar la rutina.</p>
-  </div>
+  <h2>Una para revisar, Lucas</h2>
+  <p>El motor rota por patrón de movimiento, así que lo que dice el catálogo es lo que termina
+  apareciendo en la estación. Hay dos ejercicios de glúteo cargados como empuje horizontal —
+  <code>EJ0014</code> (abductores en colchoneta con tobillera) y <code>EJ0203</code> (glúteos patada
+  en polea baja)—, y por eso pueden salir como alternativa de unas flexiones de brazos. Cambiando el
+  patrón en el catálogo se acomoda solo, sin tocar la rutina.</p>
 
   <h2>El mes completo</h2>
   
@@ -146,7 +258,7 @@
             <div class="nombre">Flexiones de brazos</div>
             <div class="meta">EJ0172 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -156,7 +268,7 @@
             <div class="nombre">Sentadilla completa sin carga</div>
             <div class="meta">EJ0247 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -166,7 +278,7 @@
             <div class="nombre">Remo con mancuerna a un bb</div>
             <div class="meta">EJ0146 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -176,7 +288,7 @@
             <div class="nombre">Planchas colchoneta</div>
             <div class="meta">EJ0281 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -186,7 +298,7 @@
             <div class="nombre">Trote en el lugar</div>
             <div class="meta">EJ0090 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -207,7 +319,7 @@
             <div class="nombre">Flexiones de brazos con apoyo de pies sobre fitball</div>
             <div class="meta">EJ0171 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -217,7 +329,7 @@
             <div class="nombre">Sentadilla media profundidad sin carga</div>
             <div class="meta">EJ0248 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x12 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -227,7 +339,7 @@
             <div class="nombre">Remo parado ambos bb con banda elastica</div>
             <div class="meta">EJ0145 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -237,7 +349,7 @@
             <div class="nombre">Vizagras alternos colchoneta</div>
             <div class="meta">EJ0283 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -247,7 +359,7 @@
             <div class="nombre">Jumping jump</div>
             <div class="meta">EJ0086 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -268,7 +380,7 @@
             <div class="nombre">Aperturas con banda elastica parado</div>
             <div class="meta">EJ0175 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -278,7 +390,7 @@
             <div class="nombre">Sentadillas laterales con sand bag</div>
             <div class="meta">EJ0222 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -288,7 +400,7 @@
             <div class="nombre">Remo bajo polea baja sentado en piso</div>
             <div class="meta">EJ0149 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -298,7 +410,7 @@
             <div class="nombre">Plancha con toque de hombros</div>
             <div class="meta">EJ0006 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -308,7 +420,7 @@
             <div class="nombre">Skiping</div>
             <div class="meta">EJ0088 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -329,7 +441,7 @@
             <div class="nombre">Flexiones de brazos</div>
             <div class="meta">EJ0172 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -339,7 +451,7 @@
             <div class="nombre">Sentadillas laterales con keteball</div>
             <div class="meta">EJ0223 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -349,7 +461,7 @@
             <div class="nombre">Remo al menton con mancuerna</div>
             <div class="meta">EJ0112 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -359,7 +471,7 @@
             <div class="nombre">Vizagras colchoneta</div>
             <div class="meta">EJ0284 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -369,7 +481,7 @@
             <div class="nombre">Talon a la cola</div>
             <div class="meta">EJ0087 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -390,7 +502,7 @@
             <div class="nombre">Flexiones de brazos con apoyo de pies sobre fitball</div>
             <div class="meta">EJ0171 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -400,7 +512,7 @@
             <div class="nombre">Squats</div>
             <div class="meta">EJ0308 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -410,7 +522,7 @@
             <div class="nombre">Remo al menton con banda elastica</div>
             <div class="meta">EJ0099 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -420,7 +532,7 @@
             <div class="nombre">Planchas con apoyo de palmas de manos bb estirados y adelante colchoneta</div>
             <div class="meta">EJ0278 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -430,7 +542,7 @@
             <div class="nombre">Trote rodilla arriba</div>
             <div class="meta">EJ0089 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -451,7 +563,7 @@
             <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
             <div class="meta">EJ0014 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -461,7 +573,7 @@
             <div class="nombre">Sentadilla + Biceps con banda elastica</div>
             <div class="meta">EJ0192 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -471,7 +583,7 @@
             <div class="nombre">Remo a un bb con banda elastica derecho</div>
             <div class="meta">EJ0194 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr>
@@ -481,7 +593,7 @@
             <div class="nombre">Superiores cortitos con rodillas suspendidas a 90 grados colchoneta</div>
             <div class="meta">EJ0294 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -491,7 +603,7 @@
             <div class="nombre">Jumping jump</div>
             <div class="meta">EJ0086 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -512,7 +624,7 @@
             <div class="nombre">Push-ups</div>
             <div class="meta">EJ0306 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -522,7 +634,7 @@
             <div class="nombre">Sentadilla completa sin carga</div>
             <div class="meta">EJ0247 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x12 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -532,7 +644,7 @@
             <div class="nombre">Sentadilla + remo con polea baja</div>
             <div class="meta">EJ0028 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -542,7 +654,7 @@
             <div class="nombre">Completos con flexion de rodillas cruzados colchoneta</div>
             <div class="meta">EJ0285 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">4:00 continuos · máx en 4 min</td>
           <td class="dur">4:00</td>
         </tr>
@@ -552,7 +664,7 @@
             <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
             <div class="meta">EJ0077 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -573,7 +685,7 @@
             <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
             <div class="meta">EJ0014 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -583,7 +695,7 @@
             <div class="nombre">Sentadilla + Biceps con banda elastica</div>
             <div class="meta">EJ0192 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -593,7 +705,7 @@
             <div class="nombre">Remo parado ambos bb con banda elastica</div>
             <div class="meta">EJ0145 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -603,7 +715,7 @@
             <div class="nombre">Planchas + crunch de rodillas por fuera colchoneta</div>
             <div class="meta">EJ0279 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">4 rondas · 60s por ronda · 4x10</td>
           <td class="dur">4:00</td>
         </tr>
@@ -613,7 +725,7 @@
             <div class="nombre">Sentadilla profunda mas salto</div>
             <div class="meta">EJ0242 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -634,7 +746,7 @@
             <div class="nombre">Aperturas con banda elastica parado</div>
             <div class="meta">EJ0175 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -644,7 +756,7 @@
             <div class="nombre">Sentadilla + extension de hombros con sandbag</div>
             <div class="meta">EJ0017 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -654,7 +766,7 @@
             <div class="nombre">Remo con mancuerna a un bb</div>
             <div class="meta">EJ0146 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr>
@@ -664,7 +776,7 @@
             <div class="nombre">Espinales con elevacion de pp alternas colchoneta</div>
             <div class="meta">EJ0257 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">4 rondas · 60s por ronda · 4x10</td>
           <td class="dur">4:00</td>
         </tr>
@@ -674,7 +786,7 @@
             <div class="nombre">Trote con banda arnes hacia delante volviendo suave</div>
             <div class="meta">EJ0083 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -695,7 +807,7 @@
             <div class="nombre">Push-ups</div>
             <div class="meta">EJ0306 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -705,7 +817,7 @@
             <div class="nombre">Sentadillas sobre bozu con sng bag</div>
             <div class="meta">EJ0224 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -715,7 +827,7 @@
             <div class="nombre">Remo parado ambos bb con banda elastica</div>
             <div class="meta">EJ0145 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr>
@@ -725,7 +837,7 @@
             <div class="nombre">Vizagras alternos colchoneta</div>
             <div class="meta">EJ0283 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -735,7 +847,7 @@
             <div class="nombre">Estocadas alternas + salto</div>
             <div class="meta">EJ0234 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -756,7 +868,7 @@
             <div class="nombre">Aperturas con banda elastica parado</div>
             <div class="meta">EJ0175 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -766,7 +878,7 @@
             <div class="nombre">Sentadilla sobre bozu</div>
             <div class="meta">EJ0009 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -776,7 +888,7 @@
             <div class="nombre">Remo al menton en polea baja con barra</div>
             <div class="meta">EJ0111 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr>
@@ -786,7 +898,7 @@
             <div class="nombre">Espinales con elevacion de pp alternas colchoneta</div>
             <div class="meta">EJ0257 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">4 rondas · 60s por ronda · 4x10</td>
           <td class="dur">4:00</td>
         </tr>
@@ -796,7 +908,7 @@
             <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
             <div class="meta">EJ0077 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -817,7 +929,7 @@
             <div class="nombre">Push-ups</div>
             <div class="meta">EJ0306 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -827,7 +939,7 @@
             <div class="nombre">Sentadillas laterales con sand bag</div>
             <div class="meta">EJ0222 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x12 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -837,7 +949,7 @@
             <div class="nombre">Remo a un bb con banda elastica derecho</div>
             <div class="meta">EJ0194 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr>
@@ -847,7 +959,7 @@
             <div class="nombre">Planchas + crunch de rodillas por fuera colchoneta</div>
             <div class="meta">EJ0279 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">4 rondas · 60s por ronda · 4x10</td>
           <td class="dur">4:00</td>
         </tr>
@@ -857,7 +969,7 @@
             <div class="nombre">Saltos a un pp con banda arnes</div>
             <div class="meta">EJ0080 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -878,7 +990,7 @@
             <div class="nombre">Flexiones de brazos</div>
             <div class="meta">EJ0172 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -888,7 +1000,7 @@
             <div class="nombre">Sentadilla completa sin carga</div>
             <div class="meta">EJ0247 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -898,7 +1010,7 @@
             <div class="nombre">Remo parado ambos bb con banda elastica</div>
             <div class="meta">EJ0145 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -908,7 +1020,7 @@
             <div class="nombre">Inferiores con agarre, elevacion de pp rodillas flexionadas mas cadera colchoneta</div>
             <div class="meta">EJ0267 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">4 rondas · 60s por ronda · 4x10</td>
           <td class="dur">4:00</td>
         </tr>
@@ -918,7 +1030,7 @@
             <div class="nombre">Sentadilla profunda mas salto</div>
             <div class="meta">EJ0242 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -939,7 +1051,7 @@
             <div class="nombre">Push-ups</div>
             <div class="meta">EJ0306 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -949,7 +1061,7 @@
             <div class="nombre">Sentadillas sobre bozu + hombros con keteball</div>
             <div class="meta">EJ0030 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -959,7 +1071,7 @@
             <div class="nombre">Sentadilla + Remo con banda elastica</div>
             <div class="meta">EJ0193 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -969,7 +1081,7 @@
             <div class="nombre">Completos con flexion de rodillas cruzados colchoneta</div>
             <div class="meta">EJ0285 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">4 rondas · 60s por ronda · 4x10</td>
           <td class="dur">4:00</td>
         </tr>
@@ -979,7 +1091,7 @@
             <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
             <div class="meta">EJ0077 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -1000,7 +1112,7 @@
             <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
             <div class="meta">EJ0014 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -1010,7 +1122,7 @@
             <div class="nombre">Sentadillas sobre bozu con keteball</div>
             <div class="meta">EJ0225 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -1020,7 +1132,7 @@
             <div class="nombre">Remo cerrucho polea baja con barra</div>
             <div class="meta">EJ0148 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr>
@@ -1030,7 +1142,7 @@
             <div class="nombre">Plancha con toque de hombros</div>
             <div class="meta">EJ0006 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -1040,7 +1152,7 @@
             <div class="nombre">Jumping jump</div>
             <div class="meta">EJ0086 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -1061,7 +1173,7 @@
             <div class="nombre">Aperturas con banda elastica parado</div>
             <div class="meta">EJ0175 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -1071,7 +1183,7 @@
             <div class="nombre">Sentadilla + extension de hombros con sandbag</div>
             <div class="meta">EJ0017 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -1081,7 +1193,7 @@
             <div class="nombre">Remo a un bb con banda elastica derecho</div>
             <div class="meta">EJ0194 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">8:00</td>
         </tr>
@@ -1091,7 +1203,7 @@
             <div class="nombre">Superiores cortitos con pp apoyados en piso colchoneta</div>
             <div class="meta">EJ0296 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -1101,7 +1213,7 @@
             <div class="nombre">Burpees</div>
             <div class="meta">EJ0299 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -1122,7 +1234,7 @@
             <div class="nombre">Push-ups</div>
             <div class="meta">EJ0306 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -1132,7 +1244,7 @@
             <div class="nombre">Sentadillas sobre bozu + hombros con keteball</div>
             <div class="meta">EJ0030 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x12 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -1142,7 +1254,7 @@
             <div class="nombre">Remo con mancuerna a un bb</div>
             <div class="meta">EJ0146 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr>
@@ -1152,7 +1264,7 @@
             <div class="nombre">Superiores cortitos con rodillas suspendidas a 90 grados colchoneta</div>
             <div class="meta">EJ0294 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">8 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">4:00</td>
         </tr>
@@ -1162,7 +1274,7 @@
             <div class="nombre">Trote con banda arnes hacia delante volviendo suave</div>
             <div class="meta">EJ0083 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">8:00 continuos · máx en 8 min</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -1183,7 +1295,7 @@
             <div class="nombre">Flexiones de brazos</div>
             <div class="meta">EJ0172 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -1193,7 +1305,7 @@
             <div class="nombre">Sentadilla completa sin carga</div>
             <div class="meta">EJ0247 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x10 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -1203,7 +1315,7 @@
             <div class="nombre">Remo al menton en polea baja con barra</div>
             <div class="meta">EJ0111 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -1213,7 +1325,7 @@
             <div class="nombre">Completos con plantas de pies apoyadas colchoneta</div>
             <div class="meta">EJ0287 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">4:00 continuos · máx en 4 min</td>
           <td class="dur">4:00</td>
         </tr>
@@ -1223,7 +1335,7 @@
             <div class="nombre">Estocadas alternas + salto</div>
             <div class="meta">EJ0234 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -1244,7 +1356,7 @@
             <div class="nombre">Abductores en colchoneta con tobillera lateral rodilla flexionada</div>
             <div class="meta">EJ0014 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x10 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -1254,7 +1366,7 @@
             <div class="nombre">Sentadilla sobre bozu</div>
             <div class="meta">EJ0009 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 75s</td>
           <td class="dur">—</td>
         </tr>
@@ -1264,7 +1376,7 @@
             <div class="nombre">Remo a un bb con polea baja</div>
             <div class="meta">EJ0151 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#c2410c">Tabata</span></td>
+          <td><span class="badge f-tabata">Tabata</span></td>
           <td class="presc">16 rondas · 20s trabajo / 10s pausa</td>
           <td class="dur">8:00</td>
         </tr>
@@ -1274,7 +1386,7 @@
             <div class="nombre">Espinales con elevacion de pp alternas colchoneta</div>
             <div class="meta">EJ0257 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">4:00 continuos · máx en 4 min</td>
           <td class="dur">4:00</td>
         </tr>
@@ -1284,7 +1396,7 @@
             <div class="nombre">Trote en el lugar</div>
             <div class="meta">EJ0090 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
@@ -1305,7 +1417,7 @@
             <div class="nombre">Aperturas con banda elastica parado</div>
             <div class="meta">EJ0175 · Empuje horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">3x12 · descanso 60s</td>
           <td class="dur">—</td>
         </tr>
@@ -1315,7 +1427,7 @@
             <div class="nombre">Sentadilla + Biceps con banda elastica</div>
             <div class="meta">EJ0192 · Rodilla dominante</div>
           </td>
-          <td><span class="badge" style="--c:#6b7280">Series</span></td>
+          <td><span class="badge f-series">Series</span></td>
           <td class="presc">4x15 · descanso 45s</td>
           <td class="dur">—</td>
         </tr>
@@ -1325,7 +1437,7 @@
             <div class="nombre">Sentadilla + Remo con banda elastica</div>
             <div class="meta">EJ0193 · Tracción horizontal</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr>
@@ -1335,7 +1447,7 @@
             <div class="nombre">Completos con plantas de pies apoyadas colchoneta</div>
             <div class="meta">EJ0287 · Core anti-extensión</div>
           </td>
-          <td><span class="badge" style="--c:#15803d">AMRAP</span></td>
+          <td><span class="badge f-amrap">AMRAP</span></td>
           <td class="presc">4:00 continuos · máx en 4 min</td>
           <td class="dur">4:00</td>
         </tr>
@@ -1345,14 +1457,19 @@
             <div class="nombre">Desplazamientos semi flexion con banda arnes</div>
             <div class="meta">EJ0077 · Locomoción</div>
           </td>
-          <td><span class="badge" style="--c:#2563eb">EMOM</span></td>
+          <td><span class="badge f-emom">EMOM</span></td>
           <td class="presc">8 rondas · 60s por ronda · 8x10</td>
           <td class="dur">8:00</td>
         </tr></tbody>
       </table></div>
     </section>
 
-  <footer>Todo esto está en el entorno de prueba, sobre un socio sin historial: por eso las
-  sesiones todavía no traen peso sugerido. En cuanto el socio tenga sesiones hechas, cada estación
-  arrastra el peso de la última vez que hizo ese movimiento o uno de su misma familia.</footer>
+  <p style="color:var(--muted);font-size:13.5px">Sobre un socio sin historial, así que las sesiones
+  todavía no traen peso sugerido. En cuanto tenga sesiones hechas, cada estación arrastra el peso de
+  la última vez que hizo ese movimiento o uno de su misma familia.</p>
+
+  <footer>
+  <span>TecnoFit — Un mes armado por el motor</span>
+  <span class="firma"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 104.646 27.737"> <defs> <style> .cls-1 { fill: currentColor; } </style> </defs> <g id="Group_1" data-name="Group 1" transform="translate(-82.149 -117.523)"> <path id="path" class="cls-1" d="M25.057,49.917,24.312,52.9h0c1.117-2.048,2.978-4.84,5.026-5.026a1.239,1.239,0,0,1,1.489,1.3,22.4,22.4,0,0,1-.745,3.165h0c1.489-2.792,3.351-4.84,5.026-5.026a1.706,1.706,0,0,1,1.862,1.3,5.533,5.533,0,0,1-.372,2.234A42.775,42.775,0,0,1,35.109,55.5c-.186.372,0,.558.186.558.372,0,1.489-1.117,2.048-1.862.186,0,.558.186.558.372a6.484,6.484,0,0,1-5.026,3.723,1.042,1.042,0,0,1-1.117-.931,3.168,3.168,0,0,1,.186-1.3c.558-1.862,1.117-3.537,1.675-5.4a3.276,3.276,0,0,0,.186-1.117.4.4,0,0,0-.372-.372c-.186,0-.931.559-1.675,1.862-1.3,1.861-2.234,4.84-3.165,7.26-.186.558-.372.558-.931.558-1.117.186-1.862,0-1.862-.558,0-.372,1.117-4.281,1.862-7.074a3.276,3.276,0,0,0,.186-1.117.4.4,0,0,0-.372-.372c-.372,0-1.117.558-1.862,1.862a36.945,36.945,0,0,0-2.978,7.26.86.86,0,0,1-.931.558c-1.117.186-1.861,0-1.861-.558,0-.372,1.489-6.143,1.861-7.26.186-.931.186-1.117-.186-.931-.931,0-1.489,1.117-1.862,1.675-.186,0-.558-.186-.558-.372a5.183,5.183,0,0,1,4.468-3.351C25.243,48.428,25.243,49.173,25.057,49.917Z" transform="translate(63.049 85.663)"/> <path id="path-2" data-name="path" class="cls-1" d="M38.186,47.889l.372-1.3c.186-.186.372-.186.745-.186h.931a1.583,1.583,0,0,1,.931.558c-.745,2.42-1.489,5.4-2.234,8.191,0,.372,0,.558.186.558a5.706,5.706,0,0,0,2.234-1.861.594.594,0,0,1,.558.558,6.97,6.97,0,0,1-4.654,3.351,1.207,1.207,0,0,1-1.117-.931,2.767,2.767,0,0,1,.186-1.117l.558-2.048H36.7c-1.3,2.048-3.537,4.282-5.212,4.468-.745,0-1.675-.558-1.675-1.3-.186-1.489.931-4.654,3.165-7.074a7.215,7.215,0,0,1,4.282-2.606C37.255,47.331,37.814,47.517,38.186,47.889Zm-1.675.745c-.372,0-.745.372-1.489,1.489C33.9,51.8,32.974,54.4,33.16,55.894v.186a.4.4,0,0,0,.372.372c.558,0,1.862-1.675,2.42-2.792.745-1.3,1.489-3.351,1.861-4.1C37.255,48.634,36.883,48.448,36.511,48.634Z" transform="translate(72.258 84.899)"/> <path id="path-3" data-name="path" class="cls-1" d="M46.28,47.489c.186,1.489-.745,2.606-1.489,2.606-.558,0-.558-.372-.745-1.117-.186-.372-.186-.558-.372-.558-.372,0-.931,1.117-1.489,2.42a39.625,39.625,0,0,0-2.048,6.143,1.126,1.126,0,0,1-1.117.558c-.558,0-1.675,0-1.489-.931.558-2.42,1.117-5.026,1.675-7.26.186-.558.186-.745-.186-.745s-1.3.931-1.861,1.675a.494.494,0,0,1-.558-.558,5.041,5.041,0,0,1,3.723-3.165c1.489-.186,1.675.931,1.3,2.234l-.745,2.792h.186c.745-1.489,1.3-2.606,1.675-3.537.745-1.117,1.3-1.861,2.234-2.048C45.721,46,46.28,46.372,46.28,47.489Z" transform="translate(78.126 84.554)"/> <path id="path-4" data-name="path" class="cls-1" d="M41.913,54.093a9.663,9.663,0,0,1,1.675-5.585,6,6,0,0,1,4.281-2.792c1.489-.186,2.606.372,2.792,1.675a1.425,1.425,0,0,1-1.489,1.675,1.021,1.021,0,0,1-1.117-.745c0-.558-.186-1.489-.559-1.489s-.931.558-1.3,1.675a9.459,9.459,0,0,0-.745,4.654c.186,1.117.558,1.675,1.117,1.489.559,0,1.489-.558,2.42-1.862a.494.494,0,0,1,.558.559A6.474,6.474,0,0,1,44.892,56.7C43.03,56.885,42.1,55.768,41.913,54.093Z" transform="translate(82.679 84.279)"/> <path id="path-5" data-name="path" class="cls-1" d="M56.879,48.389a8.115,8.115,0,0,1-1.862,5.585,6.471,6.471,0,0,1-4.1,2.234c-2.606.186-3.723-1.3-3.909-3.165a8.335,8.335,0,0,1,2.048-5.957,5.45,5.45,0,0,1,3.723-1.861C55.576,44.852,56.693,46.527,56.879,48.389Zm-5.026-1.117c-.745,1.3-2.048,4.281-1.861,6.7a.879.879,0,0,0,.931.931c.558,0,1.117-.745,1.675-1.861a14.08,14.08,0,0,0,1.3-5.957c0-.559-.186-1.117-.745-.931C52.784,46.155,52.411,46.527,51.853,47.272Z" transform="translate(87.073 83.841)"/> <path id="path-6" data-name="path" class="cls-1" d="M60.32,45.734c.372,0,.558-.186.745-.186,3.165-.372,4.282,1.3,4.468,3.165a5.944,5.944,0,0,1-1.489,4.468,6.826,6.826,0,0,1-4.84,2.792,2.36,2.36,0,0,1-1.117-.186c-.186,0-.186.186-.372.372l-.745,3.351c-.186.931-.186,1.489.745,1.489H58.83a.527.527,0,0,1,0,.931l-1.861.186c-1.489.186-2.978.372-5.026.745-.372-.186-.372-.558-.186-.931l.745-.186c1.117-.186,1.3-.745,1.675-2.42l2.792-11.914a15.39,15.39,0,0,0-2.42,1.3c-.372,0-.558-.372-.372-.745a10.336,10.336,0,0,1,3.165-2.048l.558-1.862a3.03,3.03,0,0,1,1.117-.558c.931,0,1.489,0,1.675.372Zm-1.862,8c0,.372-.186.745.186.931a1.411,1.411,0,0,0,.745.372,1.774,1.774,0,0,0,1.3-1.117A9.362,9.362,0,0,0,62.181,48.9c-.186-1.489-.931-2.048-1.862-1.861h-.372Z" transform="translate(91.078 82.4)"/> <path id="path-7" data-name="path" class="cls-1" d="M69.979,47.089a8.115,8.115,0,0,1-1.862,5.585,6.47,6.47,0,0,1-4.1,2.234c-2.606.186-3.723-1.3-3.909-3.165a8.334,8.334,0,0,1,2.048-5.957,5.449,5.449,0,0,1,3.723-1.862C68.676,43.552,69.793,45.227,69.979,47.089Zm-5.026-1.117c-.745,1.3-2.048,4.282-1.862,6.7a.879.879,0,0,0,.931.931c.558,0,1.117-.745,1.676-1.862A14.081,14.081,0,0,0,67,45.786c0-.558-.186-1.117-.745-.931A1.774,1.774,0,0,0,64.953,45.972Z" transform="translate(98.358 82.721)"/> <path id="path-8" data-name="path" class="cls-1" d="M66.3,57.057a5.235,5.235,0,0,1,.186-1.489l2.978-12.845c.186-.931.186-1.117-.372-1.489l-.745-.372a.349.349,0,0,1,0-.558A25.511,25.511,0,0,1,72.815,39C73,39,73,39,73,39.186a31.11,31.11,0,0,1-.931,3.351L69.464,55.009c-.186.745-.186,1.117.186,1.117.558,0,1.862-1.675,2.42-2.42a.594.594,0,0,1,.558.558,5.474,5.474,0,0,1-4.654,3.909C66.672,58.174,66.3,57.615,66.3,57.057Z" transform="translate(103.713 78.523)"/> <path id="path-9" data-name="path" class="cls-1" d="M79.879,46.087a8.114,8.114,0,0,1-1.861,5.585,6.471,6.471,0,0,1-4.1,2.234c-2.606.186-3.723-1.3-3.909-3.165a8.333,8.333,0,0,1,2.048-5.957,5.449,5.449,0,0,1,3.723-1.862A3.356,3.356,0,0,1,79.879,46.087Zm-4.84-1.117c-.745,1.3-2.048,4.281-1.862,6.7a.879.879,0,0,0,.931.931c.559,0,1.117-.745,1.675-1.862a14.078,14.078,0,0,0,1.3-5.957c0-.558-.186-1.117-.745-.931A1.888,1.888,0,0,0,75.039,44.97Z" transform="translate(106.888 81.861)"/> </g> </svg> Preparado por Marco Polo · 2026-08-19</span>
+</footer>
 </div>
