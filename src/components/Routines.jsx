@@ -22,6 +22,7 @@ import { generateRoutineSessions } from '../services/routineGenerationService'
 import { supabase, toCamelCase } from '../lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
+import SelectorEjercicio from './SelectorEjercicio'
 
 export default function Routines() {
   const [routines, setRoutines] = useState([])
@@ -316,10 +317,12 @@ export default function Routines() {
   // Exercise Modal Handlers
   const openExerciseModal = (sessionId, sessionExercise = null, boxNumber = null, isCooldown = false) => {
     const session = selectedRoutine?.routineSessions?.find(s => s.id === sessionId)
-    const boxExercises = isCooldown
-      ? session?.sessionExercises?.filter(se => se.isCooldown) || []
-      : session?.sessionExercises?.filter(se => se.boxNumber === boxNumber && !se.isCooldown) || []
-    const currentExercises = boxExercises.length
+    // exercise_order is UNIQUE per session, not per station. Counting only the exercises
+    // already in this box proposed 1 for every empty station, so adding a second station to a
+    // session always collided with the first one and the save failed with a 409 — nobody could
+    // build a session past one station. Take the next free number across the whole session.
+    const yaEnSesion = session?.sessionExercises || []
+    const siguienteOrden = yaEnSesion.reduce((max, se) => Math.max(max, se.exerciseOrder || 0), 0) + 1
 
     if (sessionExercise) {
       setEditingItem(sessionExercise)
@@ -345,7 +348,7 @@ export default function Routines() {
         exerciseId: '',
         boxId: isCooldown ? '' : (selectedBox?.id || ''),
         boxNumber: isCooldown ? null : (boxNumber || ''),
-        exerciseOrder: currentExercises + 1,
+        exerciseOrder: siguienteOrden,
         setsReps: '3x12',
         restTime: '60s',
         repetitionTime: '',
@@ -379,7 +382,9 @@ export default function Routines() {
     } catch (error) {
       Sentry.captureException(error, { extra: { context: 'Error saving exercise:' } })
       console.error('Error saving exercise:', error)
-      toast.error('Error al guardar ejercicio', toastOptions)
+      // The real message, always. "Error al guardar ejercicio" is what hid a unique-constraint
+      // collision on exercise_order behind a shrug for however long it has been broken.
+      toast.error(error?.message || String(error), toastOptions)
     } finally {
       setSaving(false)
     }
@@ -1108,27 +1113,19 @@ export default function Routines() {
 
                 <div>
                   <label className="form-label">Ejercicio *</label>
-                  <select
+                  {/*
+                    Was a <select> grouped by body zone. That taxonomy only covers the thirteen
+                    demo rows — the gym's 296 classified exercises carry facets instead — so the
+                    dropdown listed almost none of the catalog, and picking a station above it
+                    filtered nothing, which let an exercise land in a box without the equipment
+                    it needs. The station now drives the list.
+                  */}
+                  <SelectorEjercicio
+                    estacion={exerciseForm.isCooldown ? null : exerciseForm.boxNumber}
+                    esperaEstacion={!exerciseForm.isCooldown}
                     value={exerciseForm.exerciseId}
-                    onChange={(e) => setExerciseForm({ ...exerciseForm, exerciseId: e.target.value })}
-                    className="form-select"
-                    required
-                  >
-                    <option value="">Seleccionar ejercicio...</option>
-                    {bodyZones.map(zone => (
-                      <optgroup key={zone.id} label={zone.name}>
-                        {exercises
-                          .filter(e => {
-                            const cat = categories.find(c => c.id === e.categoryId)
-                            return cat?.bodyZoneId === zone.id
-                          })
-                          .map(ex => (
-                            <option key={ex.id} value={ex.id}>{ex.name}</option>
-                          ))
-                        }
-                      </optgroup>
-                    ))}
-                  </select>
+                    onChange={(id) => setExerciseForm({ ...exerciseForm, exerciseId: id })}
+                  />
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
