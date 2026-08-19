@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
 import { exerciseMedia } from '../lib/exerciseMedia'
 import { esPorTiempo, faseDelFormato, comoTexto } from '../lib/formatos'
+import VideoEjercicio from './VideoEjercicio'
 
 // Drift-free countdown: derives remaining time from an absolute target
 // timestamp every animation frame instead of a setInterval tick, and only
@@ -115,13 +116,10 @@ function ExercisePanel({ exercise, entradaIso }) {
         {media.kind === 'hosted' ? (
           // The poster covers the moment before the first frame decodes, so a box that
           // just changed exercise never shows black.
-          <video
+          <VideoEjercicio
             src={media.src}
-            poster={media.poster || undefined}
-            autoPlay
-            muted
-            loop
-            playsInline
+            poster={media.poster}
+            recorte={media.recorte}
             style={{ ...panelStyles.mediaEl, ...media.style }}
           />
         ) : media.kind === 'youtube' ? (

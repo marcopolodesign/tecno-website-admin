@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { mediaUrl } from '../lib/exerciseMedia'
 import EncuadreEditor from './EncuadreEditor'
 import EjercicioEditor from './EjercicioEditor'
+import RecorteEditor from './RecorteEditor'
 
 // The exercise catalog: every movement the gym can prescribe, described by pattern, role,
 // muscle and the equipment it needs.
@@ -322,13 +323,29 @@ export default function Catalogo() {
                   onClick={() => setPestana('video')}
                   style={{ ...e.pestana, ...(pestana === 'video' ? e.pestanaActiva : {}) }}
                 >
-                  Encuadre del video
+                  Encuadre
                   {!seleccionado.tv_path && <span style={e.pestanaNota}>sin filmar</span>}
+                </button>
+                <button
+                  onClick={() => setPestana('recorte')}
+                  style={{ ...e.pestana, ...(pestana === 'recorte' ? e.pestanaActiva : {}) }}
+                >
+                  Recorte
+                  {seleccionado.recorte_fin ? <span style={e.puntito} /> : null}
                 </button>
               </div>
             )}
 
-            {pestana === 'video' && seleccionado.id ? (
+            {pestana === 'recorte' && seleccionado.id ? (
+              <RecorteEditor
+                ejercicio={seleccionado}
+                onCerrar={() => setSeleccionado(null)}
+                onGuardado={(fila) => {
+                  setSeleccionado(fila)
+                  setResultados((rs) => rs.map((r) => (r.id === fila.id ? { ...r, ...fila } : r)))
+                }}
+              />
+            ) : pestana === 'video' && seleccionado.id ? (
               <EncuadreEditor
                 ejercicio={seleccionado}
                 onCerrar={() => setSeleccionado(null)}
@@ -446,4 +463,5 @@ const e = {
   },
   pestanaActiva: { background: '#FFF1ED', borderColor: '#F45F37', color: '#B33204' },
   pestanaNota: { fontSize: 11, color: '#9ca3af', fontWeight: 400 },
+  puntito: { width: 6, height: 6, borderRadius: 99, background: '#F45F37', display: 'inline-block' },
 }

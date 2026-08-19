@@ -53,6 +53,12 @@ export function exerciseMedia(ex, destino = 'tv') {
       poster: mediaUrl(ex.poster_path),
       crop: crop || null,
       style: cropStyle(crop),
+      // Which span of the clip loops. Stored, never baked in — same reason as the crop, and
+      // the same for both destinations: the interesting reps do not move between screens.
+      recorte:
+        ex.recorte_inicio != null || ex.recorte_fin != null
+          ? { inicio: Number(ex.recorte_inicio) || 0, fin: Number(ex.recorte_fin) || null }
+          : null,
     }
   }
 
@@ -75,4 +81,5 @@ export function exerciseMedia(ex, destino = 'tv') {
 // half-select them and silently fall back to the legacy path.
 export const EXERCISE_MEDIA_FIELDS =
   'id, name, description, code, video_url, video_thumbnail_url, video_platform, video_embed_id, ' +
-  'tv_path, app_path, poster_path, crop_tv, crop_app, processing_status, media_version, duration_seconds'
+  'tv_path, app_path, poster_path, crop_tv, crop_app, processing_status, media_version, duration_seconds, ' +
+  'recorte_inicio, recorte_fin'
