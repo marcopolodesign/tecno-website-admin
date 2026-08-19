@@ -145,7 +145,13 @@ export const usersService = {
 
       if (fetchError) throw fetchError
 
-      const snakeData = toSnakeCase(data)
+      // Un campo vacío del formulario llega como '' y Postgres no lo acepta en una columna de
+      // fecha ni numérica: "invalid input syntax for type date". Eso hacía fallar el guardado
+      // de cualquier socio sin fecha de nacimiento — con un toast genérico que no lo decía.
+      // Vacío significa "no hay dato", y eso en la base es NULL.
+      const snakeData = Object.fromEntries(
+        Object.entries(toSnakeCase(data)).map(([k, v]) => [k, v === '' ? null : v])
+      )
       const { data: result, error } = await supabase
         .from('users')
         .update(snakeData)

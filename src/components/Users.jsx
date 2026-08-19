@@ -17,6 +17,7 @@ import logsService from '../services/logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
 import LogsTimeline from './LogsTimeline'
 import Modal from './Modal'
+import SelectorContraindicaciones from './SelectorContraindicaciones'
 
 // Helper to format date without timezone issues
 // Parses YYYY-MM-DD string and formats as DD/MM/YYYY without timezone shift
@@ -305,6 +306,7 @@ const Users = () => {
             emergencyContact: existingUser.emergencyContact || '',
             emergencyPhone: existingUser.emergencyPhone || '',
             medicalNotes: existingUser.medicalNotes || '',
+            contraindicaciones: existingUser.contraindicaciones || [],
             notes: existingUser.notes || '',
             assignedSellerId: existingUser.assignedSellerId || null
           })
@@ -347,7 +349,7 @@ const Users = () => {
       setShowSidePanel(false)
     } catch (error) {
       console.error('Error updating user:', error)
-      toast.error('Error al actualizar usuario.')
+      toast.error(error?.message || 'Error al actualizar usuario.')
     }
   }
 
@@ -841,6 +843,7 @@ const Users = () => {
               emergencyContact: params.row.emergencyContact || '',
               emergencyPhone: params.row.emergencyPhone || '',
               medicalNotes: params.row.medicalNotes || '',
+            contraindicaciones: params.row.contraindicaciones || [],
               notes: params.row.notes || '',
               assignedSellerId: params.row.assignedSellerId || null
             })
@@ -1049,6 +1052,15 @@ const Users = () => {
                     onChange={(e) => handleFormChange('medicalNotes', e.target.value)}
                   />
                 </div>
+
+                {/*
+                  Debajo de la nota médica a propósito: es la misma información, una en las
+                  palabras del coach y otra en las que el motor de rutinas puede leer.
+                */}
+                <SelectorContraindicaciones
+                  valor={editFormData.contraindicaciones}
+                  onChange={(v) => handleFormChange('contraindicaciones', v)}
+                />
 
                 <div>
                   <label className="form-label">Notas</label>
