@@ -218,20 +218,6 @@ export default function EjercicioEditor({ ejercicio, opcionesElemento, onElement
 
   return (
     <div style={s.contenedor}>
-      <div style={s.encabezado}>
-        <div>
-          <h3 style={s.titulo}>{esNuevo ? 'Nuevo ejercicio' : ejercicio.name}</h3>
-          <span style={s.codigo}>
-            {esNuevo
-              ? 'El código se asigna solo al guardar'
-              : ejercicio.code || 'Sin código todavía — se lo asigna al guardar'}
-          </span>
-        </div>
-        {onCerrar && (
-          <button onClick={onCerrar} style={s.cerrar} aria-label="Cerrar">✕</button>
-        )}
-      </div>
-
       <Campo etiqueta="Nombre">
         <input
           value={f.name}

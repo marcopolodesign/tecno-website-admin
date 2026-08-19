@@ -16,7 +16,9 @@ import { mediaUrl } from '../lib/exerciseMedia'
 // is contraindicated for a knee — and the coach's next move is different in each case, so the
 // panel says which one happened.
 
-export default function PanelSustitutos({ filaId, ejercicioActual, estacion, onSustituido, onCerrar }) {
+// El título y el cerrar los pone el Sidecart — repetirlos acá era la única razón por la
+// que este componente conocía cómo se abre.
+export default function PanelSustitutos({ filaId, ejercicioActual, estacion, onSustituido }) {
   const [candidatos, setCandidatos] = useState([])
   const [diagnostico, setDiagnostico] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -72,16 +74,6 @@ export default function PanelSustitutos({ filaId, ejercicioActual, estacion, onS
 
   return (
     <div style={s.contenedor}>
-      <div style={s.encabezado}>
-        <div>
-          <h3 style={s.titulo}>Cambiar el ejercicio</h3>
-          <span style={s.sub}>
-            Estación {estacion} · en lugar de {ejercicioActual?.name}
-          </span>
-        </div>
-        <button onClick={onCerrar} style={s.cerrar} aria-label="Cerrar">✕</button>
-      </div>
-
       {error && <div style={s.error}>{error}</div>}
 
       {cargando && <p style={s.vacio}>Buscando alternativas…</p>}

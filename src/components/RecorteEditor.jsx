@@ -91,16 +91,6 @@ export default function RecorteEditor({ ejercicio, onGuardado, onCerrar }) {
 
   return (
     <div style={s.contenedor}>
-      <div style={s.encabezado}>
-        <div>
-          <h3 style={s.titulo}>{ejercicio.name}</h3>
-          <span style={s.codigo}>{ejercicio.code}</span>
-        </div>
-        {onCerrar && (
-          <button onClick={onCerrar} style={s.cerrar} aria-label="Cerrar">✕</button>
-        )}
-      </div>
-
       <p style={s.ayuda}>
         Elegí qué parte del clip se repite. Lo que queda afuera no se borra — se puede volver a
         mover todas las veces que haga falta.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { boxLabel } from '../services/queueService'
+import Sidecart from './Sidecart'
 
 // What each box has, and what it is missing.
 //
@@ -91,22 +92,30 @@ export default function Equipamiento() {
         </div>
       ))}
 
-      {abierto && (
-        <div style={e.fondo} onClick={() => setAbierto(null)}>
-          <div style={e.panel} onClick={(ev) => ev.stopPropagation()}>
-            <EditorBox
-              box={abierto}
-              boxes={boxes}
-              onGuardado={(fila) => {
-                alGuardar(fila)
-                setAbierto((a) => (a && a.id === fila.id ? { ...a, ...fila } : a))
-              }}
-              onCopiado={cargar}
-              onCerrar={() => setAbierto(null)}
-            />
-          </div>
-        </div>
-      )}
+      <Sidecart
+        isOpen={Boolean(abierto)}
+        onClose={() => setAbierto(null)}
+        title={abierto ? etiqueta(abierto) : ''}
+        subtitle={
+          abierto
+            ? `${abierto.linea ?? 'Sin línea'} · ${abierto.elementos.length} materiales · ${abierto.ejercicios_posibles} ejercicios posibles`
+            : undefined
+        }
+        size="lg"
+      >
+        {abierto && (
+          <EditorBox
+            box={abierto}
+            boxes={boxes}
+            onGuardado={(fila) => {
+              alGuardar(fila)
+              setAbierto((a) => (a && a.id === fila.id ? { ...a, ...fila } : a))
+            }}
+            onCopiado={cargar}
+            onCerrar={() => setAbierto(null)}
+          />
+        )}
+      </Sidecart>
     </div>
   )
 }
@@ -263,16 +272,6 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
 
   return (
     <div style={e.contenedor}>
-      <div style={e.panelEncabezado}>
-        <div>
-          <h3 style={e.titulo}>{etiqueta(box)}</h3>
-          <span style={e.codigo}>
-            {box.linea ?? 'Sin línea'} · {box.ejercicios_posibles} ejercicios posibles
-          </span>
-        </div>
-        <button onClick={onCerrar} style={e.cerrar} aria-label="Cerrar">✕</button>
-      </div>
-
       <div style={box.equipamiento_independiente ? e.syncPropio : e.syncEspejo}>
         <span style={e.syncTexto}>
           {box.equipamiento_independiente

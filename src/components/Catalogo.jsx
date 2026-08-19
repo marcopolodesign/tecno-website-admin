@@ -4,6 +4,7 @@ import { mediaUrl } from '../lib/exerciseMedia'
 import EncuadreEditor from './EncuadreEditor'
 import EjercicioEditor from './EjercicioEditor'
 import RecorteEditor from './RecorteEditor'
+import Sidecart from './Sidecart'
 
 // The exercise catalog: every movement the gym can prescribe, described by pattern, role,
 // muscle and the equipment it needs.
@@ -308,66 +309,76 @@ export default function Catalogo() {
         </div>
       )}
 
-      {seleccionado && (
-        <div style={e.fondo} onClick={() => setSeleccionado(null)}>
-          <div style={e.panel} onClick={(ev) => ev.stopPropagation()}>
-            {seleccionado.id && (
-              <div style={e.pestanas}>
-                <button
-                  onClick={() => setPestana('ficha')}
-                  style={{ ...e.pestana, ...(pestana === 'ficha' ? e.pestanaActiva : {}) }}
-                >
-                  Ficha
-                </button>
-                <button
-                  onClick={() => setPestana('video')}
-                  style={{ ...e.pestana, ...(pestana === 'video' ? e.pestanaActiva : {}) }}
-                >
-                  Encuadre
-                  {!seleccionado.tv_path && <span style={e.pestanaNota}>sin filmar</span>}
-                </button>
-                <button
-                  onClick={() => setPestana('recorte')}
-                  style={{ ...e.pestana, ...(pestana === 'recorte' ? e.pestanaActiva : {}) }}
-                >
-                  Recorte
-                  {seleccionado.recorte_fin ? <span style={e.puntito} /> : null}
-                </button>
-              </div>
-            )}
-
-            {pestana === 'recorte' && seleccionado.id ? (
-              <RecorteEditor
-                ejercicio={seleccionado}
-                onCerrar={() => setSeleccionado(null)}
-                onGuardado={(fila) => {
-                  setSeleccionado(fila)
-                  setResultados((rs) => rs.map((r) => (r.id === fila.id ? { ...r, ...fila } : r)))
-                }}
-              />
-            ) : pestana === 'video' && seleccionado.id ? (
-              <EncuadreEditor
-                ejercicio={seleccionado}
-                onCerrar={() => setSeleccionado(null)}
-                onGuardado={(actualizado) => {
-                  setSeleccionado(actualizado)
-                  setResultados((rs) => rs.map((r) => (r.id === actualizado.id ? { ...r, ...actualizado } : r)))
-                }}
-              />
-            ) : (
-              <EjercicioEditor
-                ejercicio={seleccionado.id ? seleccionado : null}
-                opcionesElemento={opcionesElemento}
-                onElementoNuevo={(nombre) =>
-                  setOpcionesElemento((els) => (els.includes(nombre) ? els : [...els, nombre].sort()))
-                }
-                onGuardado={alGuardar}
-                onCerrar={() => setSeleccionado(null)}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      {/*
+        Sidecart: lo que hay adentro son fichas largas, un editor de encuadre y un recorte con
+        video — todo cosas que en un pop-up centrado entran a medias.
+      */}
+      <Sidecart
+        isOpen={Boolean(seleccionado)}
+        onClose={() => setSeleccionado(null)}
+        title={seleccionado?.id ? seleccionado.name : 'Nuevo ejercicio'}
+        subtitle={
+          seleccionado?.id
+            ? seleccionado.code || 'Sin código todavía — se lo asigna al guardar'
+            : 'El código se asigna solo al guardar'
+        }
+        size="lg"
+        headerContent={
+          seleccionado?.id ? (
+            <div style={e.pestanas}>
+              <button
+                onClick={() => setPestana('ficha')}
+                style={{ ...e.pestana, ...(pestana === 'ficha' ? e.pestanaActiva : {}) }}
+              >
+                Ficha
+              </button>
+              <button
+                onClick={() => setPestana('video')}
+                style={{ ...e.pestana, ...(pestana === 'video' ? e.pestanaActiva : {}) }}
+              >
+                Encuadre
+                {!seleccionado.tv_path && <span style={e.pestanaNota}>sin filmar</span>}
+              </button>
+              <button
+                onClick={() => setPestana('recorte')}
+                style={{ ...e.pestana, ...(pestana === 'recorte' ? e.pestanaActiva : {}) }}
+              >
+                Recorte
+                {seleccionado.recorte_fin ? <span style={e.puntito} /> : null}
+              </button>
+            </div>
+          ) : null
+        }
+      >
+        {seleccionado && (
+          pestana === 'recorte' && seleccionado.id ? (
+            <RecorteEditor
+              ejercicio={seleccionado}
+              onGuardado={(fila) => {
+                setSeleccionado(fila)
+                setResultados((rs) => rs.map((r) => (r.id === fila.id ? { ...r, ...fila } : r)))
+              }}
+            />
+          ) : pestana === 'video' && seleccionado.id ? (
+            <EncuadreEditor
+              ejercicio={seleccionado}
+              onGuardado={(actualizado) => {
+                setSeleccionado(actualizado)
+                setResultados((rs) => rs.map((r) => (r.id === actualizado.id ? { ...r, ...actualizado } : r)))
+              }}
+            />
+          ) : (
+            <EjercicioEditor
+              ejercicio={seleccionado.id ? seleccionado : null}
+              opcionesElemento={opcionesElemento}
+              onElementoNuevo={(nombre) =>
+                setOpcionesElemento((els) => (els.includes(nombre) ? els : [...els, nombre].sort()))
+              }
+              onGuardado={alGuardar}
+            />
+          )
+        )}
+      </Sidecart>
     </div>
   )
 }

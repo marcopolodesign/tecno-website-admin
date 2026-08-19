@@ -178,18 +178,6 @@ export default function EncuadreEditor({ ejercicio, onGuardado, onCerrar }) {
 
   return (
     <div style={estilos.contenedor}>
-      <div style={estilos.encabezado}>
-        <div>
-          <h3 style={estilos.titulo}>{ejercicio.name}</h3>
-          <span style={estilos.codigo}>{ejercicio.code}</span>
-        </div>
-        {onCerrar && (
-          <button onClick={onCerrar} style={estilos.cerrar} aria-label="Cerrar">
-            ✕
-          </button>
-        )}
-      </div>
-
       <div style={estilos.tabs}>
         {Object.entries(DESTINOS).map(([clave, d]) => (
           <button

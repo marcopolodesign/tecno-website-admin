@@ -27,6 +27,7 @@ import SelectorEjercicio from './SelectorEjercicio'
 import SelectorFormato from './SelectorFormato'
 import PanelSustitutos from './PanelSustitutos'
 import PesoSugerido from './PesoSugerido'
+import Sidecart from './Sidecart'
 
 export default function Routines() {
   const [routines, setRoutines] = useState([])
@@ -923,21 +924,24 @@ export default function Routines() {
       </div>
 
       {/* Routine Modal */}
-      {showRoutineModal && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowRoutineModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {editingItem ? 'Editar Rutina' : 'Nueva Rutina'}
-                </h2>
-                <button onClick={() => setShowRoutineModal(false)} className="p-1 hover:bg-bg-surface rounded">
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
-              </div>
-              
-              <form onSubmit={saveRoutine} className="p-4 space-y-4">
+      <Sidecart
+        isOpen={showRoutineModal}
+        onClose={() => setShowRoutineModal(false)}
+        title={editingItem ? 'Editar rutina' : 'Nueva rutina'}
+        subtitle={'Para quién es y desde cuándo corre'}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowRoutineModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" form="form-rutina" disabled={saving} className="btn-primary disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        }
+      >
+        <form id="form-rutina" onSubmit={saveRoutine} className="space-y-4">
                 <div>
                   <label className="form-label">Cliente *</label>
                   <select
@@ -1017,37 +1021,28 @@ export default function Routines() {
                     />
                   </div>
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button type="button" onClick={() => setShowRoutineModal(false)} className="btn-secondary">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
-                    {saving ? 'Guardando...' : 'Guardar'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </>
-      )}
+        </form>
+      </Sidecart>
 
       {/* Session Modal */}
-      {showSessionModal && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowSessionModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-md w-full animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {editingItem ? 'Editar Sesión' : 'Nueva Sesión'}
-                </h2>
-                <button onClick={() => setShowSessionModal(false)} className="p-1 hover:bg-bg-surface rounded">
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
-              </div>
-              
-              <form onSubmit={saveSession} className="p-4 space-y-4">
+      <Sidecart
+        isOpen={showSessionModal}
+        onClose={() => setShowSessionModal(false)}
+        title={editingItem ? 'Editar sesión' : 'Nueva sesión'}
+        subtitle={'Una sesión es un día de la rutina'}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowSessionModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" form="form-sesion" disabled={saving} className="btn-primary disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        }
+      >
+        <form id="form-sesion" onSubmit={saveSession} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="form-label">Número de Sesión</label>
@@ -1082,64 +1077,69 @@ export default function Routines() {
                     placeholder="Notas para esta sesión..."
                   />
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button type="button" onClick={() => setShowSessionModal(false)} className="btn-secondary">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
-                    {saving ? 'Guardando...' : 'Guardar'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </>
-      )}
+        </form>
+      </Sidecart>
 
       {/* Substitution panel */}
-      {sustituyendo && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setSustituyendo(null)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-5">
-              <PanelSustitutos
-                filaId={sustituyendo.fila.id}
-                ejercicioActual={sustituyendo.fila.exercises}
-                estacion={sustituyendo.estacion}
-                onSustituido={() => {
-                  setSustituyendo(null)
-                  toast.success('Ejercicio cambiado', toastOptions)
-                  fetchRoutineDetail(selectedRoutine.id)
-                }}
-                onCerrar={() => setSustituyendo(null)}
-              />
-            </div>
-          </div>
-        </>
-      )}
+      <Sidecart
+        isOpen={Boolean(sustituyendo)}
+        onClose={() => setSustituyendo(null)}
+        title="Cambiar el ejercicio"
+        subtitle={
+          sustituyendo
+            ? `Estación ${sustituyendo.estacion} · en lugar de ${sustituyendo.fila.exercises?.name ?? ''}`
+            : undefined
+        }
+        size="lg"
+      >
+        {sustituyendo && (
+          <PanelSustitutos
+            filaId={sustituyendo.fila.id}
+            ejercicioActual={sustituyendo.fila.exercises}
+            estacion={sustituyendo.estacion}
+            onSustituido={() => {
+              setSustituyendo(null)
+              toast.success('Ejercicio cambiado', toastOptions)
+              fetchRoutineDetail(selectedRoutine.id)
+            }}
+          />
+        )}
+      </Sidecart>
 
-      {/* Exercise Modal */}
-      {showExerciseModal && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowExerciseModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {editingItem ? 'Editar Ejercicio' : 'Agregar Ejercicio'}
-                  {exerciseForm.isCooldown ? (
-                    <span className="ml-2 text-sm font-normal text-blue-500">- Cooldown</span>
-                  ) : exerciseForm.boxNumber ? (
-                    <span className="ml-2 text-sm font-normal text-brand">- Estación {exerciseForm.boxNumber}</span>
-                  ) : null}
-                </h2>
-                <button onClick={() => setShowExerciseModal(false)} className="p-1 hover:bg-bg-surface rounded">
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
-              </div>
-              
-              <form onSubmit={saveExerciseToSession} className="p-4 space-y-4">
+      {/*
+        Sidecart, no modal. Lo que va acá es una lista de ejercicios con miniaturas y filtros, y
+        un pop-up centrado la apretaba en una columna de 512px con el resto de la pantalla
+        vacía al lado.
+      */}
+      <Sidecart
+        isOpen={showExerciseModal}
+        onClose={() => setShowExerciseModal(false)}
+        title={editingItem ? 'Editar ejercicio' : 'Agregar ejercicio'}
+        subtitle={
+          exerciseForm.isCooldown
+            ? 'Cooldown — no va en una estación'
+            : exerciseForm.boxNumber
+              ? `Estación ${exerciseForm.boxNumber}`
+              : 'Elegí la estación para ver qué se puede hacer ahí'
+        }
+        size="xl"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowExerciseModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="form-ejercicio-sesion"
+              disabled={saving}
+              className="btn-primary disabled:opacity-50"
+            >
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        }
+      >
+              <form id="form-ejercicio-sesion" onSubmit={saveExerciseToSession} className="space-y-4">
                 {/* Station Selection (hidden for cooldown exercises) */}
                 {exerciseForm.isCooldown ? (
                   <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1290,19 +1290,8 @@ export default function Routines() {
                   />
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button type="button" onClick={() => setShowExerciseModal(false)} className="btn-secondary">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
-                    {saving ? 'Guardando...' : 'Guardar'}
-                  </button>
-                </div>
               </form>
-            </div>
-          </div>
-        </>
-      )}
+      </Sidecart>
     </div>
   )
 }
