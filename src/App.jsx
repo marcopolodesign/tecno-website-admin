@@ -12,6 +12,7 @@ import ContentManagement from './components/ContentManagement'
 import MembershipPlans from './components/MembershipPlans'
 import Exercises from './components/Exercises'
 import Catalogo from './components/Catalogo'
+import Equipamiento from './components/Equipamiento'
 import Routines from './components/Routines'
 import CheckIn from './components/CheckIn'
 import MemberAccess from './components/MemberAccess'
@@ -97,7 +98,7 @@ function App() {
     const role = userRole // 'super_admin', 'admin', 'front_desk', 'coach'
 
     // Fitness routes are restricted to specific emails
-    if (['/exercises', '/routines', '/catalogo'].includes(route)) {
+    if (['/exercises', '/routines', '/catalogo', '/equipamiento'].includes(route)) {
       return canSeeFitness
     }
 
@@ -237,6 +238,9 @@ function AuthenticatedShell({
               )}
               {canSeeFitness && (
                 <Route path="/routines" element={<Routines />} />
+              )}
+              {canSeeFitness && (
+                <Route path="/equipamiento" element={<Equipamiento />} />
               )}
 
               {canAccess('/access-logs') && (
