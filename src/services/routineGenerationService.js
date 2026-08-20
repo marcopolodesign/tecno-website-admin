@@ -342,6 +342,19 @@ async function getProposedWeight(userId, exerciseId) {
  * Both are 1-3 and filled in for 298 of the 310 exercises. Missing means EMOM only — the
  * conservative one — rather than a guess made from an empty field.
  */
+/**
+ * Los techos que le pone el arquetipo del socio.
+ *
+ * Un arquetipo no dice qué entrenar, dice hasta dónde: alguien que arranca no debería recibir lo
+ * más técnico del catálogo por más que el patrón de movimiento coincida. Sin arquetipo cargado no
+ * hay techo y el motor se comporta como siempre.
+ */
+async function techosDelSocio(userId) {
+  if (!userId) return null
+  const { data } = await supabase.rpc('techos_del_socio', { p_user_id: userId })
+  return data?.[0] ?? null
+}
+
 async function perfilesDeEsfuerzo() {
   // The whole catalog in one query rather than a lookup per generated station: a month of five
   // stations is 125 of them, and this is 310 rows of three small columns.
@@ -370,6 +383,24 @@ function formatosPosibles(ejercicio) {
 // Six minutes is the target, not a rule. What is fixed is that the station takes the same slot in
 // the line whichever format it runs, so the queue never has to care.
 const BLOQUE_SEG = 360
+
+/**
+ * Si un ejercicio entra bajo el techo del arquetipo del socio.
+ *
+ * El techo se aplica sólo cuando queda alguien debajo: es preferible ofrecerle algo por encima
+ * del techo que dejarle un hueco en el circuito, porque el hueco lo ve en el piso y el techo es
+ * una preferencia, no una contraindicación. Para lo que no se negocia están las
+ * contraindicaciones, que filtran antes y sin excepción.
+ */
+function dentroDelTecho(ejercicio, techos) {
+  if (!techos) return true
+  const { complejidad_max: cMax, intensidad_max: iMax } = techos
+  const c = ejercicio?.complejidad_tecnica
+  const i = ejercicio?.intensidad_relativa
+  if (cMax != null && c != null && c > cMax) return false
+  if (iMax != null && i != null && i > iMax) return false
+  return true
+}
 
 /**
  * How a station of BLOQUE_SEG runs under each format: how long the circuit prefers to be, and
@@ -426,9 +457,12 @@ function trabajoDelBloque(formato, cantidad) {
  * Series is left alone. The coach prescribing sets and reps decided the station is strength work;
  * turning it into a Tabata changes what the station is for, not how it is measured.
  */
-function formatoDelBloque(plantilla, semilla) {
+function formatoDelBloque(plantilla, semilla, techos) {
   if (!plantilla.formato || plantilla.formato === 'Series') return null
-  const opciones = Object.keys(CIRCUITO)
+  // Las que prefiere el arquetipo, si declaró alguna. Sigue eligiendo entre varias: una sola
+  // modalidad para todo el mes es el problema que vinimos a resolver.
+  const preferidas = (techos?.formatos_preferidos || []).filter((f) => CIRCUITO[f])
+  const opciones = preferidas.length ? preferidas : Object.keys(CIRCUITO)
   return opciones[seededIndex(semilla, opciones.length)]
 }
 
@@ -494,6 +528,7 @@ export const generateRoutineSessions = async (routineId) => {
     }
 
     const perfiles = await perfilesDeEsfuerzo()
+    const techos = await techosDelSocio(routine.client_id)
 
     // What the last hand-written session used. Without this the first generated session is the
     // only one in the month that does not know what came the day before, and it can repeat it —
@@ -504,7 +539,7 @@ export const generateRoutineSessions = async (routineId) => {
       // Rotate through the hand-made sessions so the month keeps their variety instead of
       // orbiting one of them.
       const base = conEjercicios[(n - aMano - 1) % conEjercicios.length]
-      anterior = await generarSesion(routineId, routine.client_id, base, n, anterior, perfiles)
+      anterior = await generarSesion(routineId, routine.client_id, base, n, anterior, perfiles, techos)
     }
 
     await supabase
@@ -523,7 +558,7 @@ export const generateRoutineSessions = async (routineId) => {
 }
 
 /** One generated session. Returns the exercise ids it used, for the next one to avoid. */
-async function generarSesion(routineId, clientId, base, sessionNumber, evitar, perfiles) {
+async function generarSesion(routineId, clientId, base, sessionNumber, evitar, perfiles, techos) {
   // Yesterday's movements, as families rather than ids.
   const familiasAyer = new Set(
     evitar.map((id) => perfiles?.get(id)?.family_code).filter(Boolean)
@@ -575,7 +610,7 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
     }
 
     const semillaEstacion = `${routineId}-${sessionNumber}-f${cabeza.box_number}`
-    const formato = formatoDelBloque(cabeza, semillaEstacion)
+    const formato = formatoDelBloque(cabeza, semillaEstacion, techos)
     // Series keeps the circuit the coach wrote; a timed format sizes it to fill the six minutes.
     const cupo = formato ? CIRCUITO[formato].ejercicios : plantillas.length
 
@@ -598,27 +633,38 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
         return data || []
       }
 
-      // Ideally: not twice in the same session, not what yesterday had, not already in this
-      // circuit. When the station's pool is too shallow for all three — box 1 has five horizontal
-      // pushes in the whole catalog — repeating yesterday is the lesser evil, and repeating inside
-      // today's own circuit is the worst. So that is the order they get dropped in.
-      let opciones = await pedir([...usados, ...evitar, ...candidatos])
-      let sinFamiliaDeAyer = true
-      if (!opciones.length) {
-        opciones = await pedir([...usados, ...candidatos])
-        sinFamiliaDeAyer = false
-      }
+      // Las concesiones tienen orden, y el orden es por lo que le cuesta al socio.
+      //
+      //   1. Contraindicaciones — no se ceden nunca; filtran del lado de la base.
+      //   2. No repetir dentro del circuito de hoy — lo peor de ver en el piso.
+      //   3. El techo del arquetipo — al que arranca no se le ofrece lo más técnico, aunque el
+      //      patrón coincida. Cede antes que 2 y después que 4.
+      //   4. No repetir el movimiento de ayer — molesto, pero es lo más barato de resolver.
+      //
+      // La versión anterior cedía el techo primero, y al que arranca le aparecían sentadillas
+      // sobre bosu con sandbag porque el pool de esa estación no tenía nada más simple sin
+      // repetir. Repetir una sentadilla sin carga es mejor que eso.
+      const bajoTecho = (lista) => lista.filter((o) => dentroDelTecho(perfiles?.get(o.id), techos))
 
-      // A different id is not a different movement. The catalog says so itself with family_code:
-      // squats with a sandbag and squats with a kettlebell are one movement holding two things.
-      // Without this the member does the same thing two days running and the engine reports
-      // variety it did not deliver.
-      if (sinFamiliaDeAyer) {
-        const otraFamilia = opciones.filter((o) => {
+      // Un id distinto no es un movimiento distinto. El catálogo lo dice con family_code:
+      // sentadilla con sandbag y sentadilla con kettlebell son una sentadilla agarrando otra cosa.
+      const otraFamilia = (lista) => {
+        const fuera = lista.filter((o) => {
           const fam = perfiles?.get(o.id)?.family_code
           return !fam || !familiasAyer.has(fam)
         })
-        if (otraFamilia.length) opciones = otraFamilia
+        return fuera.length ? fuera : lista
+      }
+
+      const conAyerFuera = await pedir([...usados, ...evitar, ...candidatos])
+      let opciones = bajoTecho(otraFamilia(conAyerFuera))
+
+      if (!opciones.length) {
+        // Se afloja lo de ayer, manteniendo el techo.
+        const conAyerAdentro = await pedir([...usados, ...candidatos])
+        opciones = bajoTecho(conAyerAdentro)
+        // Y recién si tampoco hay nada bajo techo, se cede el techo.
+        if (!opciones.length) opciones = conAyerAdentro
       }
 
       // Only movements that tolerate the station's format get into the station's circuit.
