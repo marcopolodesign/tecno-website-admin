@@ -436,9 +436,10 @@ export default function Routines() {
   const handleGenerateSessions = async () => {
     if (!selectedRoutine) return
     // The engine builds from whatever the coach wrote by hand; it only needs one to start.
-    const aMano = selectedRoutine.routineSessions?.filter(s => s.sessionNumber <= 5) || []
+    // Con una alcanza. El motor construye a partir de las que escribió el coach, sean una o seis.
+    const aMano = selectedRoutine.routineSessions || []
     if (aMano.length === 0) {
-      toast.error('Cargá al menos la Sesión 1 antes de generar — el motor construye a partir de las que armás vos', toastOptions)
+      toast.error('Cargá la Sesión 1 antes de generar — con una alcanza, el motor construye a partir de las que armás vos', toastOptions)
       return
     }
     if (!confirm('El motor va a completar el mes usando las sesiones que cargaste a mano como base.\n\nCada sesión generada rota el ejercicio de cada estación por otro del mismo patrón de movimiento, que la estación pueda correr y que el socio pueda hacer.\n\nLo que ya estaba generado se reemplaza; lo que cargaste a mano no se toca.\n\n¿Continuar?')) return
@@ -670,12 +671,12 @@ export default function Routines() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {(selectedRoutine.routineSessions?.length === 1 || !selectedRoutine.generationStatus || selectedRoutine.generationStatus === 'manual') && (
+                      {selectedRoutine.generationStatus !== 'generating' && (
                         <button
                           onClick={handleGenerateSessions}
                           disabled={generating}
                           className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50 disabled:opacity-50"
-                          title="Genera 30 sesiones basadas en la Sesión 1"
+                          title="Completa el resto del mes a partir de las sesiones que cargaste a mano"
                         >
                           {generating ? (
                             <>
@@ -685,7 +686,7 @@ export default function Routines() {
                           ) : (
                             <>
                               <PlayIcon className="h-3.5 w-3.5" />
-                              Generar Sesiones
+                              {selectedRoutine.generationStatus === 'completed' ? 'Regenerar' : 'Generar Sesiones'}
                             </>
                           )}
                         </button>

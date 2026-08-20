@@ -8,9 +8,6 @@ import { supabase } from '../lib/supabase'
 // EXERCISE GROUPS
 // =====================================================
 
-// Cuántas sesiones escribe el coach a mano antes de que el motor siga solo.
-const SESIONES_A_MANO = 5
-
 export const getExerciseGroups = async () => {
   const { data, error } = await supabase
     .from('exercise_groups')
@@ -455,21 +452,27 @@ export const generateRoutineSessions = async (routineId) => {
   if (rError) throw rError
 
   const totalSessions = routine.total_sessions || 30
-  // The hand-made ones. Five is what the gym writes; a routine can say otherwise.
-  const aMano = routine.template_sessions || SESIONES_A_MANO
 
   const { data: plantillas, error: pError } = await supabase
     .from('routine_sessions')
     .select('id, session_number, session_exercises (*)')
     .eq('routine_id', routineId)
-    .lte('session_number', aMano)
     .order('session_number')
   if (pError) throw pError
 
-  const conEjercicios = (plantillas || []).filter((s) => (s.session_exercises || []).length > 0)
+  // What the coach wrote is whatever is not the engine's own work — not the first five sessions.
+  // Five is what the gym happens to write on a good week, and hardcoding it meant a coach who
+  // wrote one day had nothing to generate from, and a coach who wrote six had the sixth ignored
+  // and then overwritten. The base is the hand-written sessions, however many there are.
+  const conEjercicios = (plantillas || []).filter((s) =>
+    (s.session_exercises || []).some((se) => !se.is_auto_generated)
+  )
+  const aMano = conEjercicios.length
+    ? Math.max(...conEjercicios.map((s) => s.session_number))
+    : 0
   if (conEjercicios.length === 0) {
     throw new Error(
-      `No hay ninguna sesión cargada a mano para usar de base. Armá al menos la Sesión 1 antes de generar.`
+      'No hay ninguna sesión cargada a mano para usar de base. Con una alcanza: armá la Sesión 1 y volvé a generar.'
     )
   }
 
