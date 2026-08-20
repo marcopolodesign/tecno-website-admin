@@ -366,64 +366,73 @@ function formatosPosibles(ejercicio) {
   return posibles
 }
 
+// A station is a circuit, not an exercise. The gym runs five stations of about six minutes each,
+// and inside a station the member cycles through several movements — the routines CENTRAL has for
+// August are all three exercises of 25s work / 15s rest, repeated three times: 3 × 3 × 40s = 6:00.
+//
+// Six minutes is the target, not a rule. What is fixed is that the station takes the same slot in
+// the line whichever format it runs, so the queue never has to care.
+const BLOQUE_SEG = 360
+
 /**
- * Turn a station's timed work into a different format of the same length.
+ * How a station of BLOQUE_SEG runs under each format: how long the circuit prefers to be, and
+ * what one turn of one exercise costs.
  *
- * The station keeps its slot in the line — a member spends the same minutes at box 3 whether it
- * is an EMOM, an AMRAP or a Tabata — so the queue and the rest of the line are untouched. What
- * changes is how those minutes are spent, which is the whole point: without this, box 3 is EMOM
- * for the entire month because that is what the coach happened to write in session 1.
+ * Locking every station to three exercises is a limitation of Tabata, not of the gym — with a
+ * clock per round it is the count that divides evenly. EMOM and AMRAP do not have that problem,
+ * so the circuit length changes with the format and the member stops recognising the station by
+ * its shape.
  *
- * Rounds are derived from the template's total so the time budget survives the swap, and the
- * pick is seeded, so regenerating lands on the same month.
+ *   Tabata  4 × (20s + 10s) × 3 vueltas = 6:00   — el clásico, con un ejercicio más
+ *   EMOM    3 × 60s × 2 vueltas          = 6:00   — un movimiento por minuto
+ *   AMRAP   4 ejercicios en 6:00 corridos         — las vueltas las pone el socio
+ *   Series  lo que escribió el coach, sin reloj   — carga y repeticiones
+ *
+ * `rondas` no está acá: sale de dividir los seis minutos por lo que ocupa una vuelta del
+ * circuito, así el bloque cierra en 6:00 aunque queden menos ejercicios de los preferidos.
  */
-function variarFormato(plantilla, ejercicio, semilla) {
-  // Series is a prescription of load and reps — the coach decided this station is strength work.
-  // Rotating it into a Tabata would change what the station is for, not just how it is measured.
-  if (!plantilla.formato || plantilla.formato === 'Series') return null
+const CIRCUITO = {
+  Tabata: { ejercicios: 4, celda: 30, trabajo: 20, descanso: 10, reps: 'máx por ronda' },
+  EMOM: { ejercicios: 3, celda: 60, trabajo: 60, descanso: 0, reps: '10 por minuto' },
+  AMRAP: { ejercicios: 4, celda: null, trabajo: null, descanso: 0, reps: '10 por vuelta' },
+}
 
-  const total =
-    (plantilla.rondas ?? 0) * ((plantilla.trabajo_seg ?? 0) + (plantilla.descanso_seg ?? 0))
-  if (total <= 0) return null
-
-  const posibles = formatosPosibles(ejercicio)
-  const formato = posibles[seededIndex(semilla, posibles.length)]
-
-  const acotar = (v, min, max) => Math.max(min, Math.min(max, v))
-  switch (formato) {
-    case 'Tabata': {
-      // 30s cycles. Eight of them is the classic four minutes; longer stations get more rounds.
-      const rondas = acotar(Math.round(total / 30), 4, 16)
-      return { formato, rondas, trabajo_seg: 20, descanso_seg: 10, sets_reps: 'máx por ronda' }
-    }
-    case 'AMRAP': {
-      // One round against the clock. The cap is the station's whole turn.
-      const cap = acotar(total, 180, 1200)
-      return {
-        formato, rondas: 1, trabajo_seg: cap, descanso_seg: 0,
-        sets_reps: `máx en ${Math.round(cap / 60)} min`,
-      }
-    }
-    default: {
-      const rondas = acotar(Math.round(total / 60), 4, 20)
-      return {
-        formato: 'EMOM', rondas, trabajo_seg: 60, descanso_seg: 0,
-        sets_reps: `${rondas}x${repsPorRonda(plantilla)}`,
-      }
-    }
+/**
+ * El trabajo de una estación: cuántas vueltas y cuánto dura cada turno, para que el bloque cierre
+ * en seis minutos con los ejercicios que efectivamente entraron.
+ *
+ * En AMRAP el reloj es uno solo para todo el bloque — el socio da las vueltas que pueda. Se
+ * reparte igual entre los ejercicios porque la duración de la estación es lo que la cola tiene
+ * que poder consultar, y una estación que dice durar veinticuatro minutos rompe la línea.
+ */
+function trabajoDelBloque(formato, cantidad) {
+  const c = CIRCUITO[formato]
+  if (formato === 'AMRAP') {
+    const parte = Math.round(BLOQUE_SEG / cantidad)
+    return { formato, rondas: 1, trabajo_seg: parte, descanso_seg: 0, sets_reps: c.reps }
+  }
+  const rondas = Math.max(1, Math.round(BLOQUE_SEG / (cantidad * c.celda)))
+  return {
+    formato, rondas, trabajo_seg: c.trabajo, descanso_seg: c.descanso, sets_reps: c.reps,
   }
 }
 
 /**
- * How many reps go in each round of an EMOM.
+ * Which format the station is going to run — decided before the exercises, not after.
  *
- * Taken from the template when it was already an EMOM — that number is the coach's dose for this
- * station and should survive. When the template was a Tabata or an AMRAP there is no rep count to
- * inherit ("máx por ronda" is not a number), so it falls back to ten.
+ * The whole circuit runs under one format, so every movement in it has to tolerate that format:
+ * one technical lift at 20s all-out is enough to make a Tabata a bad idea for the whole station.
+ * Choosing the format first and then filling the circuit with movements that tolerate it is what
+ * keeps the variety; deciding afterwards means one awkward candidate drags every station back to
+ * EMOM, which is what happened the first time.
+ *
+ * Series is left alone. The coach prescribing sets and reps decided the station is strength work;
+ * turning it into a Tabata changes what the station is for, not how it is measured.
  */
-function repsPorRonda(plantilla) {
-  const m = plantilla.formato === 'EMOM' && /(\d+)\s*x\s*(\d+)/i.exec(plantilla.sets_reps || '')
-  return m ? m[2] : 10
+function formatoDelBloque(plantilla, semilla) {
+  if (!plantilla.formato || plantilla.formato === 'Series') return null
+  const opciones = Object.keys(CIRCUITO)
+  return opciones[seededIndex(semilla, opciones.length)]
 }
 
 /**
@@ -529,59 +538,126 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
   // station — the same constraint that used to make the admin's own form collide.
   let orden = 0
 
-  const ejercicios = [...(base.session_exercises || [])].sort(
+  // Group the template by station. The station is what gets generated: its format, how long the
+  // circuit is and which movements are in it are one decision, not one per row.
+  const estaciones = new Map()
+  for (const te of [...(base.session_exercises || [])].sort(
     (a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0)
-  )
+  )) {
+    const clave = te.is_cooldown ? `cool-${te.exercise_order}` : `box-${te.box_number}`
+    if (!estaciones.has(clave)) estaciones.set(clave, [])
+    estaciones.get(clave).push(te)
+  }
 
-  for (const te of ejercicios) {
-    orden += 1
-    let exerciseId = te.exercise_id
-    let fuente = 'template'
+  for (const [, plantillas] of estaciones) {
+    const cabeza = plantillas[0]
 
     // A cooldown has no station, so there is nothing to rotate it against — it carries over.
-    if (!te.is_cooldown && te.box_number) {
-      const { data: candidatos } = await supabase.rpc('sustitutos_para_ejercicio', {
-        p_exercise_id: te.exercise_id,
-        p_line_position: te.box_number,
-        p_user_id: clientId,
-        // Never twice in the same session, and not what yesterday already had.
-        p_excluir: [...new Set([...usados, ...evitar])],
-        p_limite: 8,
-      })
+    if (cabeza.is_cooldown || !cabeza.box_number) {
+      orden += 1
+      await insertarEjercicio(session.id, cabeza, cabeza.exercise_id, orden, 'template', {
+        formato: cabeza.formato || 'Series',
+        rondas: cabeza.rondas,
+        trabajo_seg: cabeza.trabajo_seg,
+        descanso_seg: cabeza.descanso_seg,
+        sets_reps: cabeza.sets_reps,
+      }, await getProposedWeight(clientId, cabeza.exercise_id))
+      usados.push(cabeza.exercise_id)
+      continue
+    }
 
-      if (candidatos?.length) {
+    const semillaEstacion = `${routineId}-${sessionNumber}-f${cabeza.box_number}`
+    const formato = formatoDelBloque(cabeza, semillaEstacion)
+    // Series keeps the circuit the coach wrote; a timed format sizes it to fill the six minutes.
+    const cupo = formato ? CIRCUITO[formato].ejercicios : plantillas.length
+
+    // One candidate per slot. When the format asks for more exercises than the coach wrote, the
+    // extra slots reuse the template's movements in order — the fourth exercise of a Tabata
+    // rotates the first one's pattern again, into a different movement.
+    const candidatos = []
+    for (let i = 0; i < cupo; i++) {
+      const te = plantillas[i % plantillas.length]
+      const pedir = async (excluir) => {
+        const { data } = await supabase.rpc('sustitutos_para_ejercicio', {
+          p_exercise_id: te.exercise_id,
+          p_line_position: te.box_number,
+          p_user_id: clientId,
+          p_excluir: [...new Set(excluir)],
+          p_limite: 12,
+        })
+        return data || []
+      }
+
+      // Ideally: not twice in the same session, not what yesterday had, not already in this
+      // circuit. When the station's pool is too shallow for all three — box 1 has five horizontal
+      // pushes in the whole catalog — repeating yesterday is the lesser evil, and repeating inside
+      // today's own circuit is the worst. So that is the order they get dropped in.
+      let opciones = await pedir([...usados, ...evitar, ...candidatos])
+      if (!opciones.length) opciones = await pedir([...usados, ...candidatos])
+
+      // Only movements that tolerate the station's format get into the station's circuit.
+      const admiten = opciones.filter(
+        (o) => !formato || formatosPosibles(perfiles?.get(o.id)).includes(formato)
+      )
+      const elegibles = admiten.length ? admiten : opciones
+
+      if (elegibles.length) {
         // The engine's own order is the same every time for a given member and station, so the
         // session number is what makes session 7 differ from session 12. seededIndex keeps it
         // reproducible: same routine, same month, every time.
-        const semilla = `${routineId}-${sessionNumber}-b${te.box_number}-o${te.exercise_order}`
-        exerciseId = candidatos[seededIndex(semilla, candidatos.length)].id
-        fuente = 'similar'
+        const semilla = `${semillaEstacion}-s${i}`
+        candidatos.push(elegibles[seededIndex(semilla, elegibles.length)].id)
+      } else if (i < plantillas.length && !candidatos.includes(te.exercise_id)) {
+        // No substitute available: the coach's own choice is better than a hole in the circuit.
+        candidatos.push(te.exercise_id)
       }
     }
+    if (!candidatos.length) continue
 
-    usados.push(exerciseId)
+    // A format nobody in the circuit tolerates would be a station the member cannot do. EMOM is
+    // the one everything tolerates, so it is where an impossible station lands.
+    const formatoFinal =
+      formato && candidatos.every((id) => formatosPosibles(perfiles?.get(id)).includes(formato))
+        ? formato
+        : formato && 'EMOM'
+    // Falling back re-sizes the circuit too: four exercises at a minute each is eight minutes, not
+    // six, and the station has to give the line back its slot on time.
+    const delBloque = formatoFinal
+      ? candidatos.slice(0, CIRCUITO[formatoFinal].ejercicios)
+      : candidatos
+    // Rounds come from how many exercises actually made it in, so the block still closes at 6:00.
+    const trabajo = formatoFinal ? trabajoDelBloque(formatoFinal, delBloque.length) : null
 
-    const peso = await getProposedWeight(clientId, exerciseId)
+    for (const [i, exerciseId] of delBloque.entries()) {
+      orden += 1
+      usados.push(exerciseId)
+      const te = plantillas[i % plantillas.length]
+      const fuente = exerciseId === te.exercise_id ? 'template' : 'similar'
+      await insertarEjercicio(
+        session.id, te, exerciseId, orden, fuente,
+        trabajo ?? {
+          formato: 'Series',
+          rondas: null,
+          trabajo_seg: null,
+          descanso_seg: null,
+          sets_reps: te.sets_reps,
+        },
+        await getProposedWeight(clientId, exerciseId)
+      )
+    }
+  }
 
-    // The station's format rotates too. Without this, whatever the coach wrote in the first
-    // session is what box 3 does for the whole month.
-    const trabajo =
-      variarFormato(te, perfiles?.get(exerciseId), `${routineId}-${sessionNumber}-f${te.box_number}`) ?? {
-        formato: te.formato || 'Series',
-        rondas: te.rondas,
-        trabajo_seg: te.trabajo_seg,
-        descanso_seg: te.descanso_seg,
-        sets_reps: te.sets_reps,
-      }
+  return usados
+}
 
-    await supabase.from('session_exercises').insert([{
-      session_id: session.id,
+/** Una fila de session_exercises. La forma sale de la plantilla; el trabajo, del bloque. */
+async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, trabajo, peso) {
+  await supabase.from('session_exercises').insert([{
+      session_id: sessionId,
       exercise_id: exerciseId,
       box_id: te.box_id,
       box_number: te.box_number,
       exercise_order: orden,
-      // The rep prescription belongs to the format: carrying "8x10" into an AMRAP reads as a
-      // contradiction on the box screen.
       sets_reps: trabajo.sets_reps,
       rest_time: te.rest_time,
       repetition_time: te.repetition_time,
@@ -595,10 +671,7 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
       is_auto_generated: true,
       is_cooldown: te.is_cooldown || false,
       generation_source: fuente,
-    }])
-  }
-
-  return usados
+  }])
 }
 
 // =====================================================
