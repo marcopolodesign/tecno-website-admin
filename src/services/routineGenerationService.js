@@ -347,10 +347,10 @@ async function getProposedWeight(userId, exerciseId) {
  */
 async function perfilesDeEsfuerzo() {
   // The whole catalog in one query rather than a lookup per generated station: a month of five
-  // stations is 125 of them, and this is 310 rows of two smallint columns.
+  // stations is 125 of them, and this is 310 rows of three small columns.
   const { data } = await supabase
     .from('exercises')
-    .select('id, complejidad_tecnica, intensidad_relativa')
+    .select('id, complejidad_tecnica, intensidad_relativa, family_code')
     .eq('is_active', true)
   return new Map((data || []).map((e) => [e.id, e]))
 }
@@ -521,6 +521,11 @@ export const generateRoutineSessions = async (routineId) => {
 
 /** One generated session. Returns the exercise ids it used, for the next one to avoid. */
 async function generarSesion(routineId, clientId, base, sessionNumber, evitar, perfiles) {
+  // Yesterday's movements, as families rather than ids.
+  const familiasAyer = new Set(
+    evitar.map((id) => perfiles?.get(id)?.family_code).filter(Boolean)
+  )
+
   const { data: session, error: sError } = await supabase
     .from('routine_sessions')
     .insert([{
@@ -593,7 +598,23 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
       // pushes in the whole catalog — repeating yesterday is the lesser evil, and repeating inside
       // today's own circuit is the worst. So that is the order they get dropped in.
       let opciones = await pedir([...usados, ...evitar, ...candidatos])
-      if (!opciones.length) opciones = await pedir([...usados, ...candidatos])
+      let sinFamiliaDeAyer = true
+      if (!opciones.length) {
+        opciones = await pedir([...usados, ...candidatos])
+        sinFamiliaDeAyer = false
+      }
+
+      // A different id is not a different movement. The catalog says so itself with family_code:
+      // squats with a sandbag and squats with a kettlebell are one movement holding two things.
+      // Without this the member does the same thing two days running and the engine reports
+      // variety it did not deliver.
+      if (sinFamiliaDeAyer) {
+        const otraFamilia = opciones.filter((o) => {
+          const fam = perfiles?.get(o.id)?.family_code
+          return !fam || !familiasAyer.has(fam)
+        })
+        if (otraFamilia.length) opciones = otraFamilia
+      }
 
       // Only movements that tolerate the station's format get into the station's circuit.
       const admiten = opciones.filter(
