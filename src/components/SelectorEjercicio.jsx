@@ -24,6 +24,7 @@ const FALTA_ESTACION =
 
 export default function SelectorEjercicio({
   estacion,
+  boxId,
   value,
   onChange,
   soloConVideo = false,
@@ -62,18 +63,18 @@ export default function SelectorEjercicio({
       const [{ data: fila }, { data: faltante }] = await Promise.all([
         supabase.from('exercises_catalogo').select('*').eq('id', value).maybeSingle(),
         estacion
-          ? supabase.rpc('falta_para_estacion', { p_exercise_id: value, p_line_position: estacion })
+          ? supabase.rpc('falta_para_estacion', { p_exercise_id: value, p_box_id: boxId })
           : Promise.resolve({ data: [] }),
       ])
       setElegido(fila || null)
       setFalta(faltante || [])
     })()
-  }, [value, estacion])
+  }, [value, boxId])
 
-  const bloqueado = esperaEstacion && !estacion
+  const bloqueado = esperaEstacion && !boxId
 
   const buscar = useCallback(async () => {
-    if (esperaEstacion && !estacion) {
+    if (esperaEstacion && !boxId) {
       setResultados([])
       return
     }
@@ -84,7 +85,7 @@ export default function SelectorEjercicio({
       const { data, error: err } = await supabase.rpc('buscar_ejercicios', {
         q: q.trim() || null,
         musculos: musculos.length ? musculos : null,
-        estacion: estacion ? Number(estacion) : null,
+        box_id: boxId ? Number(boxId) : null,
         solo_con_video: soloConVideo,
         limite: 60,
       })
@@ -97,7 +98,7 @@ export default function SelectorEjercicio({
     } finally {
       if (mio === pedido.current) setCargando(false)
     }
-  }, [q, musculos, estacion, soloConVideo, esperaEstacion])
+  }, [q, musculos, boxId, soloConVideo, esperaEstacion])
 
   useEffect(() => {
     const t = setTimeout(buscar, 200)
@@ -108,7 +109,7 @@ export default function SelectorEjercicio({
     setMusculos((ms) => (ms.includes(m) ? ms.filter((v) => v !== m) : [...ms, m]))
 
   const resumen = useMemo(() => {
-    if (esperaEstacion && !estacion) return FALTA_ESTACION
+    if (esperaEstacion && !boxId) return FALTA_ESTACION
     if (cargando) return 'Buscando…'
     const n = `${resultados.length}${resultados.length === 60 ? '+' : ''}`
     return estacion

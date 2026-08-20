@@ -588,7 +588,9 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
       const pedir = async (excluir) => {
         const { data } = await supabase.rpc('sustitutos_para_ejercicio', {
           p_exercise_id: te.exercise_id,
-          p_line_position: te.box_number,
+          // El box, no la posición: la posición 3 existe en cada línea de cada sede, y preguntar
+          // por número devolvía lo que tenían en común todas ellas.
+          p_box_id: te.box_id,
           p_user_id: clientId,
           p_excluir: [...new Set(excluir)],
           p_limite: 12,

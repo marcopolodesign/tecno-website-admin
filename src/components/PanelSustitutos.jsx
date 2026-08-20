@@ -18,7 +18,7 @@ import { mediaUrl } from '../lib/exerciseMedia'
 
 // El título y el cerrar los pone el Sidecart — repetirlos acá era la única razón por la
 // que este componente conocía cómo se abre.
-export default function PanelSustitutos({ filaId, ejercicioActual, estacion, onSustituido }) {
+export default function PanelSustitutos({ filaId, ejercicioActual, estacion, boxId, onSustituido }) {
   const [candidatos, setCandidatos] = useState([])
   const [diagnostico, setDiagnostico] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -39,7 +39,7 @@ export default function PanelSustitutos({ filaId, ejercicioActual, estacion, onS
       if (!data || data.length === 0) {
         const { data: diag } = await supabase.rpc('diagnostico_sustitutos', {
           p_exercise_id: ejercicioActual?.id,
-          p_line_position: estacion,
+          p_box_id: boxId,
           p_user_id: null,
         })
         setDiagnostico(diag?.[0] || null)
@@ -49,7 +49,7 @@ export default function PanelSustitutos({ filaId, ejercicioActual, estacion, onS
     } finally {
       setCargando(false)
     }
-  }, [filaId, ejercicioActual?.id, estacion])
+  }, [filaId, ejercicioActual?.id, boxId])
 
   useEffect(() => {
     cargar()

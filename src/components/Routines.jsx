@@ -786,7 +786,7 @@ export default function Routines() {
                                             </div>
                                             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                               <button
-                                                onClick={() => setSustituyendo({ fila: se, estacion: boxNum })}
+                                                onClick={() => setSustituyendo({ fila: se, estacion: boxNum, boxId: se.box_id })}
                                                 className="p-0.5 text-text-tertiary hover:text-brand"
                                                 title="Cambiar por otro del mismo patrón"
                                               >
@@ -1099,6 +1099,7 @@ export default function Routines() {
             filaId={sustituyendo.fila.id}
             ejercicioActual={sustituyendo.fila.exercises}
             estacion={sustituyendo.estacion}
+            boxId={sustituyendo.boxId}
             onSustituido={() => {
               setSustituyendo(null)
               toast.success('Ejercicio cambiado', toastOptions)
@@ -1151,23 +1152,30 @@ export default function Routines() {
                 ) : (
                   <div>
                     <label className="form-label">Estación *</label>
+                    {/*
+                      Las estaciones son las que el local tiene cargadas, no del uno al cinco.
+                      Una línea puede ser de tres o de siete, y el número se repite entre líneas:
+                      lo que se elige es el box, y el número queda para nombrarlo.
+                    */}
                     <select
-                      value={exerciseForm.boxNumber}
+                      value={exerciseForm.boxId}
                       onChange={(e) => {
-                        const boxNum = parseInt(e.target.value)
-                        const selectedBox = boxes.find(b => b.boxNumber === boxNum)
+                        const box = boxes.find(b => String(b.id) === e.target.value)
                         setExerciseForm({
                           ...exerciseForm,
-                          boxNumber: boxNum,
-                          boxId: selectedBox?.id || ''
+                          boxId: box?.id || '',
+                          boxNumber: box?.linePosition ?? box?.boxNumber ?? ''
                         })
                       }}
                       className="form-select"
                       required
                     >
                       <option value="">Seleccionar estación...</option>
-                      {[1, 2, 3, 4, 5].map(num => (
-                        <option key={num} value={num}>Estación {num}</option>
+                      {boxes.map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.productionLines?.name ? `${b.productionLines.name} · ` : ''}
+                          {b.name || `Estación ${b.linePosition ?? b.boxNumber}`}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1184,6 +1192,7 @@ export default function Routines() {
                   */}
                   <SelectorEjercicio
                     estacion={exerciseForm.isCooldown ? null : exerciseForm.boxNumber}
+                    boxId={exerciseForm.isCooldown ? null : exerciseForm.boxId}
                     esperaEstacion={!exerciseForm.isCooldown}
                     value={exerciseForm.exerciseId}
                     onChange={(id) => setExerciseForm({ ...exerciseForm, exerciseId: id })}

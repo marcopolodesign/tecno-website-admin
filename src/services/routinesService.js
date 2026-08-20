@@ -4,9 +4,11 @@ export const routinesService = {
   // ==================== BOXES (STATIONS) ====================
   async getBoxes() {
     try {
+      // Con su línea y su sede: una estación se llama "3" en cada línea de cada local, así que
+      // el número solo no alcanza para elegirla ni para preguntarle qué material tiene.
       const { data, error } = await supabase
         .from('boxes')
-        .select('*')
+        .select('*, production_lines (id, name, line_number, location_id, locations (id, name))')
         .eq('is_active', true)
         .order('box_number', { ascending: true })
 
