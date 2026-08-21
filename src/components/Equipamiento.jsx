@@ -15,11 +15,59 @@ import Sidecart from './Sidecart'
 // equipment is data entry; seeing that a colchoneta would unlock 35 exercises in Estación 6 is
 // a reason to walk over and put one there.
 
+// Lo que puede entrenar una estación, con el nombre que usa el coach y no el código del catálogo.
+// Es la misma lista cerrada con la que están clasificados los 296 ejercicios, así que declarar un
+// objetivo acá y buscar por patrón allá hablan de lo mismo.
+const PATRONES = [
+  ['EMP-H', 'Empuje horizontal'],
+  ['EMP-V', 'Empuje vertical'],
+  ['TRA-H', 'Tracción horizontal'],
+  ['TRA-V', 'Tracción vertical'],
+  ['ROD', 'Rodilla dominante'],
+  ['CAD', 'Cadera dominante'],
+  ['UNI', 'Unilateral'],
+  ['CORE-AE', 'Core anti-extensión'],
+  ['CORE-AR', 'Core anti-rotación'],
+  ['LOC', 'Locomoción'],
+  ['AIS', 'Aislado'],
+]
+
 export default function Equipamiento() {
   const [boxes, setBoxes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
   const [abierto, setAbierto] = useState(null)
+  const [sumando, setSumando] = useState(null)
+
+  // Una línea no tiene un largo fijo: es la lista de sus boxes. Sumar uno es sumar una fila, y
+  // el gimnasio no debería necesitarnos para eso.
+  const sumarBox = async (lineaId) => {
+    setSumando(lineaId)
+    setError(null)
+    try {
+      const { error: err } = await supabase.rpc('agregar_box', { p_linea_id: lineaId })
+      if (err) throw err
+      await cargar()
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setSumando(null)
+    }
+  }
+
+  const sumarLinea = async (sedeId) => {
+    setSumando('linea')
+    setError(null)
+    try {
+      const { error: err } = await supabase.rpc('agregar_linea', { p_sede_id: sedeId })
+      if (err) throw err
+      await cargar()
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setSumando(null)
+    }
+  }
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -48,14 +96,17 @@ export default function Equipamiento() {
   const porLinea = useMemo(() => {
     const grupos = new Map()
     for (const b of boxes) {
-      const clave = b.linea ?? '__sin_linea__'
-      if (!grupos.has(clave)) grupos.set(clave, { linea: b.linea, boxes: [] })
+      const clave = b.linea_id ?? '__sin_linea__'
+      if (!grupos.has(clave)) {
+        grupos.set(clave, { lineaId: b.linea_id, linea: b.linea, sedeId: b.sede_id, boxes: [] })
+      }
       grupos.get(clave).boxes.push(b)
     }
     return [...grupos.values()]
   }, [boxes])
 
   const vacios = boxes.filter((b) => b.elementos.length === 0).length
+  const sedeId = boxes.find((b) => b.sede_id)?.sede_id ?? null
 
   const alGuardar = (fila) =>
     setBoxes((bs) => bs.map((b) => (b.id === fila.id ? { ...b, ...fila } : b)))
@@ -82,8 +133,23 @@ export default function Equipamiento() {
       {error && <div style={e.error}>{error}</div>}
 
       {porLinea.map((g) => (
-        <div key={g.linea ?? 'sin'} style={e.grupo}>
-          <span style={e.grupoTitulo}>{g.linea ?? 'Sin línea asignada'}</span>
+        <div key={g.lineaId ?? 'sin'} style={e.grupo}>
+          <div style={e.grupoEncabezado}>
+            <span style={e.grupoTitulo}>{g.linea ?? 'Sin línea asignada'}</span>
+            <span style={e.grupoCuenta}>
+              {g.boxes.length} {g.boxes.length === 1 ? 'estación' : 'estaciones'}
+            </span>
+            {g.lineaId && (
+              <button
+                type="button"
+                onClick={() => sumarBox(g.lineaId)}
+                disabled={sumando === g.lineaId}
+                style={e.botonSumar}
+              >
+                {sumando === g.lineaId ? 'Agregando…' : '+ Estación'}
+              </button>
+            )}
+          </div>
           <div style={e.grilla}>
             {g.boxes.map((b) => (
               <Tarjeta key={b.id} box={b} onAbrir={() => setAbierto(b)} />
@@ -91,6 +157,17 @@ export default function Equipamiento() {
           </div>
         </div>
       ))}
+
+      {sedeId && (
+        <button
+          type="button"
+          onClick={() => sumarLinea(sedeId)}
+          disabled={sumando === 'linea'}
+          style={e.botonSumarLinea}
+        >
+          {sumando === 'linea' ? 'Agregando…' : '+ Agregar una línea'}
+        </button>
+      )}
 
       <Sidecart
         isOpen={Boolean(abierto)}
@@ -153,6 +230,13 @@ function Tarjeta({ box, onAbrir }) {
         <span style={{ ...e.cuenta, ...(vacio ? e.cuentaVacia : {}) }}>
           {box.ejercicios_posibles} ejercicios
         </span>
+        {box.objetivos?.length > 0 && (
+          <span style={e.sello}>
+            {box.objetivos.length === 1
+              ? (PATRONES.find(([c]) => c === box.objetivos[0])?.[1] ?? box.objetivos[0])
+              : `${box.objetivos.length} objetivos`}
+          </span>
+        )}
         {box.equipamiento_independiente ? (
           <span style={e.sello}>equipamiento propio</span>
         ) : box.desincronizado ? (
@@ -171,6 +255,8 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
   const [guardado, setGuardado] = useState(false)
   const [error, setError] = useState(null)
   const [copiarDe, setCopiarDe] = useState('')
+  const [objetivos, setObjetivos] = useState(box.objetivos || [])
+  const [guardandoObjetivo, setGuardandoObjetivo] = useState(false)
 
   const cargarImpacto = useCallback(async () => {
     const { data, error: err } = await supabase.rpc('impacto_elementos_box', { p_box_id: box.id })
@@ -180,6 +266,7 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
 
   useEffect(() => {
     setSeleccion(box.elementos)
+    setObjetivos(box.objetivos || [])
     setError(null)
     cargarImpacto()
   }, [box.id, box.elementos, cargarImpacto])
@@ -224,6 +311,32 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
       setError(err.message || String(err))
     } finally {
       setGuardando(false)
+    }
+  }
+
+  const alternarObjetivo = (p) =>
+    setObjetivos((o) => (o.includes(p) ? o.filter((x) => x !== p) : [...o, p]))
+
+  const objetivoSucio = useMemo(() => {
+    const a = [...objetivos].sort().join('|')
+    const b = [...(box.objetivos || [])].sort().join('|')
+    return a !== b
+  }, [objetivos, box.objetivos])
+
+  const guardarObjetivo = async () => {
+    setGuardandoObjetivo(true)
+    setError(null)
+    try {
+      const { data, error: err } = await supabase.rpc('guardar_box_objetivos', {
+        p_box_id: box.id,
+        p_objetivos: objetivos,
+      })
+      if (err) throw err
+      onGuardado?.({ id: box.id, objetivos: [...objetivos], ejercicios_posibles: data })
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setGuardandoObjetivo(false)
     }
   }
 
@@ -286,6 +399,33 @@ function EditorBox({ box, boxes, onGuardado, onCopiado, onCerrar }) {
               : 'Darle equipamiento propio'}
         </button>
       </div>
+
+      <Campo
+        etiqueta="Qué entrena"
+        ayuda="Sin nada marcado la estación acepta cualquier movimiento, que es como está el gym hoy. Marcar acota: el motor sólo le va a poner esos patrones."
+      >
+        <div style={e.chips}>
+          {PATRONES.map(([codigo, nombre]) => (
+            <Chip
+              key={codigo}
+              activo={objetivos.includes(codigo)}
+              onClick={() => alternarObjetivo(codigo)}
+            >
+              {nombre}
+            </Chip>
+          ))}
+        </div>
+        {objetivoSucio && (
+          <button
+            type="button"
+            onClick={guardarObjetivo}
+            disabled={guardandoObjetivo}
+            style={e.syncBoton}
+          >
+            {guardandoObjetivo ? 'Guardando…' : 'Guardar el objetivo'}
+          </button>
+        )}
+      </Campo>
 
       <Campo etiqueta="Tiene" ayuda="El número es cuántos ejercicios se perderían si lo sacás.">
         {tiene.length === 0 ? (
@@ -376,6 +516,16 @@ const e = {
     color: '#92400E', fontSize: 13, lineHeight: 1.45,
   },
   grupo: { display: 'flex', flexDirection: 'column', gap: 8 },
+  grupoEncabezado: { display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 },
+  grupoCuenta: { fontSize: 12, color: '#8A8178' },
+  botonSumar: {
+    marginLeft: 'auto', fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 8,
+    border: '1px solid #E5E7EB', background: '#fff', color: '#374151', cursor: 'pointer',
+  },
+  botonSumarLinea: {
+    fontSize: 13, fontWeight: 600, padding: '9px 16px', borderRadius: 10,
+    border: '1px dashed #D1D5DB', background: 'transparent', color: '#6B7280', cursor: 'pointer',
+  },
   grupoTitulo: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#9ca3af' },
   grilla: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 12 },
   tarjeta: {
