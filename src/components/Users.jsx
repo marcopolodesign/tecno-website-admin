@@ -18,6 +18,7 @@ import { getCurrentUserForLogging } from '../utils/logHelpers'
 import LogsTimeline from './LogsTimeline'
 import Modal from './Modal'
 import SelectorContraindicaciones from './SelectorContraindicaciones'
+import { supabase } from '../lib/supabase'
 
 // Helper to format date without timezone issues
 // Parses YYYY-MM-DD string and formats as DD/MM/YYYY without timezone shift
@@ -43,6 +44,7 @@ const Users = () => {
   const [hasChanges, setHasChanges] = useState(false)
   const [sellers, setSellers] = useState([])
   const [membershipPlans, setMembershipPlans] = useState([])
+  const [arquetipos, setArquetipos] = useState([])
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [reasonData, setReasonData] = useState({
     userId: null,
@@ -96,6 +98,16 @@ const Users = () => {
     paymentNotes: ''
   })
 
+
+  // Los arquetipos son filas, no una lista escrita en el código: el gym los renombra.
+  useEffect(() => {
+    supabase
+      .from('arquetipos')
+      .select('id, nombre, descripcion')
+      .eq('is_active', true)
+      .order('orden')
+      .then(({ data }) => setArquetipos(data || []))
+  }, [])
   useEffect(() => {
     fetchUsers()
     fetchSellers()
@@ -307,6 +319,7 @@ const Users = () => {
             emergencyPhone: existingUser.emergencyPhone || '',
             medicalNotes: existingUser.medicalNotes || '',
             contraindicaciones: existingUser.contraindicaciones || [],
+            arquetipoId: existingUser.arquetipo_id ?? existingUser.arquetipoId ?? null,
             notes: existingUser.notes || '',
             assignedSellerId: existingUser.assignedSellerId || null
           })
@@ -844,6 +857,7 @@ const Users = () => {
               emergencyPhone: params.row.emergencyPhone || '',
               medicalNotes: params.row.medicalNotes || '',
             contraindicaciones: params.row.contraindicaciones || [],
+            arquetipoId: params.row.arquetipo_id ?? params.row.arquetipoId ?? null,
               notes: params.row.notes || '',
               assignedSellerId: params.row.assignedSellerId || null
             })
@@ -1061,6 +1075,29 @@ const Users = () => {
                   valor={editFormData.contraindicaciones}
                   onChange={(v) => handleFormChange('contraindicaciones', v)}
                 />
+
+                {/*
+                  Las contraindicaciones dicen qué no puede hacer; el arquetipo, hasta dónde
+                  llevarlo. Van juntas porque son las dos cosas que el motor lee del socio.
+                */}
+                <div>
+                  <label className="form-label">Arquetipo</label>
+                  <select
+                    className="form-select"
+                    value={editFormData.arquetipoId || ''}
+                    onChange={(e) => handleFormChange('arquetipoId', e.target.value || null)}
+                  >
+                    <option value="">Sin arquetipo</option>
+                    {arquetipos.map((a) => (
+                      <option key={a.id} value={a.id}>{a.nombre}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-text-tertiary mt-1">
+                    {arquetipos.find((a) => String(a.id) === String(editFormData.arquetipoId))
+                      ?.descripcion ||
+                      'A qué se parece este socio. El motor lo usa para no ofrecerle lo que todavía le queda grande.'}
+                  </p>
+                </div>
 
                 <div>
                   <label className="form-label">Notas</label>

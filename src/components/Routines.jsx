@@ -61,8 +61,10 @@ export default function Routines() {
     description: '',
     validFrom: new Date().toISOString().split('T')[0],
     validUntil: '',
-    goal: ''
+    goal: '',
+    arquetipoId: ''
   })
+  const [arquetipos, setArquetipos] = useState([])
 
   const [sessionForm, setSessionForm] = useState({
     routineId: null,
@@ -130,6 +132,13 @@ export default function Routines() {
       setCategories(categoriesRes.data || [])
       setBodyZones(zonesRes.data || [])
       setBoxes(boxesRes.data || [])
+      // Los arquetipos son filas, no una lista en el código: el gym los renombra.
+      supabase
+        .from('arquetipos')
+        .select('id, nombre, descripcion')
+        .eq('is_active', true)
+        .order('orden')
+        .then(({ data }) => setArquetipos(data || []))
     } catch (error) {
       Sentry.captureException(error, { extra: { context: 'Error fetching data:' } })
       console.error('Error fetching data:', error)
@@ -237,7 +246,21 @@ export default function Routines() {
         toast.success('Rutina actualizada', toastOptions)
       } else {
         const { data } = await routinesService.createRoutine(routineForm)
-        toast.success('Rutina creada', toastOptions)
+        // Partir del arquetipo es copiar sus sesiones escritas a mano: quedan como manuales, así
+        // que el coach las ajusta y el motor completa el resto desde ahí.
+        if (routineForm.arquetipoId) {
+          const { data: copiadas, error: errCopia } = await supabase.rpc(
+            'copiar_plantilla_de_arquetipo',
+            { p_routine_id: data.id, p_arquetipo_id: Number(routineForm.arquetipoId) }
+          )
+          if (errCopia) {
+            toast.error(errCopia.message, toastOptions)
+          } else {
+            toast.success(`Rutina creada con ${copiadas} ${copiadas === 1 ? 'sesión' : 'sesiones'} del arquetipo`, toastOptions)
+          }
+        } else {
+          toast.success('Rutina creada', toastOptions)
+        }
         // Auto-open the new routine
         fetchRoutineDetail(data.id)
       }
@@ -977,6 +1000,27 @@ export default function Routines() {
                         Basado en el objetivo de entrenamiento del cliente
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {!editingItem && arquetipos.length > 0 && (
+                  <div>
+                    <label className="form-label">Partir de un arquetipo</label>
+                    <select
+                      value={routineForm.arquetipoId}
+                      onChange={(e) => setRoutineForm({ ...routineForm, arquetipoId: e.target.value })}
+                      className="form-select"
+                    >
+                      <option value="">Empezar de cero</option>
+                      {arquetipos.map((a) => (
+                        <option key={a.id} value={a.id}>{a.nombre}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      {arquetipos.find((a) => String(a.id) === String(routineForm.arquetipoId))
+                        ?.descripcion ||
+                        'Copia las sesiones ya escritas del arquetipo para no empezar con la hoja en blanco. Después las ajustás y el motor completa el mes.'}
+                    </p>
                   </div>
                 )}
 
