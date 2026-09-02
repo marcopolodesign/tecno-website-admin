@@ -809,12 +809,36 @@ export default function Routines() {
                                   ?.filter(se => se.boxNumber === boxNum)
                                   ?.sort((a, b) => a.exerciseOrder - b.exerciseOrder) || []
                                 
+                                // Lo que ocupa la estación de los seis minutos del bloque. Estaba
+                                // sólo adentro del modal de cada ejercicio: para saber si el box
+                                // iba en 2:00 o en 6:00 había que abrir las filas de a una.
+                                const ocupado = duracionEstacionSeg(boxExercises)
+                                const pasado = ocupado > BLOQUE_SEG
+
                                 return (
                                   <div key={boxNum} className="bg-bg-secondary min-h-[150px]">
                                     {/* Station Header */}
-                                    <div className="bg-brand/10 px-2 py-1.5 text-center border-b border-border-default">
-                                      <span className="text-xs font-semibold text-brand">Estación {boxNum}</span>
-                                      <span className="text-xs text-text-tertiary ml-1">({boxExercises.length})</span>
+                                    <div className="bg-brand/10 px-2 py-1.5 border-b border-border-default">
+                                      <div className="flex items-baseline justify-center gap-1.5">
+                                        <span className="text-xs font-semibold text-brand">Estación {boxNum}</span>
+                                        <span className="text-xs text-text-tertiary">({boxExercises.length})</span>
+                                      </div>
+                                      {ocupado > 0 && (
+                                        <>
+                                          <div className="mt-1 h-1 rounded-full bg-brand/20 overflow-hidden">
+                                            <div
+                                              className={`h-full rounded-full ${pasado ? 'bg-error' : 'bg-brand'}`}
+                                              style={{ width: `${Math.min(100, (ocupado / BLOQUE_SEG) * 100)}%` }}
+                                            />
+                                          </div>
+                                          <p
+                                            className={`mt-0.5 text-center text-[10px] tabular-nums ${pasado ? 'text-error font-semibold' : 'text-text-tertiary'}`}
+                                            title={pasado ? 'Se pasa del bloque de 6:00 que dura el turno en el box' : 'Tiempo con reloj de esta estación'}
+                                          >
+                                            {mmss(ocupado)} / {mmss(BLOQUE_SEG)}
+                                          </p>
+                                        </>
+                                      )}
                                     </div>
                                     
                                     {/* Exercises in Station */}
@@ -833,8 +857,15 @@ export default function Routines() {
                                                 {se.setsReps}
                                                 {se.weightKg && ` • ${se.weightKg}kg`}
                                               </p>
+                                              {/* Sin esto un Tabata y unas series sueltas se
+                                                  veían igual en la grilla. */}
+                                              {esPorTiempo(se.formato) && (
+                                                <p className="mt-0.5 inline-flex items-center rounded bg-brand/10 px-1.5 py-px text-[10px] font-medium text-brand">
+                                                  {comoTexto(se.formato, se)} · {mmss(duracionSeg(se))}
+                                                </p>
+                                              )}
                                             </div>
-                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                               <button
                                                 onClick={() => setSustituyendo({ fila: se, estacion: boxNum, boxId: se.box_id })}
                                                 className="p-0.5 text-text-tertiary hover:text-brand"
