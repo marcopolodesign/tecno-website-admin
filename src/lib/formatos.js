@@ -7,7 +7,7 @@
 // countdown that stops because a request failed is worse than one derived locally. Both sides
 // are pure functions of elapsed seconds, so they cannot drift apart.
 
-export const FORMATOS = ['Series', 'AMRAP', 'EMOM', 'Tabata']
+export const FORMATOS = ['Series', 'AMRAP', 'EMOM', 'Tabata', 'A completar']
 
 // Una estación dura seis minutos. No es una preferencia de diseño: es el reloj con el que la
 // cola hace avanzar a la gente de box en box, así que una estación más larga no se alarga —
@@ -24,6 +24,10 @@ export const PRESETS = {
   // EMOM has no stored rest — the rest is whatever is left of the minute after the reps.
   EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0 },
   Tabata: { rondas: 8, trabajoSeg: 20, descansoSeg: 10 },
+  // Sin estructura fija: el coach carga los ejercicios que quiera (sin el tope de 3 de AMRAP)
+  // y describe la submodalidad a mano en las notas (ej. "escalera 1-1-2-2-3-3"). El bloque de
+  // seis minutos es el mismo que el resto de los formatos por tiempo.
+  'A completar': { rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 },
 }
 
 export const esPorTiempo = (formato) => Boolean(formato) && formato !== 'Series'
@@ -53,6 +57,7 @@ export function duracionEstacionSeg(filas) {
 export function comoTexto(formato, { rondas, trabajoSeg, descansoSeg } = {}) {
   if (!esPorTiempo(formato)) return null
   if (formato === 'AMRAP') return `AMRAP ${Math.round(trabajoSeg / 60)}′`
+  if (formato === 'A completar') return `A completar ${Math.round(trabajoSeg / 60)}′`
   if (formato === 'EMOM') return `EMOM ${rondas}′`
   return `${formato} ${rondas}×${trabajoSeg}/${descansoSeg}`
 }

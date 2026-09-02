@@ -81,7 +81,7 @@ function RelojFormato({ fase, formato }) {
       </span>
       <span style={{ ...panelStyles.formatoSeg, color }}>{fase.restanteSeg}</span>
       <span style={panelStyles.formatoRonda}>
-        {formato.formato === 'AMRAP'
+        {formato.formato === 'AMRAP' || formato.formato === 'A completar'
           ? 'las vueltas que entren'
           : `ronda ${fase.ronda} de ${formato.rondas}`}
       </span>

@@ -1405,7 +1405,11 @@ export default function Routines() {
                     onChange={(e) => setExerciseForm({ ...exerciseForm, notes: e.target.value })}
                     className="form-textarea"
                     rows={2}
-                    placeholder="Instrucciones específicas..."
+                    placeholder={
+                      exerciseForm.formato === 'A completar'
+                        ? 'Submodalidad, si tiene una (ej. escalera 1-1-2-2-3-3)...'
+                        : 'Instrucciones específicas...'
+                    }
                   />
                 </div>
 

@@ -62,7 +62,7 @@ export default function SelectorFormato({ valor, onChange, turnoSeg, usadoSeg = 
               <input type="number" min="1" max="60" value={rondas ?? ''} onChange={set('rondas')} style={s.input} />
             </label>
             <label style={s.campo}>
-              <span style={s.etiqueta}>{formato === 'AMRAP' ? 'Tiempo total (seg)' : 'Trabajo (seg)'}</span>
+              <span style={s.etiqueta}>{formato === 'AMRAP' || formato === 'A completar' ? 'Tiempo total (seg)' : 'Trabajo (seg)'}</span>
               <input type="number" min="5" max={BLOQUE_SEG} value={trabajoSeg ?? ''} onChange={set('trabajoSeg')} style={s.input} />
             </label>
             <label style={s.campo}>
@@ -84,7 +84,9 @@ export default function SelectorFormato({ valor, onChange, turnoSeg, usadoSeg = 
               ? 'En EMOM el descanso es lo que sobra del minuto después de las reps — por eso no se carga.'
               : formato === 'AMRAP'
                 ? 'Las vueltas que entren en ese tiempo. Las reps por vuelta van en Series x Reps.'
-                : 'Cada ronda: trabajo y después descanso.'}
+                : formato === 'A completar'
+                  ? 'Sin estructura fija ni tope de ejercicios. Si es una submodalidad con nombre (ej. escalera 1-1-2-2-3-3), describila en Notas.'
+                  : 'Cada ronda: trabajo y después descanso.'}
           </span>
 
           <div style={{ ...s.medidor, ...(excede ? s.medidorRoto : {}) }}>
