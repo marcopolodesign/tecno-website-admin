@@ -1,4 +1,4 @@
-import { FORMATOS, PRESETS, esPorTiempo, duracionSeg, mmss } from '../lib/formatos'
+import { FORMATOS, PRESETS, BLOQUE_SEG, esPorTiempo, duracionSeg, mmss } from '../lib/formatos'
 
 // How the work at this station is measured.
 //
@@ -6,15 +6,21 @@ import { FORMATOS, PRESETS, esPorTiempo, duracionSeg, mmss } from '../lib/format
 // asking them to type it is how one station ends up as 6 × 25/10 by accident. The numbers stay
 // editable underneath, because a coach who wants 6 rounds should get 6 rounds.
 //
-// The total is always on screen. What decides whether a format belongs at a station is whether
-// it fits the turn, and that is the one number a coach cannot read off rounds and seconds
-// without stopping to multiply.
+// What is on screen is not this row's duration but the station's: the member does the whole
+// circuit before advancing, so what has to fit in the six minutes is the sum. Reading one row at
+// a time is how three two-minute rows each passed the check and the box ran six minutes long.
 
-export default function SelectorFormato({ valor, onChange, turnoSeg }) {
+export default function SelectorFormato({ valor, onChange, turnoSeg, usadoSeg = 0 }) {
   const { formato = 'Series', rondas, trabajoSeg, descansoSeg } = valor || {}
   const porTiempo = esPorTiempo(formato)
-  const total = porTiempo ? duracionSeg({ rondas, trabajoSeg, descansoSeg }) : 0
-  const noEntra = porTiempo && turnoSeg > 0 && total > turnoSeg
+  const propio = porTiempo ? duracionSeg({ rondas, trabajoSeg, descansoSeg }) : 0
+  const estacion = usadoSeg + propio
+  const excede = estacion > BLOQUE_SEG
+  const restante = Math.max(0, BLOQUE_SEG - usadoSeg)
+  // El turno real que viene corriendo la cola. Sólo se menciona si discrepa del bloque: si
+  // coinciden no aporta nada, y si el box viene avanzando antes de los seis minutos es un
+  // problema de configuración de la línea que el coach no puede arreglar desde acá.
+  const turnoDiscrepa = turnoSeg > 0 && Math.abs(turnoSeg - BLOQUE_SEG) > 30
 
   const elegir = (f) => {
     if (!esPorTiempo(f)) {
@@ -29,6 +35,9 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
     const n = ev.target.value === '' ? '' : Math.max(0, Number(ev.target.value))
     onChange({ formato, rondas, trabajoSeg, descansoSeg, [campo]: n })
   }
+
+  const pct = Math.min(100, Math.round((estacion / BLOQUE_SEG) * 100))
+  const pctUsado = Math.min(100, Math.round((usadoSeg / BLOQUE_SEG) * 100))
 
   return (
     <div style={s.contenedor}>
@@ -54,7 +63,7 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
             </label>
             <label style={s.campo}>
               <span style={s.etiqueta}>{formato === 'AMRAP' ? 'Tiempo total (seg)' : 'Trabajo (seg)'}</span>
-              <input type="number" min="5" max="3600" value={trabajoSeg ?? ''} onChange={set('trabajoSeg')} style={s.input} />
+              <input type="number" min="5" max={BLOQUE_SEG} value={trabajoSeg ?? ''} onChange={set('trabajoSeg')} style={s.input} />
             </label>
             <label style={s.campo}>
               <span style={s.etiqueta}>Descanso (seg)</span>
@@ -78,10 +87,34 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
                 : 'Cada ronda: trabajo y después descanso.'}
           </span>
 
-          <div style={{ ...s.total, ...(noEntra ? s.totalRoto : {}) }}>
-            Dura <strong>{mmss(total)}</strong>
-            {turnoSeg > 0 && ` · el turno en el box es de ${mmss(turnoSeg)}`}
-            {noEntra && ' — no entra, el socio se va a mover de box antes de terminar.'}
+          <div style={{ ...s.medidor, ...(excede ? s.medidorRoto : {}) }}>
+            <div style={s.barra}>
+              <div style={{ ...s.barraUsado, width: `${pctUsado}%` }} />
+              <div
+                style={{
+                  ...s.barraPropio,
+                  left: `${pctUsado}%`,
+                  width: `${Math.max(0, pct - pctUsado)}%`,
+                  background: excede ? '#DC2626' : '#F45F37',
+                }}
+              />
+            </div>
+            <div style={s.medidorTexto}>
+              <strong>{mmss(estacion)}</strong> de los {mmss(BLOQUE_SEG)} de la estación
+              {usadoSeg > 0 && ` · este ejercicio suma ${mmss(propio)} a ${mmss(usadoSeg)} ya cargados`}
+              {!excede && usadoSeg > 0 && ` · quedan ${mmss(restante - propio)}`}
+            </div>
+            {excede && (
+              <div style={s.error}>
+                Se pasa {mmss(estacion - BLOQUE_SEG)} del bloque. El box avanza a los{' '}
+                {mmss(BLOQUE_SEG)} igual: el socio se va a mover antes de terminar.
+              </div>
+            )}
+            {turnoDiscrepa && (
+              <div style={s.aviso}>
+                Ojo: el turno que viene corriendo la cola es de {mmss(turnoSeg)}, no {mmss(BLOQUE_SEG)}.
+              </div>
+            )}
           </div>
         </>
       )}
@@ -105,9 +138,16 @@ const s = {
     fontSize: 14, boxSizing: 'border-box', color: '#111827',
   },
   ayuda: { fontSize: 12, color: '#9ca3af', lineHeight: 1.4 },
-  total: {
-    padding: '8px 10px', borderRadius: 8, background: '#F0FDF4', border: '1px solid #BBF7D0',
+  medidor: {
+    display: 'flex', flexDirection: 'column', gap: 8,
+    padding: '10px 12px', borderRadius: 10, background: '#F0FDF4', border: '1px solid #BBF7D0',
     color: '#166534', fontSize: 13,
   },
-  totalRoto: { background: '#FFFBEB', borderColor: '#FDE68A', color: '#92400E' },
+  medidorRoto: { background: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' },
+  barra: { position: 'relative', height: 8, borderRadius: 4, background: '#E7E3DD', overflow: 'hidden' },
+  barraUsado: { position: 'absolute', top: 0, bottom: 0, left: 0, background: '#C4BFB8' },
+  barraPropio: { position: 'absolute', top: 0, bottom: 0 },
+  medidorTexto: { lineHeight: 1.4 },
+  error: { fontSize: 12.5, fontWeight: 500, lineHeight: 1.4 },
+  aviso: { fontSize: 12, color: '#92400E', lineHeight: 1.4 },
 }

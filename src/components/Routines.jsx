@@ -416,10 +416,37 @@ export default function Routines() {
     setShowExerciseModal(true)
   }
 
+  // Lo que ya ocupan las OTRAS filas de esta estación. El socio hace el circuito entero antes
+  // de avanzar de box, así que el tope de seis minutos es de la estación, no de la fila: sin
+  // esto, tres filas de dos minutos pasaban el control una por una y el box corría seis de más.
+  const usadoEnEstacion = (() => {
+    const sesion = selectedRoutine?.routineSessions?.find((x) => x.id === exerciseForm.sessionId)
+    return duracionEstacionSeg(
+      (sesion?.sessionExercises || []).filter(
+        (se) =>
+          se.id !== editingItem?.id &&
+          Boolean(se.isCooldown) === Boolean(exerciseForm.isCooldown) &&
+          (exerciseForm.isCooldown || se.boxNumber === exerciseForm.boxNumber)
+      )
+    )
+  })()
+
   const saveExerciseToSession = async (e) => {
     e.preventDefault()
     if (!exerciseForm.exerciseId) {
       toast.error('Selecciona un ejercicio', toastOptions)
+      return
+    }
+
+    // El tope se corta acá y no sólo en el aviso del selector: el aviso lo puede pasar por alto
+    // quien está cargando rápido, y lo que llega a la tabla es lo que después corre en el box.
+    const totalEstacion = usadoEnEstacion + (esPorTiempo(exerciseForm.formato) ? duracionSeg(exerciseForm) : 0)
+    if (totalEstacion > BLOQUE_SEG) {
+      toast.error(
+        `La estación queda en ${mmss(totalEstacion)} y el tope es ${mmss(BLOQUE_SEG)}. ` +
+          'Bajá rondas o tiempo antes de guardar.',
+        toastOptions
+      )
       return
     }
 
@@ -1254,6 +1281,7 @@ export default function Routines() {
                     }}
                     onChange={(v) => setExerciseForm({ ...exerciseForm, ...v })}
                     turnoSeg={turnoSeg}
+                    usadoSeg={usadoEnEstacion}
                   />
                 </div>
 

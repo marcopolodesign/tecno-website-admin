@@ -9,11 +9,20 @@
 
 export const FORMATOS = ['Series', 'AMRAP', 'EMOM', 'Tabata']
 
+// Una estación dura seis minutos. No es una preferencia de diseño: es el reloj con el que la
+// cola hace avanzar a la gente de box en box, así que una estación más larga no se alarga —
+// se corta, con el socio a mitad de la última vuelta y la línea entera corrida.
+//
+// Vive acá y no en el generador porque son dos caminos hacia la misma tabla: el generador
+// arma el mes solo y el coach escribe las primeras sesiones a mano. El tope lo tenía escrito
+// únicamente el generador, y a mano se podía guardar cualquier cosa.
+export const BLOQUE_SEG = 360
+
 export const PRESETS = {
   // AMRAP is one round with a cap: as many rounds as possible inside the time.
-  AMRAP: { rondas: 1, trabajoSeg: 480, descansoSeg: 0 },
+  AMRAP: { rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 },
   // EMOM has no stored rest — the rest is whatever is left of the minute after the reps.
-  EMOM: { rondas: 10, trabajoSeg: 60, descansoSeg: 0 },
+  EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0 },
   Tabata: { rondas: 8, trabajoSeg: 20, descansoSeg: 10 },
 }
 
@@ -22,6 +31,23 @@ export const esPorTiempo = (formato) => Boolean(formato) && formato !== 'Series'
 export function duracionSeg({ rondas, trabajoSeg, descansoSeg }) {
   if (!rondas || !trabajoSeg) return 0
   return rondas * (trabajoSeg + (descansoSeg || 0))
+}
+
+/**
+ * Lo que dura la estación entera: la suma de sus filas con reloj.
+ *
+ * Se mide por estación y no por ejercicio porque el socio no cambia de box entre un ejercicio
+ * y el siguiente — hace el circuito completo y recién ahí avanza. Tres filas de dos minutos
+ * son seis minutos de box, y mirando fila por fila las tres pasan el control.
+ *
+ * Series no suma: no tiene reloj, la carga y las repeticiones las administra el socio dentro
+ * del turno.
+ */
+export function duracionEstacionSeg(filas) {
+  return (filas || []).reduce(
+    (total, f) => total + (esPorTiempo(f?.formato) ? duracionSeg(f) : 0),
+    0
+  )
 }
 
 export function comoTexto(formato, { rondas, trabajoSeg, descansoSeg } = {}) {

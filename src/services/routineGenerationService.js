@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { BLOQUE_SEG } from '../lib/formatos'
 
 /**
  * Service for routine auto-generation and coach overrides
@@ -382,7 +383,6 @@ function formatosPosibles(ejercicio) {
 //
 // Six minutes is the target, not a rule. What is fixed is that the station takes the same slot in
 // the line whichever format it runs, so the queue never has to care.
-const BLOQUE_SEG = 360
 
 /**
  * Si un ejercicio entra bajo el techo del arquetipo del socio.
@@ -439,7 +439,10 @@ function trabajoDelBloque(formato, cantidad) {
     const parte = Math.round(BLOQUE_SEG / cantidad)
     return { formato, rondas: 1, trabajo_seg: parte, descanso_seg: 0, sets_reps: c.reps }
   }
-  const rondas = Math.max(1, Math.round(BLOQUE_SEG / (cantidad * c.celda)))
+  // floor y no round: redondear para arriba pasa el bloque, no lo ajusta. Hoy no se nota
+  // porque el circuito se recorta antes a los 3-4 ejercicios que el formato prefiere, pero con
+  // round un cambio en esa preferencia (EMOM a 4) devolvía ocho minutos sin que nada avisara.
+  const rondas = Math.max(1, Math.floor(BLOQUE_SEG / (cantidad * c.celda)))
   return {
     formato, rondas, trabajo_seg: c.trabajo, descanso_seg: c.descanso, sets_reps: c.reps,
   }
