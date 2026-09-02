@@ -26,6 +26,7 @@ import {
   CheckIcon,
   BuildingStorefrontIcon,
   BoltIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline'
 
 // Emails allowed to see fitness section (beta feature)
@@ -82,7 +83,7 @@ const ESPACIOS = [
   },
 ]
 
-const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => {
+const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLogout }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const [abierto, setAbierto] = useState(false)
@@ -140,46 +141,48 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
   }
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-bg-secondary border-r border-border-default">
-      {/* Logo/Brand */}
-      <div className="flex items-center justify-between h-14 px-4 border-b border-border-default">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-brand rounded flex items-center justify-center">
-            <span className="text-white font-bold text-sm">T</span>
+    // Sin fondo ni borde propios: el sidebar es el shell rojo que se ve a través de él.
+    <div className="flex flex-col h-full px-2.5 pb-1.5">
+      {/* Logo/Brand — el cuadrado se invierte, blanco con la T roja: el rojo de marca sobre
+          rojo de marca no se veía. */}
+      <div className="flex items-center justify-between h-12 px-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-[26px] h-[26px] bg-white rounded-lg flex items-center justify-center">
+            <span className="text-shell font-bold text-sm">T</span>
           </div>
-          <span className="text-text-primary font-semibold text-sm">TecnoFit</span>
+          <span className="text-white font-semibold text-[15px] tracking-tight">TecnoFit</span>
         </div>
         <button
           onClick={onCloseMobileMenu}
-          className="lg:hidden p-1 hover:bg-bg-surface rounded-md transition-colors"
+          className="lg:hidden p-1 hover:bg-white/10 rounded-md transition-colors"
         >
-          <XMarkIcon className="h-5 w-5 text-text-secondary" />
+          <XMarkIcon className="h-5 w-5 text-white/60" />
         </button>
       </div>
 
       {/* Space switcher — only when there is more than one space to switch to */}
       {espacios.length > 1 && espacioActual && (
-        <div className="px-2 pt-3" ref={selectorRef}>
+        <div className="pt-2.5" ref={selectorRef}>
           <div className="relative">
             <button
               onClick={() => setAbierto((v) => !v)}
               aria-haspopup="listbox"
               aria-expanded={abierto}
-              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg border border-border-default bg-bg-secondary hover:bg-bg-surface transition-colors"
+              className="w-full flex items-center gap-2.5 h-10 px-2.5 rounded-xl sidebar-surface hover:bg-white/[0.17] transition-colors"
             >
-              <span className="w-5 h-5 rounded bg-brand/10 flex items-center justify-center flex-shrink-0">
-                <espacioActual.icono className="h-3.5 w-3.5 text-brand" />
+              <span className="w-[22px] h-[22px] rounded-md bg-white/15 flex items-center justify-center flex-shrink-0">
+                <espacioActual.icono className="h-3.5 w-3.5 text-white" />
               </span>
-              <span className="text-sm font-medium text-text-primary flex-1 text-left truncate">
+              <span className="text-sm font-medium text-white flex-1 text-left truncate">
                 {espacioActual.nombre}
               </span>
-              <ChevronUpDownIcon className="h-4 w-4 text-text-tertiary flex-shrink-0" />
+              <ChevronUpDownIcon className="h-4 w-4 text-white/60 flex-shrink-0" />
             </button>
 
             {abierto && (
               <div
                 role="listbox"
-                className="absolute left-0 right-0 mt-1 z-50 p-1 rounded-lg border border-border-default bg-bg-secondary shadow-lg"
+                className="absolute left-0 right-0 mt-1.5 z-50 p-1.5 rounded-xl border border-white/20 bg-shell-deep shadow-xl"
               >
                 {espacios.map((espacio) => {
                   const activo = espacio.id === espacioActual.id
@@ -189,18 +192,20 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
                       role="option"
                       aria-selected={activo}
                       onClick={() => cambiarEspacio(espacio)}
-                      className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-bg-surface transition-colors text-left"
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-left ${
+                        activo ? 'bg-white/[0.13]' : 'hover:bg-white/[0.08]'
+                      }`}
                     >
-                      <span className="w-5 h-5 rounded bg-brand/10 flex items-center justify-center flex-shrink-0">
-                        <espacio.icono className="h-3.5 w-3.5 text-brand" />
+                      <span className="w-[22px] h-[22px] rounded-md bg-white/15 flex items-center justify-center flex-shrink-0">
+                        <espacio.icono className="h-3.5 w-3.5 text-white" />
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-medium text-text-primary truncate">
+                        <span className="block text-[13.5px] font-medium text-white truncate">
                           {espacio.nombre}
                         </span>
-                        <span className="block text-xs text-text-tertiary truncate">{espacio.detalle}</span>
+                        <span className="block text-xs text-white/60 truncate">{espacio.detalle}</span>
                       </span>
-                      {activo && <CheckIcon className="h-4 w-4 text-brand flex-shrink-0" />}
+                      {activo && <CheckIcon className="h-4 w-4 text-white flex-shrink-0" />}
                     </button>
                   )
                 })}
@@ -211,10 +216,10 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 pt-3 space-y-0.5 overflow-y-auto">
         {espacioActual?.grupos.map((grupo, i) => (
-          <div key={grupo.titulo ?? `grupo-${i}`} className="space-y-1">
-            {grupo.titulo && <div className={`section-header ${i > 0 ? 'mt-4' : ''}`}>{grupo.titulo}</div>}
+          <div key={grupo.titulo ?? `grupo-${i}`} className="space-y-0.5">
+            {grupo.titulo && <div className="sidebar-section">{grupo.titulo}</div>}
             {grupo.items.map((item) => {
               const isActive = location.pathname === item.href
               return (
@@ -222,9 +227,9 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
                   key={item.name}
                   to={item.href}
                   onClick={handleNavClick}
-                  className={isActive ? 'nav-item-active' : 'nav-item-inactive'}
+                  className={isActive ? 'sidebar-item-active' : 'sidebar-item'}
                 >
-                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
                   <span>{item.name}</span>
                 </Link>
               )
@@ -233,17 +238,23 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-border-default">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-bg-surface rounded-full flex items-center justify-center">
-            <UserCircleIcon className="h-5 w-5 text-text-tertiary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-text-primary truncate">Admin</p>
-            <p className="text-xs text-text-tertiary truncate capitalize">{userRole?.replace('_', ' ') || 'User'}</p>
-          </div>
+      {/* Footer — "Cerrar sesión" bajó acá desde la barra de Header, que ya no existe. */}
+      <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.12]">
+        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+          <UserCircleIcon className="h-5 w-5 text-white/80" />
         </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-medium text-white truncate">Admin</p>
+          <p className="text-xs text-white/60 truncate capitalize">{userRole?.replace('_', ' ') || 'User'}</p>
+        </div>
+        <button
+          onClick={onLogout}
+          title="Cerrar sesión"
+          aria-label="Cerrar sesión"
+          className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
+        >
+          <ArrowRightOnRectangleIcon className="h-[17px] w-[17px]" />
+        </button>
       </div>
     </div>
   )
@@ -251,8 +262,8 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:flex-shrink-0 sticky top-0 h-screen">
-        <div className="flex flex-col w-56">
+      <div className="relative z-10 hidden lg:flex lg:flex-shrink-0">
+        <div className="flex flex-col w-[236px]">
           <SidebarContent />
         </div>
       </div>
@@ -261,7 +272,8 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu }) => 
       {mobileMenuOpen && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onCloseMobileMenu} />
-          <div className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden animate-slide-in-left">
+          {/* El panel mobile vive fuera del shell, así que se pinta el rojo él mismo. */}
+          <div className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden animate-slide-in-left bg-shell py-1.5">
             <SidebarContent />
           </div>
         </>

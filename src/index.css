@@ -11,16 +11,23 @@
   --color-brand-muted: rgba(220, 38, 38, 0.1);
   --color-brand-secondary: #f59e0b;
   
+  /* Shell — el marco rojo sobre el que flota el contenedor. Es un token aparte de
+     bg-primary a propósito: bg-primary lo usan pantallas sueltas (login, check-in, TV)
+     que siguen siendo claras y no tienen que volverse rojas. */
+  --color-shell: #A81D17;
+  --color-shell-deep: #7C110C;
+  --color-canvas: #FAF9F7;
+
   /* Background colors - Light theme */
   --color-bg-primary: #f8f9fa;
   --color-bg-secondary: #ffffff;
-  --color-bg-surface: #f3f4f6;
+  --color-bg-surface: #F1EFEB;
   --color-bg-surface-hover: #e5e7eb;
   --color-bg-overlay: rgba(0, 0, 0, 0.5);
   
   /* Border colors */
-  --color-border-default: #e5e7eb;
-  --color-border-hover: #d1d5db;
+  --color-border-default: #ECEAE5;
+  --color-border-hover: #E0DCD5;
   --color-border-focus: #dc2626;
   
   /* Text colors */
@@ -75,11 +82,16 @@
 
 /* Component utility classes using Tailwind v4 @utility */
 @utility btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  height: 2.5rem;
   background-color: var(--color-brand);
   color: white;
   font-weight: 500;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  padding: 0 1.125rem;
+  border-radius: 9999px;
+  white-space: nowrap;
   transition: all 150ms;
   &:hover {
     background-color: var(--color-brand-hover);
@@ -91,12 +103,17 @@
 }
 
 @utility btn-secondary {
-  background-color: transparent;
-  color: var(--color-text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  height: 2.5rem;
+  background-color: white;
+  color: #4B5563;
   font-weight: 500;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--color-border-default);
+  padding: 0 1.125rem;
+  border-radius: 9999px;
+  border: 1px solid #E4E1DB;
+  white-space: nowrap;
   transition: all 150ms;
   &:hover {
     background-color: var(--color-bg-surface);
@@ -109,11 +126,15 @@
 }
 
 @utility btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  height: 2.5rem;
   background-color: rgba(239, 68, 68, 0.1);
   color: var(--color-error);
   font-weight: 500;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  padding: 0 1.125rem;
+  border-radius: 9999px;
   border: 1px solid rgba(239, 68, 68, 0.2);
   transition: all 150ms;
   &:hover {
@@ -190,16 +211,16 @@
 
 @utility card {
   background-color: var(--color-bg-secondary);
-  border-radius: 0.5rem;
+  border-radius: 0.875rem;
   border: 1px solid var(--color-border-default);
-  padding: 1.25rem;
+  padding: 1.375rem 1.5rem;
 }
 
 @utility card-hover {
   background-color: var(--color-bg-secondary);
-  border-radius: 0.5rem;
+  border-radius: 0.875rem;
   border: 1px solid var(--color-border-default);
-  padding: 1.25rem;
+  padding: 1.375rem 1.5rem;
   transition: border-color 150ms, box-shadow 150ms;
   &:hover {
     border-color: var(--color-border-hover);
@@ -210,9 +231,9 @@
 @utility status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 0.4375rem;
+  font-size: 0.78125rem;
   font-weight: 500;
 }
 
@@ -241,14 +262,12 @@
 }
 
 @utility table-header {
-  padding: 0.75rem 1rem;
+  padding: 0.8125rem 1rem;
   text-align: left;
-  font-size: 0.75rem;
+  font-size: 0.78125rem;
   font-weight: 500;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background-color: var(--color-bg-surface);
+  color: var(--color-text-tertiary);
+  background-color: #FBFAF8;
   border-bottom: 1px solid var(--color-border-default);
 }
 
@@ -266,52 +285,57 @@
   }
 }
 
-@utility nav-item {
+/* El sidebar vive sobre el rojo del shell, no sobre blanco. Va con nombres propios
+   (sidebar-*) en vez de reusar nav-item-*: son clases pensadas para un fondo oscuro y
+   aplicadas dentro del contenedor claro quedarían blanco sobre blanco, sin aviso. */
+@utility sidebar-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
+  gap: 0.6875rem;
+  padding: 0.5rem 0.6875rem;
+  border-radius: 0.5625rem;
   font-size: 0.875rem;
   font-weight: 500;
-  transition: all 150ms;
-}
-
-@utility nav-item-active {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  background-color: rgba(220, 38, 38, 0.1);
-  color: var(--color-brand);
-}
-
-@utility nav-item-inactive {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  transition: all 150ms;
+  color: rgba(255, 255, 255, 0.78);
+  transition: background-color 150ms, color 150ms;
   &:hover {
-    color: var(--color-text-primary);
-    background-color: var(--color-bg-surface);
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.08);
   }
 }
 
-@utility section-header {
-  font-size: 0.75rem;
+@utility sidebar-item-active {
+  display: flex;
+  align-items: center;
+  gap: 0.6875rem;
+  padding: 0.5rem 0.6875rem;
+  border-radius: 0.5625rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  color: var(--color-text-tertiary);
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+@utility sidebar-section {
+  font-size: 0.65625rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.52);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.5rem 0.75rem;
+  letter-spacing: 0.09em;
+  padding: 1rem 0.6875rem 0.4375rem;
+}
+
+/* Superficie translúcida del sidebar: selector de espacios y tarjeta de usuario. */
+@utility sidebar-surface {
+  background-color: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+}
+
+/* El contenedor blanco que flota sobre el shell. */
+@utility app-canvas {
+  background-color: var(--color-canvas);
+  border-radius: 1.125rem;
+  overflow: hidden;
 }
 
 @utility font-mono {

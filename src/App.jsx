@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Bars3Icon } from '@heroicons/react/24/outline'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
@@ -21,7 +22,7 @@ import QueueMonitor from './components/QueueMonitor'
 import QueueConfig from './components/QueueConfig'
 import QueueTv from './components/QueueTv'
 import Sidebar from './components/Sidebar'
-import Header from './components/Header'
+import ShellGlow from './components/ShellGlow'
 import { authService } from './services/authService'
 
 // Emails allowed to see fitness section (beta feature)
@@ -176,17 +177,30 @@ function AuthenticatedShell({
     userEmail && FITNESS_ALLOWED_EMAILS.includes(userEmail.toLowerCase())
 
   return (
-    <div className="min-h-screen bg-bg-primary flex">
+    // El shell: rojo de marca con el resplandor detrás, y el contenido flotando encima en un
+    // contenedor blanco redondeado. La barra global de Header desapareció — cada pantalla ya
+    // trae su propio <h1> y sus acciones, y tener las dos cosas era un título arriba de otro.
+    <div className="relative min-h-screen flex bg-shell p-2.5">
+      <ShellGlow />
       <Sidebar
         userRole={userRole}
         userEmail={userEmail}
         mobileMenuOpen={mobileMenuOpen}
         onCloseMobileMenu={onCloseMobileMenu}
+        onLogout={onLogout}
       />
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <Header onLogout={onLogout} onMenuToggle={onMenuToggle} />
+      <div className="relative z-10 flex-1 min-w-0 flex flex-col app-canvas">
+        {/* El botón de menú vivía en Header. Sigue existiendo en mobile, ahora sobre el
+            contenedor, porque sin él no hay forma de abrir el sidebar en pantalla chica. */}
+        <button
+          onClick={onMenuToggle}
+          aria-label="Abrir menú"
+          className="lg:hidden absolute top-4 left-4 z-20 p-2 text-text-secondary hover:text-text-primary hover:bg-bg-surface rounded-full transition-colors"
+        >
+          <Bars3Icon className="h-5 w-5" />
+        </button>
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="px-6 lg:px-[30px] pt-6 pb-7 max-lg:pt-16">
             <Routes>
               <Route
                 path="/"
