@@ -21,6 +21,7 @@ import routinesService from '../services/routinesService'
 import exercisesService from '../services/exercisesService'
 import { generateRoutineSessions } from '../services/routineGenerationService'
 import { supabase, toCamelCase } from '../lib/supabase'
+import { BLOQUE_SEG, comoTexto, duracionEstacionSeg, duracionSeg, esPorTiempo, mmss } from '../lib/formatos'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
 import SelectorEjercicio from './SelectorEjercicio'
@@ -848,24 +849,28 @@ export default function Routines() {
                                           key={se.id} 
                                           className="bg-bg-surface p-2 rounded text-xs group hover:bg-bg-surface/70"
                                         >
-                                          <div className="flex items-start justify-between gap-1">
-                                            <div className="flex-1 min-w-0">
-                                              <p className="font-medium text-text-primary truncate" title={se.exercises?.name}>
+                                          {/* Apilado, no en dos columnas: la estación mide ~200px
+                                              y con el nombre y los botones peleando por el mismo
+                                              renglón los ejercicios quedaban en "1. Sen…". El
+                                              nombre se lleva el ancho completo y usa dos líneas. */}
+                                          <div className="flex flex-col gap-1">
+                                            <div className="min-w-0">
+                                              <p className="font-medium text-text-primary line-clamp-2" title={se.exercises?.name}>
                                                 {idx + 1}. {se.exercises?.name}
                                               </p>
-                                              <p className="text-text-tertiary">
+                                              <p className="text-text-tertiary truncate">
                                                 {se.setsReps}
                                                 {se.weightKg && ` • ${se.weightKg}kg`}
                                               </p>
                                               {/* Sin esto un Tabata y unas series sueltas se
                                                   veían igual en la grilla. */}
                                               {esPorTiempo(se.formato) && (
-                                                <p className="mt-0.5 inline-flex items-center rounded bg-brand/10 px-1.5 py-px text-[10px] font-medium text-brand">
+                                                <p className="mt-1 inline-flex items-center whitespace-nowrap rounded bg-brand/10 px-1.5 py-px text-[10px] font-medium text-brand">
                                                   {comoTexto(se.formato, se)} · {mmss(duracionSeg(se))}
                                                 </p>
                                               )}
                                             </div>
-                                            <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                                               <button
                                                 onClick={() => setSustituyendo({ fila: se, estacion: boxNum, boxId: se.box_id })}
                                                 className="p-0.5 text-text-tertiary hover:text-brand"
