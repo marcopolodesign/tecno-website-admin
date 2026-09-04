@@ -89,6 +89,10 @@ export const routinesService = {
             last_name,
             email
           ),
+          arquetipos (
+            id,
+            nombre
+          ),
           routine_sessions (
             id,
             session_number,
@@ -108,6 +112,10 @@ export const routinesService = {
               weight_kg,
               micro_pause,
               notes,
+              formato,
+              rondas,
+              trabajo_seg,
+              descanso_seg,
               boxes (
                 id,
                 name,

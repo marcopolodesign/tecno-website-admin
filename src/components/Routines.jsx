@@ -943,9 +943,45 @@ export default function Routines() {
                             </div>
                             <div>
                               <p className="font-medium text-text-primary text-sm">{session.title}</p>
-                              <p className="text-xs text-text-tertiary">
-                                {session.sessionExercises?.length || 0} ejercicios
-                              </p>
+                              {/* Qué estaciones están completas y con qué modalidad, en vez de
+                                  "N ejercicios" — eso no decía si la sesión estaba armada. */}
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                {[1, 2, 3, 4, 5].map((boxNum) => {
+                                  const filas = (session.sessionExercises || []).filter((se) => se.boxNumber === boxNum)
+                                  const primera = filas[0]
+                                  const modalidad = primera
+                                    ? esPorTiempo(primera.formato)
+                                      ? comoTexto(primera.formato, primera)
+                                      : 'Series × reps'
+                                    : null
+                                  return (
+                                    <span
+                                      key={boxNum}
+                                      title={`Estación ${boxNum}${modalidad ? ` · ${modalidad}` : ' · sin ejercicios'}`}
+                                      className={`w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0 ${
+                                        primera
+                                          ? 'bg-brand text-white'
+                                          : 'bg-bg-surface border border-border-default text-text-tertiary'
+                                      }`}
+                                    >
+                                      {boxNum}
+                                    </span>
+                                  )
+                                })}
+                                <span className="text-xs text-text-tertiary">
+                                  {mmss(
+                                    [1, 2, 3, 4, 5].filter((boxNum) =>
+                                      (session.sessionExercises || []).some((se) => se.boxNumber === boxNum)
+                                    ).length * BLOQUE_SEG
+                                  )}{' '}
+                                  total
+                                </span>
+                                {selectedRoutine?.arquetipos?.nombre && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand/10 text-brand font-medium">
+                                    {selectedRoutine.arquetipos.nombre}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
