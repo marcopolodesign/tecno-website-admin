@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { PlusIcon, PencilIcon, TrashIcon, MapPinIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, PencilIcon, TrashIcon, MapPinIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { locationsService } from '../services/locationsService'
 import { useSede } from '../contexts/SedeContext'
 import toast from 'react-hot-toast'
@@ -13,14 +13,20 @@ const Locations = () => {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingLocation, setEditingLocation] = useState(null)
+  const [sincronizando, setSincronizando] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     address: '',
     city: '',
     country: '',
     phone: '',
-    is_active: true
+    is_active: true,
+    sync_from_location_id: '',
+    sync_enabled: false
   })
+  // Sólo tiene sentido al CREAR — copiar es el punto de partida, no algo que se repite cada vez
+  // que se edita una sede que ya existe. El sync continuo (formData.sync_enabled) es aparte.
+  const [copiarDe, setCopiarDe] = useState('')
 
   useEffect(() => {
     fetchLocations()
@@ -42,12 +48,27 @@ const Locations = () => {
     setLoading(true)
 
     try {
+      const payload = { ...formData, sync_from_location_id: formData.sync_from_location_id || null }
+
       if (editingLocation) {
-        await locationsService.updateLocation(editingLocation.id, formData)
+        await locationsService.updateLocation(editingLocation.id, payload)
         toast.success('Sede actualizada')
       } else {
-        await locationsService.createLocation(formData)
+        const { data: nueva } = await locationsService.createLocation(payload)
         toast.success('Sede creada')
+
+        if (copiarDe && nueva?.id) {
+          try {
+            const { data: resultado } = await locationsService.copiarEquipamiento(copiarDe, nueva.id)
+            toast.success(
+              `Equipamiento copiado: ${resultado?.lineas_creadas ?? 0} líneas, ${resultado?.boxes_creados ?? 0} boxes`
+            )
+          } catch (copyError) {
+            // La sede ya quedó creada — no copiar el equipamiento no es motivo para perderla.
+            // Se puede reintentar desde acá mismo (botón "Sincronizar ahora" una vez guardada).
+            toast.error('La sede se creó, pero copiar el equipamiento falló — probá "Sincronizar ahora" desde su tarjeta.')
+          }
+        }
       }
 
       await fetchLocations()
@@ -57,6 +78,21 @@ const Locations = () => {
       toast.error('Error al guardar sede')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const sincronizarAhora = async (location) => {
+    if (!location.sync_from_location_id) return
+    setSincronizando(location.id)
+    try {
+      const { data: resultado } = await locationsService.copiarEquipamiento(location.sync_from_location_id, location.id)
+      toast.success(
+        `Sincronizado: ${resultado?.lineas_creadas ?? 0} líneas nuevas, ${resultado?.boxes_creados ?? 0} boxes nuevos, ${resultado?.boxes_actualizados ?? 0} actualizados`
+      )
+    } catch (error) {
+      toast.error('Error al sincronizar')
+    } finally {
+      setSincronizando(null)
     }
   }
 
@@ -81,21 +117,31 @@ const Locations = () => {
       city: location.city || '',
       country: location.country || '',
       phone: location.phone || '',
-      is_active: location.is_active ?? true
+      is_active: location.is_active ?? true,
+      sync_from_location_id: location.sync_from_location_id || '',
+      sync_enabled: location.sync_enabled ?? false
     })
+    setShowModal(true)
+  }
+
+  const openNewModal = () => {
+    setCopiarDe('')
     setShowModal(true)
   }
 
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingLocation(null)
+    setCopiarDe('')
     setFormData({
       name: '',
       address: '',
       city: '',
       country: '',
       phone: '',
-      is_active: true
+      is_active: true,
+      sync_from_location_id: '',
+      sync_enabled: false
     })
   }
 
@@ -113,7 +159,7 @@ const Locations = () => {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openNewModal}
           className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
@@ -180,19 +226,33 @@ const Locations = () => {
                   )}
                 </div>
 
-                {esActiva ? (
-                  <div className="flex items-center gap-1.5 text-sm font-medium text-sky-600">
-                    <CheckCircleIcon className="h-4 w-4" />
-                    Sede activa
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setSedeId(location.id)}
-                    className="text-sm font-medium text-sky-600 hover:text-sky-800"
-                  >
-                    Elegir como sede activa
-                  </button>
-                )}
+                <div className="flex items-center justify-between gap-2">
+                  {esActiva ? (
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-sky-600">
+                      <CheckCircleIcon className="h-4 w-4" />
+                      Sede activa
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setSedeId(location.id)}
+                      className="text-sm font-medium text-sky-600 hover:text-sky-800"
+                    >
+                      Elegir como sede activa
+                    </button>
+                  )}
+
+                  {location.sync_enabled && location.sync_from_location_id && (
+                    <button
+                      onClick={() => sincronizarAhora(location)}
+                      disabled={sincronizando === location.id}
+                      title={`Sincroniza con ${locations.find((l) => l.id === location.sync_from_location_id)?.name || 'otra sede'}`}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-sky-600 disabled:opacity-50"
+                    >
+                      <ArrowPathIcon className={`h-3.5 w-3.5 ${sincronizando === location.id ? 'animate-spin' : ''}`} />
+                      Sincronizar
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
@@ -290,6 +350,59 @@ const Locations = () => {
             />
             Sede activa (aparece en el selector)
           </label>
+
+          {!editingLocation && locations.length > 0 && (
+            <div className="pt-2 border-t border-border-default">
+              <label className="form-label">Copiar equipamiento de</label>
+              <select
+                value={copiarDe}
+                onChange={(e) => setCopiarDe(e.target.value)}
+                className="form-select"
+              >
+                <option value="">No copiar — arrancar vacía</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-text-tertiary mt-1">
+                Trae las mismas líneas, boxes y materiales como punto de partida — se pueden
+                editar después desde Equipamiento, igual que cualquier sede.
+              </p>
+            </div>
+          )}
+
+          {locations.length > 0 && (
+            <div className="pt-2 border-t border-border-default">
+              <label className="flex items-center gap-2 text-sm text-text-secondary mb-2">
+                <input
+                  type="checkbox"
+                  checked={formData.sync_enabled}
+                  onChange={(e) => setFormData({ ...formData, sync_enabled: e.target.checked })}
+                />
+                Mantener sincronizado el equipamiento con otra sede
+              </label>
+              {formData.sync_enabled && (
+                <>
+                  <select
+                    value={formData.sync_from_location_id}
+                    onChange={(e) => setFormData({ ...formData, sync_from_location_id: e.target.value })}
+                    className="form-select"
+                  >
+                    <option value="">Elegir sede de origen...</option>
+                    {locations
+                      .filter((l) => l.id !== editingLocation?.id)
+                      .map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                  </select>
+                  <p className="text-[11px] text-text-tertiary mt-1">
+                    Cada 15 minutos se copian las líneas, boxes y materiales nuevos o cambiados
+                    de esa sede acá — nunca borra un box que ya existe en esta sede.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </form>
       </Modal>
     </div>
