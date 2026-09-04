@@ -5,12 +5,16 @@ import logsService from './logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
 
 export const usersService = {
-  async getUsers() {
+  async getUsers(sedeId) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false })
+
+      if (sedeId) query = query.eq('location_id', sedeId)
+
+      const { data, error } = await query
 
       if (error) throw error
       return { data: toCamelCase(data) }
@@ -69,7 +73,8 @@ export const usersService = {
         utm_campaign: data.utmCampaign || null,
         utm_term: data.utmTerm || null,
         utm_content: data.utmContent || null,
-        converted_at: new Date().toISOString()
+        converted_at: new Date().toISOString(),
+        location_id: data.locationId || null
       }
 
       const { data: result, error } = await supabase

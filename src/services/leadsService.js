@@ -23,9 +23,12 @@ const trainingGoalMap = {
 }
 
 export const leadsService = {
-  async getLeads() {
+  // sedeId es opcional a propósito: leads viejos pueden no tener sede todavía (todo lo previo
+  // a la migración de location_id quedó apuntando a la única sede que existía en ese momento,
+  // pero por las dudas no se filtran fuera si algún día queda uno en null).
+  async getLeads(sedeId) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -36,6 +39,10 @@ export const leadsService = {
           )
         `)
         .order('created_at', { ascending: false })
+
+      if (sedeId) query = query.eq('location_id', sedeId)
+
+      const { data, error } = await query
 
       if (error) throw error
       return { data: toCamelCase(data) }
@@ -84,7 +91,8 @@ export const leadsService = {
         utm_medium: data.utmMedium || null,
         utm_campaign: data.utmCampaign || null,
         utm_term: data.utmTerm || null,
-        utm_content: data.utmContent || null
+        utm_content: data.utmContent || null,
+        location_id: data.locationId || null
       }
       
       // Add source field only if provided (requires schema cache refresh after adding column)

@@ -11,8 +11,10 @@ import { DataGrid } from '@mui/x-data-grid'
 import { prospectsService } from '../services/prospectsService'
 import { sellersService } from '../services/sellersService'
 import { dataGridStyles, toastOptions } from '../lib/themeStyles'
+import { useSede } from '../contexts/SedeContext'
 
 const Prospects = () => {
+  const { sedeId } = useSede()
   const [prospects, setProspects] = useState([])
   const [filteredProspects, setFilteredProspects] = useState([])
   const [loading, setLoading] = useState(true)
@@ -34,9 +36,12 @@ const Prospects = () => {
   })
 
   useEffect(() => {
-    fetchProspects()
     fetchSellers()
   }, [])
+
+  useEffect(() => {
+    fetchProspects()
+  }, [sedeId])
 
   useEffect(() => {
     filterProspects()
@@ -44,7 +49,7 @@ const Prospects = () => {
 
   const fetchProspects = async () => {
     try {
-      const response = await prospectsService.getProspects()
+      const response = await prospectsService.getProspects(sedeId)
       setProspects(response.data || [])
     } catch (error) {
       console.error('Error fetching prospects:', error)
@@ -166,7 +171,7 @@ const Prospects = () => {
 
   const handleExport = async () => {
     try {
-      const response = await prospectsService.getProspects()
+      const response = await prospectsService.getProspects(sedeId)
       const prospectsData = response.data || []
       
       const csvContent = [

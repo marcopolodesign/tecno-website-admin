@@ -14,10 +14,12 @@ import { leadsService } from '../services/leadsService'
 import { sellersService } from '../services/sellersService'
 import membershipPlansService from '../services/membershipPlansService'
 import { dataGridStyles, toastOptions } from '../lib/themeStyles'
+import { useSede } from '../contexts/SedeContext'
 import Sidecart from './Sidecart'
 import Modal from './Modal'
 
 const Leads = ({ userRole }) => {
+  const { sedeId } = useSede()
   const [leads, setLeads] = useState([])
   const [filteredLeads, setFilteredLeads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -61,10 +63,13 @@ const Leads = ({ userRole }) => {
   })
 
   useEffect(() => {
-    fetchLeads()
     fetchSellers()
     fetchMembershipPlans()
   }, [])
+
+  useEffect(() => {
+    fetchLeads()
+  }, [sedeId])
 
   useEffect(() => {
     filterLeads()
@@ -72,7 +77,7 @@ const Leads = ({ userRole }) => {
 
   const fetchLeads = async () => {
     try {
-      const response = await leadsService.getLeads()
+      const response = await leadsService.getLeads(sedeId)
       setLeads(response.data || [])
     } catch (error) {
       console.error('Error fetching leads:', error)
@@ -228,7 +233,7 @@ const Leads = ({ userRole }) => {
     }
 
     try {
-      const response = await leadsService.createLead(createFormData)
+      const response = await leadsService.createLead({ ...createFormData, locationId: sedeId })
       setLeads([response.data, ...leads])
       setShowCreateModal(false)
       setCreateFormData({

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { boxLabel } from '../services/queueService'
+import { useSede } from '../contexts/SedeContext'
 import Sidecart from './Sidecart'
 
 // What each box has, and what it is missing.
@@ -33,6 +34,7 @@ const PATRONES = [
 ]
 
 export default function Equipamiento() {
+  const { sedeId } = useSede()
   const [boxes, setBoxes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
@@ -69,13 +71,17 @@ export default function Equipamiento() {
     }
   }
 
+  // Sin sedeId todavía (SedeContext sigue resolviendo cuál sede va primero) no hay nada que
+  // traer — antes esto mezclaba las boxes de todas las sedes en una sola grilla.
   const cargar = useCallback(async () => {
+    if (!sedeId) return
     setCargando(true)
     setError(null)
     try {
       const { data, error: err } = await supabase
         .from('boxes_equipamiento')
         .select('*')
+        .eq('sede_id', sedeId)
         .order('line_number', { nullsFirst: false })
         .order('box_number')
       if (err) throw err
@@ -85,7 +91,7 @@ export default function Equipamiento() {
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [sedeId])
 
   useEffect(() => {
     cargar()
@@ -106,7 +112,6 @@ export default function Equipamiento() {
   }, [boxes])
 
   const vacios = boxes.filter((b) => b.elementos.length === 0).length
-  const sedeId = boxes.find((b) => b.sede_id)?.sede_id ?? null
 
   const alGuardar = (fila) =>
     setBoxes((bs) => bs.map((b) => (b.id === fila.id ? { ...b, ...fila } : b)))

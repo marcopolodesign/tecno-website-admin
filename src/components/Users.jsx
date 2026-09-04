@@ -18,6 +18,7 @@ import { getCurrentUserForLogging } from '../utils/logHelpers'
 import LogsTimeline from './LogsTimeline'
 import Modal from './Modal'
 import SelectorContraindicaciones from './SelectorContraindicaciones'
+import { useSede } from '../contexts/SedeContext'
 import { supabase } from '../lib/supabase'
 
 // Helper to format date without timezone issues
@@ -32,6 +33,7 @@ const formatDateSafe = (dateString) => {
 }
 
 const Users = () => {
+  const { sedeId } = useSede()
   const [users, setUsers] = useState([])
   const [filteredUsers, setFilteredUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -109,10 +111,13 @@ const Users = () => {
       .then(({ data }) => setArquetipos(data || []))
   }, [])
   useEffect(() => {
-    fetchUsers()
     fetchSellers()
     fetchMembershipPlans()
   }, [])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [sedeId])
 
   useEffect(() => {
     filterUsers()
@@ -120,7 +125,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await usersService.getUsers()
+      const response = await usersService.getUsers(sedeId)
       setUsers(response.data || [])
     } catch (error) {
       console.error('Error fetching users:', error)
@@ -268,7 +273,7 @@ const Users = () => {
         notes: createFormData.paymentNotes
       } : null
 
-      const response = await usersService.createUser(createFormData, paymentData)
+      const response = await usersService.createUser({ ...createFormData, locationId: sedeId }, paymentData)
       setUsers([response.data, ...users])
       setShowCreateModal(false)
       // Reset form
@@ -420,7 +425,7 @@ const Users = () => {
 
   const handleExport = async () => {
     try {
-      const response = await usersService.getUsers()
+      const response = await usersService.getUsers(sedeId)
       const usersData = response.data || []
       
       const csvContent = [

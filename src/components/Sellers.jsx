@@ -3,10 +3,12 @@ import { supabase, isServiceRole } from '../lib/supabase'
 import { locationsService } from '../services/locationsService'
 import logsService from '../services/logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
+import { useSede } from '../contexts/SedeContext'
 import { PlusIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import Modal from './Modal'
 
 const Sellers = () => {
+  const { sedeId } = useSede()
   const [sellers, setSellers] = useState([])
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -24,9 +26,12 @@ const Sellers = () => {
   })
 
   useEffect(() => {
-    fetchSellers()
     fetchLocations()
   }, [])
+
+  useEffect(() => {
+    fetchSellers()
+  }, [sedeId])
 
   const fetchLocations = async () => {
     try {
@@ -38,6 +43,7 @@ const Sellers = () => {
   }
 
   const fetchSellers = async () => {
+    if (!sedeId) return
     try {
       const { data, error } = await supabase
         .from('sellers')
@@ -45,6 +51,7 @@ const Sellers = () => {
           *,
           locations(name)
         `)
+        .eq('location_id', sedeId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -197,7 +204,7 @@ const Sellers = () => {
       password: '',
       role: 'front_desk',
       active: true,
-      location_id: ''
+      location_id: sedeId || ''
     })
     setEditingSeller(null)
   }

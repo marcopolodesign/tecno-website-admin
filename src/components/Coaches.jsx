@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase, isServiceRole } from '../lib/supabase'
 import { locationsService } from '../services/locationsService'
+import { useSede } from '../contexts/SedeContext'
 import { PlusIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import Modal from './Modal'
 
 const Coaches = () => {
+  const { sedeId } = useSede()
   const [coaches, setCoaches] = useState([])
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -26,9 +28,12 @@ const Coaches = () => {
   })
 
   useEffect(() => {
-    fetchCoaches()
     fetchLocations()
   }, [])
+
+  useEffect(() => {
+    fetchCoaches()
+  }, [sedeId])
 
   const fetchLocations = async () => {
     try {
@@ -40,6 +45,7 @@ const Coaches = () => {
   }
 
   const fetchCoaches = async () => {
+    if (!sedeId) return
     try {
       const { data, error } = await supabase
         .from('coaches')
@@ -48,6 +54,7 @@ const Coaches = () => {
           users(count),
           locations(name)
         `)
+        .eq('location_id', sedeId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -194,7 +201,7 @@ const Coaches = () => {
       bio: '',
       is_active: true,
       hire_date: '',
-      location_id: '',
+      location_id: sedeId || '',
       age: ''
     })
     setEditingCoach(null)
