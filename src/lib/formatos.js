@@ -38,20 +38,21 @@ export function duracionSeg({ rondas, trabajoSeg, descansoSeg }) {
 }
 
 /**
- * Lo que dura la estación entera: la suma de sus filas con reloj.
+ * Lo que dura la estación entera.
  *
- * Se mide por estación y no por ejercicio porque el socio no cambia de box entre un ejercicio
- * y el siguiente — hace el circuito completo y recién ahí avanza. Tres filas de dos minutos
- * son seis minutos de box, y mirando fila por fila las tres pasan el control.
+ * La modalidad es de la ESTACIÓN, no de cada ejercicio: todas las filas de una misma estación
+ * comparten formato/rondas/trabajoSeg/descansoSeg (se sincronizan al guardar cualquiera de
+ * ellas), así que el tiempo de la estación es el de UNA fila cualquiera — sumar como antes
+ * multiplicaba el tiempo por la cantidad de ejercicios cargados (tres ejercicios en AMRAP 6:00
+ * daban 18:00 de estación, que no existe).
  *
- * Series no suma: no tiene reloj, la carga y las repeticiones las administra el socio dentro
+ * Series no cuenta: no tiene reloj, la carga y las repeticiones las administra el socio dentro
  * del turno.
  */
 export function duracionEstacionSeg(filas) {
-  return (filas || []).reduce(
-    (total, f) => total + (esPorTiempo(f?.formato) ? duracionSeg(f) : 0),
-    0
-  )
+  const primera = (filas || [])[0]
+  if (!primera || !esPorTiempo(primera.formato)) return 0
+  return duracionSeg(primera)
 }
 
 export function comoTexto(formato, { rondas, trabajoSeg, descansoSeg } = {}) {

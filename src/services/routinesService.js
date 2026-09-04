@@ -404,6 +404,36 @@ export const routinesService = {
     }
   },
 
+  // La modalidad es de la estación entera, no de cada fila — todas las de un mismo
+  // session_id + box_number tienen que compartir formato/rondas/trabajo_seg/descanso_seg. Se
+  // corre después de guardar cualquiera de sus ejercicios, para que el resto de la estación
+  // quede sincronizado con el cambio (excluye la fila recién guardada: esa ya salió con estos
+  // valores en el propio insert/update).
+  async syncEstacionFormato(sessionId, boxNumber, formatoData, exceptoId = null) {
+    try {
+      let query = supabase
+        .from('session_exercises')
+        .update({
+          formato: formatoData.formato || 'Series',
+          rondas: formatoData.rondas || null,
+          trabajo_seg: formatoData.trabajoSeg || null,
+          descanso_seg: formatoData.descansoSeg ?? null
+        })
+        .eq('session_id', sessionId)
+        .eq('box_number', boxNumber)
+        .eq('is_cooldown', false)
+
+      if (exceptoId) query = query.neq('id', exceptoId)
+
+      const { error } = await query
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('Error syncing station modality:', error)
+      throw error
+    }
+  },
+
   async reorderSessionExercises(sessionId, exerciseOrders) {
     try {
       // Update each exercise's order

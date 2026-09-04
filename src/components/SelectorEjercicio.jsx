@@ -31,6 +31,9 @@ export default function SelectorEjercicio({
   esperaEstacion = true,
 }) {
   const [q, setQ] = useState('')
+  // El catálogo entero plegado por default — se abre tocando el resumen, o solo con
+  // escribir/filtrar (si no, escribir con la lista cerrada se siente roto).
+  const [abierto, setAbierto] = useState(false)
   const [musculos, setMusculos] = useState([])
   const [opcionesMusculo, setOpcionesMusculo] = useState([])
   const [resultados, setResultados] = useState([])
@@ -57,6 +60,7 @@ export default function SelectorEjercicio({
     if (!value) {
       setElegido(null)
       setFalta([])
+      setAbierto(false)
       return
     }
     ;(async () => {
@@ -117,6 +121,8 @@ export default function SelectorEjercicio({
       : `${n} ejercicios del catálogo`
   }, [estacion, esperaEstacion, cargando, resultados.length])
 
+  const mostrarLista = abierto || Boolean(q.trim()) || musculos.length > 0
+
   return (
     <div style={s.contenedor}>
       {elegido && (
@@ -173,10 +179,28 @@ export default function SelectorEjercicio({
             </div>
           )}
 
-          <span style={s.resumen}>{resumen}</span>
+          {!bloqueado && (
+            <button type="button" onClick={() => setAbierto((v) => !v)} style={s.resumenBoton}>
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ transform: mostrarLista ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms', flexShrink: 0 }}
+              >
+                <polyline points="9 6 15 12 9 18" />
+              </svg>
+              {resumen}
+            </button>
+          )}
+          {bloqueado && <span style={s.resumen}>{resumen}</span>}
           {error && <div style={s.error}>{error}</div>}
 
-          {!bloqueado && (
+          {!bloqueado && mostrarLista && (
             <div style={s.lista}>
               {resultados.map((ex) => (
                 <button
@@ -231,6 +255,10 @@ const s = {
   },
   chipActivo: { background: '#FFF1ED', borderColor: '#F45F37', color: '#B33204', fontWeight: 600 },
   resumen: { fontSize: 12, color: '#9ca3af' },
+  resumenBoton: {
+    display: 'flex', alignItems: 'center', gap: 6, width: '100%', border: 'none', background: 'transparent',
+    padding: '2px 0', fontSize: 12, color: '#9ca3af', textAlign: 'left', cursor: 'pointer',
+  },
   lista: {
     display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 300, overflowY: 'auto',
     border: '1px solid #f3f4f6', borderRadius: 12, padding: 6,

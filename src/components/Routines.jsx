@@ -9,12 +9,14 @@ import {
   CalendarIcon,
   UserIcon,
   ChevronDownIcon,
+  ChevronUpIcon,
   ChevronRightIcon,
   PlayIcon,
   CheckCircleIcon,
   ClockIcon,
   DocumentDuplicateIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  Bars2Icon
 } from '@heroicons/react/24/outline'
 import * as Sentry from '@sentry/react'
 import routinesService from '../services/routinesService'
@@ -85,12 +87,23 @@ export default function Routines() {
     weightKg: '',
     microPause: '',
     notes: '',
-    isCooldown: false,
-    formato: 'Series',
-    rondas: null,
-    trabajoSeg: null,
-    descansoSeg: null
+    isCooldown: false
   })
+
+  // La modalidad es de la ESTACIÓN, no de cada ejercicio — un solo control arriba de todo del
+  // panel, no uno por fila. El default siempre ocupa el bloque entero (AMRAP, 360s = 6:00),
+  // nunca más que eso: se recalcula desde los ejercicios ya cargados de la estación al abrir el
+  // panel (openExerciseModal), y se sincroniza a todas las filas de la estación al guardar
+  // cualquiera de ellas (saveExerciseToSession).
+  const [estacionFormato, setEstacionFormato] = useState({
+    formato: 'AMRAP',
+    rondas: 1,
+    trabajoSeg: 360,
+    descansoSeg: 0
+  })
+  // Reordenar los bloques de la estación arrastrando.
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
 
   // Expanded sessions
   const [expandedSessions, setExpandedSessions] = useState({})
@@ -372,6 +385,22 @@ export default function Routines() {
     const yaEnSesion = session?.sessionExercises || []
     const siguienteOrden = yaEnSesion.reduce((max, se) => Math.max(max, se.exerciseOrder || 0), 0) + 1
 
+    // La modalidad ya cargada en la estación, si hay alguna fila — todas comparten la misma,
+    // así que cualquiera sirve de referencia. Estación recién empezada: bloque entero por
+    // default, nunca más que eso.
+    const filasDeLaEstacion = (yaEnSesion || []).filter(
+      (se) => !isCooldown && se.boxNumber === boxNumber
+    )
+    const formatoDeLaEstacion = filasDeLaEstacion[0]
+      ? {
+          formato: filasDeLaEstacion[0].formato || 'Series',
+          rondas: filasDeLaEstacion[0].rondas ?? null,
+          trabajoSeg: filasDeLaEstacion[0].trabajoSeg ?? null,
+          descansoSeg: filasDeLaEstacion[0].descansoSeg ?? null
+        }
+      : { formato: 'AMRAP', rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 }
+    setEstacionFormato(formatoDeLaEstacion)
+
     if (sessionExercise) {
       setEditingItem(sessionExercise)
       setExerciseForm({
@@ -386,11 +415,7 @@ export default function Routines() {
         weightKg: sessionExercise.weightKg || '',
         microPause: sessionExercise.microPause || '',
         notes: sessionExercise.notes || '',
-        isCooldown: sessionExercise.isCooldown || false,
-        formato: sessionExercise.formato || 'Series',
-        rondas: sessionExercise.rondas ?? null,
-        trabajoSeg: sessionExercise.trabajoSeg ?? null,
-        descansoSeg: sessionExercise.descansoSeg ?? null
+        isCooldown: sessionExercise.isCooldown || false
       })
     } else {
       const selectedBox = boxes.find(b => b.boxNumber === boxNumber)
@@ -407,30 +432,11 @@ export default function Routines() {
         weightKg: '',
         microPause: '',
         notes: '',
-        isCooldown: isCooldown,
-        formato: 'Series',
-        rondas: null,
-        trabajoSeg: null,
-        descansoSeg: null
+        isCooldown: isCooldown
       })
     }
     setShowExerciseModal(true)
   }
-
-  // Lo que ya ocupan las OTRAS filas de esta estación. El socio hace el circuito entero antes
-  // de avanzar de box, así que el tope de seis minutos es de la estación, no de la fila: sin
-  // esto, tres filas de dos minutos pasaban el control una por una y el box corría seis de más.
-  const usadoEnEstacion = (() => {
-    const sesion = selectedRoutine?.routineSessions?.find((x) => x.id === exerciseForm.sessionId)
-    return duracionEstacionSeg(
-      (sesion?.sessionExercises || []).filter(
-        (se) =>
-          se.id !== editingItem?.id &&
-          Boolean(se.isCooldown) === Boolean(exerciseForm.isCooldown) &&
-          (exerciseForm.isCooldown || se.boxNumber === exerciseForm.boxNumber)
-      )
-    )
-  })()
 
   const saveExerciseToSession = async (e) => {
     e.preventDefault()
@@ -441,26 +447,51 @@ export default function Routines() {
 
     // El tope se corta acá y no sólo en el aviso del selector: el aviso lo puede pasar por alto
     // quien está cargando rápido, y lo que llega a la tabla es lo que después corre en el box.
-    const totalEstacion = usadoEnEstacion + (esPorTiempo(exerciseForm.formato) ? duracionSeg(exerciseForm) : 0)
+    // Es el tiempo de la ESTACIÓN entera — el mismo sin importar cuántos ejercicios tenga.
+    const totalEstacion = esPorTiempo(estacionFormato.formato) ? duracionSeg(estacionFormato) : 0
     if (totalEstacion > BLOQUE_SEG) {
       toast.error(
         `La estación queda en ${mmss(totalEstacion)} y el tope es ${mmss(BLOQUE_SEG)}. ` +
-          'Bajá rondas o tiempo antes de guardar.',
+          'Bajá rondas o tiempo antes de confirmar.',
         toastOptions
       )
       return
     }
 
+    const payload = { ...exerciseForm, ...(exerciseForm.isCooldown ? {} : estacionFormato) }
+
     try {
       setSaving(true)
       if (editingItem) {
-        await routinesService.updateSessionExercise(editingItem.id, exerciseForm)
+        await routinesService.updateSessionExercise(editingItem.id, payload)
         toast.success('Ejercicio actualizado', toastOptions)
       } else {
-        await routinesService.addExerciseToSession(exerciseForm)
+        await routinesService.addExerciseToSession(payload)
         toast.success('Ejercicio agregado', toastOptions)
       }
-      setShowExerciseModal(false)
+      // La modalidad se decide una vez por estación: si cambió acá, el resto de sus filas tiene
+      // que quedar igual — si no, cada fila cuenta un tiempo distinto para la misma estación.
+      if (!exerciseForm.isCooldown && exerciseForm.boxNumber) {
+        await routinesService.syncEstacionFormato(
+          exerciseForm.sessionId,
+          exerciseForm.boxNumber,
+          estacionFormato,
+          editingItem?.id
+        )
+      }
+      // El panel se queda abierto: se sigue armando la estación agregando el próximo ejercicio.
+      // Cierra recién con Cancelar, Confirmar entrenamiento o la X.
+      setEditingItem(null)
+      setExerciseForm((prev) => ({
+        ...prev,
+        exerciseId: '',
+        setsReps: '3x12',
+        restTime: '60s',
+        repetitionTime: '',
+        weightKg: '',
+        microPause: '',
+        notes: ''
+      }))
       fetchRoutineDetail(selectedRoutine.id)
     } catch (error) {
       Sentry.captureException(error, { extra: { context: 'Error saving exercise:' } })
@@ -472,6 +503,55 @@ export default function Routines() {
       setSaving(false)
     }
   }
+
+  // Reordenar arrastrando: swap inmediato en memoria para que la UI responda al toque, y
+  // persiste el nuevo orden de toda la estación en un solo viaje a la base.
+  const moverEjercicioDeEstacion = async (sessionId, boxNumber, filas, desde, hacia) => {
+    if (hacia < 0 || hacia >= filas.length) return
+    const reordenadas = filas.slice()
+    const [movida] = reordenadas.splice(desde, 1)
+    reordenadas.splice(hacia, 0, movida)
+    // Optimista: refleja el nuevo orden ya mismo, antes de que vuelva el fetch.
+    setSelectedRoutine((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        routineSessions: prev.routineSessions.map((s) =>
+          s.id !== sessionId
+            ? s
+            : {
+                ...s,
+                sessionExercises: s.sessionExercises.map((se) => {
+                  // reordenadas[idx] es la propia fila (nunca cambió su exerciseOrder) — el
+                  // valor nuevo es el que SE QUEDÓ en esa posición, o sea el de filas[idx].
+                  const idx = reordenadas.findIndex((r) => r.id === se.id)
+                  return idx === -1 ? se : { ...se, exerciseOrder: filas[idx].exerciseOrder }
+                })
+              }
+        )
+      }
+    })
+    try {
+      await routinesService.reorderSessionExercises(
+        sessionId,
+        reordenadas.map((r, i) => ({ id: r.id, order: filas[i].exerciseOrder }))
+      )
+    } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error reordering station exercises' } })
+      toast.error(error?.message || String(error), toastOptions)
+      fetchRoutineDetail(selectedRoutine.id)
+    }
+  }
+
+  // Los ejercicios ya cargados de la estación que se está armando en el panel — es lo que se ve
+  // como bloques a la derecha, y aparece recién con el primero.
+  const filasEstacionActual = (() => {
+    if (exerciseForm.isCooldown || !exerciseForm.boxNumber) return []
+    const sesion = selectedRoutine?.routineSessions?.find((x) => x.id === exerciseForm.sessionId)
+    return (sesion?.sessionExercises || [])
+      .filter((se) => se.boxNumber === exerciseForm.boxNumber)
+      .sort((a, b) => a.exerciseOrder - b.exerciseOrder)
+  })()
 
   const removeExerciseFromSession = async (sessionExerciseId) => {
     if (!confirm('¿Quitar este ejercicio de la sesión?')) return
@@ -1224,196 +1304,258 @@ export default function Routines() {
       <Sidecart
         isOpen={showExerciseModal}
         onClose={() => setShowExerciseModal(false)}
-        title={editingItem ? 'Editar ejercicio' : 'Agregar ejercicio'}
+        title={
+          exerciseForm.isCooldown
+            ? 'Cooldown'
+            : `Crear entrenamiento para Estación ${exerciseForm.boxNumber ?? ''}`
+        }
         subtitle={
           exerciseForm.isCooldown
-            ? 'Cooldown — no va en una estación'
-            : exerciseForm.boxNumber
-              ? `Estación ${exerciseForm.boxNumber}`
-              : 'Elegí la estación para ver qué se puede hacer ahí'
+            ? 'No va en una estación'
+            : (() => {
+                const sesion = selectedRoutine?.routineSessions?.find((s) => s.id === exerciseForm.sessionId)
+                return sesion?.sessionNumber ? `Sesión ${sesion.sessionNumber}` : undefined
+              })()
         }
-        size="xl"
+        size="2xl"
         footer={
           <div className="flex justify-end gap-3">
             <button type="button" onClick={() => setShowExerciseModal(false)} className="btn-secondary">
               Cancelar
             </button>
             <button
-              type="submit"
-              form="form-ejercicio-sesion"
-              disabled={saving}
+              type="button"
+              onClick={() => setShowExerciseModal(false)}
+              disabled={filasEstacionActual.length === 0}
               className="btn-primary disabled:opacity-50"
             >
-              {saving ? 'Guardando...' : 'Guardar'}
+              Confirmar entrenamiento
             </button>
           </div>
         }
       >
-              <form id="form-ejercicio-sesion" onSubmit={saveExerciseToSession} className="space-y-4">
-                {/* Station Selection (hidden for cooldown exercises) */}
-                {exerciseForm.isCooldown ? (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-                    <span className="text-sm text-blue-700 font-medium">Ejercicio de Cooldown</span>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="form-label">Estación *</label>
-                    {/*
-                      Las estaciones son las que el local tiene cargadas, no del uno al cinco.
-                      Una línea puede ser de tres o de siete, y el número se repite entre líneas:
-                      lo que se elige es el box, y el número queda para nombrarlo.
-                    */}
-                    <select
-                      value={exerciseForm.boxId}
-                      onChange={(e) => {
-                        const box = boxes.find(b => String(b.id) === e.target.value)
-                        setExerciseForm({
-                          ...exerciseForm,
-                          boxId: box?.id || '',
-                          boxNumber: box?.linePosition ?? box?.boxNumber ?? ''
-                        })
-                      }}
-                      className="form-select"
-                      required
-                    >
-                      <option value="">Seleccionar estación...</option>
-                      {boxes.map(b => (
-                        <option key={b.id} value={b.id}>
-                          {b.productionLines?.name ? `${b.productionLines.name} · ` : ''}
-                          {b.name || `Estación ${b.linePosition ?? b.boxNumber}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+        {/* Paso 1 — la estación ya está fija (viene del "+ Agregar" de su columna, no se
+            vuelve a preguntar acá, y la línea A/B no aparece: la decide la cola). La modalidad
+            es de la estación entera, una sola vez arriba de todo — no una por ejercicio. */}
+        {exerciseForm.isCooldown ? (
+          <div className="flex items-center gap-2 px-3 py-2 mb-6 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+            <span className="text-sm text-blue-700 font-medium">Ejercicio de Cooldown</span>
+          </div>
+        ) : (
+          <div className="mb-6">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-brand mb-1">Paso 1</p>
+            <label className="form-label">Modalidad de la estación</label>
+            <SelectorFormato valor={estacionFormato} onChange={setEstacionFormato} turnoSeg={turnoSeg} />
+          </div>
+        )}
 
-                <div>
-                  <label className="form-label">Ejercicio *</label>
-                  {/*
-                    Was a <select> grouped by body zone. That taxonomy only covers the thirteen
-                    demo rows — the gym's 296 classified exercises carry facets instead — so the
-                    dropdown listed almost none of the catalog, and picking a station above it
-                    filtered nothing, which let an exercise land in a box without the equipment
-                    it needs. The station now drives the list.
-                  */}
-                  <SelectorEjercicio
-                    estacion={exerciseForm.isCooldown ? null : exerciseForm.boxNumber}
-                    boxId={exerciseForm.isCooldown ? null : exerciseForm.boxId}
-                    esperaEstacion={!exerciseForm.isCooldown}
-                    value={exerciseForm.exerciseId}
-                    onChange={(id) => setExerciseForm({ ...exerciseForm, exerciseId: id })}
-                  />
-                </div>
+        <div className={`flex items-start ${filasEstacionActual.length > 0 ? 'gap-6' : ''}`}>
+          <form
+            id="form-ejercicio-sesion"
+            onSubmit={saveExerciseToSession}
+            className={`space-y-4 min-w-0 ${filasEstacionActual.length > 0 ? 'flex-1' : 'w-full max-w-xl'}`}
+          >
+            <div>
+              {!exerciseForm.isCooldown && (
+                <p className="text-[11px] font-bold uppercase tracking-wide text-brand mb-1">Paso 2</p>
+              )}
+              <label className="form-label">Buscar ejercicio</label>
+              {/*
+                Was a <select> grouped by body zone. That taxonomy only covers the thirteen
+                demo rows — the gym's 296 classified exercises carry facets instead — so the
+                dropdown listed almost none of the catalog, and picking a station above it
+                filtered nothing, which let an exercise land in a box without the equipment
+                it needs. The station now drives the list.
+              */}
+              <SelectorEjercicio
+                estacion={exerciseForm.isCooldown ? null : exerciseForm.boxNumber}
+                boxId={exerciseForm.isCooldown ? null : exerciseForm.boxId}
+                esperaEstacion={!exerciseForm.isCooldown}
+                value={exerciseForm.exerciseId}
+                onChange={(id) => setExerciseForm({ ...exerciseForm, exerciseId: id })}
+              />
+            </div>
 
-                <div>
-                  <label className="form-label">Cómo se mide el trabajo</label>
-                  <SelectorFormato
-                    valor={{
-                      formato: exerciseForm.formato,
-                      rondas: exerciseForm.rondas,
-                      trabajoSeg: exerciseForm.trabajoSeg,
-                      descansoSeg: exerciseForm.descansoSeg,
-                    }}
-                    onChange={(v) => setExerciseForm({ ...exerciseForm, ...v })}
-                    turnoSeg={turnoSeg}
-                    usadoSeg={usadoEnEstacion}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="form-label">Series x Reps *</label>
-                    <input
-                      type="text"
-                      value={exerciseForm.setsReps}
-                      onChange={(e) => setExerciseForm({ ...exerciseForm, setsReps: e.target.value })}
-                      className="form-input"
-                      placeholder="3x12"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Descanso</label>
-                    <input
-                      type="text"
-                      value={exerciseForm.restTime}
-                      onChange={(e) => setExerciseForm({ ...exerciseForm, restTime: e.target.value })}
-                      className="form-input"
-                      placeholder="60s"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">T. Rep (seg)</label>
-                    <input
-                      type="number"
-                      value={exerciseForm.repetitionTime}
-                      onChange={(e) => setExerciseForm({ ...exerciseForm, repetitionTime: e.target.value })}
-                      className="form-input"
-                      placeholder="Opcional"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="form-label">Peso (kg)</label>
-                    <input
-                      type="number"
-                      value={exerciseForm.weightKg}
-                      onChange={(e) => setExerciseForm({ ...exerciseForm, weightKg: e.target.value })}
-                      className="form-input"
-                      placeholder="Opcional"
-                      step="0.5"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Micro Pausa</label>
-                    <input
-                      type="number"
-                      value={exerciseForm.microPause}
-                      onChange={(e) => setExerciseForm({ ...exerciseForm, microPause: e.target.value })}
-                      className="form-input"
-                      placeholder="seg"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Orden</label>
-                    <input
-                      type="number"
-                      value={exerciseForm.exerciseOrder}
-                      onChange={(e) => setExerciseForm({ ...exerciseForm, exerciseOrder: parseInt(e.target.value) })}
-                      className="form-input"
-                      min="1"
-                    />
-                  </div>
-                </div>
-
-                {/* Full width: the sentence wraps to four words a line inside a third of the row. */}
-                <PesoSugerido
-                  clientId={selectedRoutine?.clientId}
-                  exerciseId={exerciseForm.exerciseId}
-                  valorActual={exerciseForm.weightKg}
-                  onUsar={(kg) => setExerciseForm({ ...exerciseForm, weightKg: kg })}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="form-label">Series x Reps *</label>
+                <input
+                  type="text"
+                  value={exerciseForm.setsReps}
+                  onChange={(e) => setExerciseForm({ ...exerciseForm, setsReps: e.target.value })}
+                  className="form-input"
+                  placeholder="3x12"
+                  required
                 />
+              </div>
+              <div>
+                <label className="form-label">Descanso</label>
+                <input
+                  type="text"
+                  value={exerciseForm.restTime}
+                  onChange={(e) => setExerciseForm({ ...exerciseForm, restTime: e.target.value })}
+                  className="form-input"
+                  placeholder="60s"
+                />
+              </div>
+              <div>
+                <label className="form-label">T. Rep (seg)</label>
+                <input
+                  type="number"
+                  value={exerciseForm.repetitionTime}
+                  onChange={(e) => setExerciseForm({ ...exerciseForm, repetitionTime: e.target.value })}
+                  className="form-input"
+                  placeholder="Opcional"
+                />
+              </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="form-label">Peso (kg)</label>
+                <input
+                  type="number"
+                  value={exerciseForm.weightKg}
+                  onChange={(e) => setExerciseForm({ ...exerciseForm, weightKg: e.target.value })}
+                  className="form-input"
+                  placeholder="Opcional"
+                  step="0.5"
+                />
+              </div>
+              <div>
+                <label className="form-label">Micro Pausa</label>
+                <input
+                  type="number"
+                  value={exerciseForm.microPause}
+                  onChange={(e) => setExerciseForm({ ...exerciseForm, microPause: e.target.value })}
+                  className="form-input"
+                  placeholder="seg"
+                />
+              </div>
+            </div>
 
-                <div>
-                  <label className="form-label">Notas</label>
-                  <textarea
-                    value={exerciseForm.notes}
-                    onChange={(e) => setExerciseForm({ ...exerciseForm, notes: e.target.value })}
-                    className="form-textarea"
-                    rows={2}
-                    placeholder={
-                      exerciseForm.formato === 'A completar'
-                        ? 'Submodalidad, si tiene una (ej. escalera 1-1-2-2-3-3)...'
-                        : 'Instrucciones específicas...'
-                    }
-                  />
-                </div>
+            {/* Full width: the sentence wraps to four words a line inside a third of the row. */}
+            <PesoSugerido
+              clientId={selectedRoutine?.clientId}
+              exerciseId={exerciseForm.exerciseId}
+              valorActual={exerciseForm.weightKg}
+              onUsar={(kg) => setExerciseForm({ ...exerciseForm, weightKg: kg })}
+            />
 
-              </form>
+            <div>
+              <label className="form-label">Notas</label>
+              <textarea
+                value={exerciseForm.notes}
+                onChange={(e) => setExerciseForm({ ...exerciseForm, notes: e.target.value })}
+                className="form-textarea"
+                rows={2}
+                placeholder={
+                  estacionFormato.formato === 'A completar'
+                    ? 'Submodalidad, si tiene una (ej. escalera 1-1-2-2-3-3)...'
+                    : 'Instrucciones específicas...'
+                }
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn-primary disabled:opacity-50 w-full justify-center"
+              >
+                {saving ? 'Guardando...' : editingItem ? 'Guardar cambios' : '+ Agregar a la estación'}
+              </button>
+            </div>
+          </form>
+
+          {/* Los bloques de la estación: aparecen con el primer ejercicio, no antes. Se
+              reordenan arrastrando o con las flechas — el orden es la posición, no un número
+              que haya que escribir. */}
+          {filasEstacionActual.length > 0 && (
+            <div className="w-72 flex-shrink-0 border-l border-border-default pl-5">
+              <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-3">
+                Ejercicios de la estación
+              </p>
+              <div className="space-y-2">
+                {filasEstacionActual.map((se, idx) => {
+                  const enDrag = dragOverIndex === idx && dragIndex !== null && dragIndex !== idx
+                  const meta = [se.setsReps, se.weightKg ? `${se.weightKg}kg` : null].filter(Boolean).join(' · ')
+                  return (
+                    <div
+                      key={se.id}
+                      draggable
+                      onDragStart={() => setDragIndex(idx)}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        if (dragIndex !== null && dragIndex !== idx) setDragOverIndex(idx)
+                      }}
+                      onDrop={() => {
+                        if (dragIndex !== null && dragIndex !== idx) {
+                          moverEjercicioDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber, filasEstacionActual, dragIndex, idx)
+                        }
+                        setDragIndex(null)
+                        setDragOverIndex(null)
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null)
+                        setDragOverIndex(null)
+                      }}
+                      className={`p-2.5 rounded-xl border text-xs ${
+                        enDrag ? 'border-brand border-dashed bg-brand/5' : 'border-border-default bg-bg-secondary'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <Bars2Icon className="h-3.5 w-4 text-text-muted mt-0.5 flex-shrink-0 cursor-grab" />
+                        <span className="w-[18px] h-[18px] rounded-full border border-text-primary text-[10px] font-bold text-text-primary flex items-center justify-center flex-shrink-0 mt-px">
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-text-primary line-clamp-2">{se.exercises?.name}</p>
+                          {meta && <p className="text-text-tertiary truncate mt-0.5">{meta}</p>}
+                        </div>
+                        <div className="flex gap-0.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openExerciseModal(exerciseForm.sessionId, se, exerciseForm.boxNumber)}
+                            className="p-0.5 text-text-tertiary hover:text-brand"
+                          >
+                            <PencilIcon className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeExerciseFromSession(se.id)}
+                            className="p-0.5 text-text-tertiary hover:text-error"
+                          >
+                            <TrashIcon className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-1 mt-1.5">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => moverEjercicioDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber, filasEstacionActual, idx, idx - 1)}
+                          className="p-1 rounded border border-border-default text-text-secondary disabled:opacity-30"
+                        >
+                          <ChevronUpIcon className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === filasEstacionActual.length - 1}
+                          onClick={() => moverEjercicioDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber, filasEstacionActual, idx, idx + 1)}
+                          className="p-1 rounded border border-border-default text-text-secondary disabled:opacity-30"
+                        >
+                          <ChevronDownIcon className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </Sidecart>
     </div>
   )
