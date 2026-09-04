@@ -21,10 +21,13 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
   const estacion = porTiempo ? duracionSeg({ rondas, trabajoSeg, descansoSeg }) : 0
   const excede = estacion > BLOQUE_SEG
   const restante = Math.max(0, BLOQUE_SEG - estacion)
-  // El turno real que viene corriendo la cola. Sólo se menciona si discrepa del bloque: si
-  // coinciden no aporta nada, y si el box viene avanzando antes de los seis minutos es un
-  // problema de configuración de la línea que el coach no puede arreglar desde acá.
-  const turnoDiscrepa = turnoSeg > 0 && Math.abs(turnoSeg - BLOQUE_SEG) > 30
+  // El turno real que viene corriendo la cola. El box se queda ocupado más que los seis
+  // minutos del ejercicio a propósito (demo + margen antes de avanzar al siguiente) — eso no
+  // es un problema, es el diseño (advance-queue-tick corre a los 8:00 = 6:00 de ejercicio +
+  // 1:00 de demo + 1:00 de margen). Sólo importa cuando el turno real es MÁS CORTO que el
+  // bloque: ahí el socio se va a mover antes de terminar el ejercicio, y es un problema de
+  // configuración de la línea que el coach no puede arreglar desde acá.
+  const turnoDiscrepa = turnoSeg > 0 && turnoSeg < BLOQUE_SEG - 30
 
   const elegir = (f) => {
     if (!esPorTiempo(f)) {
@@ -115,7 +118,7 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
             )}
             {turnoDiscrepa && (
               <div style={s.aviso}>
-                Ojo: el turno que viene corriendo la cola es de {mmss(turnoSeg)}, no {mmss(BLOQUE_SEG)}.
+                Ojo: la cola avanza el box a los {mmss(turnoSeg)}, antes de los {mmss(BLOQUE_SEG)} que necesita el ejercicio — el socio se va a mover sin terminar.
               </div>
             )}
           </div>
