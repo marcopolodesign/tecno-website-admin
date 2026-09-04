@@ -15,7 +15,6 @@ import {
   QrCodeIcon,
   ClockIcon,
   // Fitness icons
-  ListBulletIcon,
   ClipboardDocumentListIcon,
   RectangleGroupIcon,
   WrenchScrewdriverIcon,
@@ -50,7 +49,6 @@ const managementNav = [
 
 const catalogoNav = [
   { name: 'Catálogo', href: '/catalogo', icon: RectangleGroupIcon, roles: ['super_admin', 'admin', 'coach'] },
-  { name: 'Ejercicios', href: '/exercises', icon: ListBulletIcon, roles: ['super_admin', 'admin', 'coach'] },
   { name: 'Rutinas', href: '/routines', icon: ClipboardDocumentListIcon, roles: ['super_admin', 'admin', 'coach'] },
   { name: 'Arquetipos', href: '/arquetipos', icon: UserGroupIcon, roles: ['super_admin', 'admin', 'coach'] },
   { name: 'Equipamiento', href: '/equipamiento', icon: WrenchScrewdriverIcon, roles: ['super_admin', 'admin', 'coach'] },

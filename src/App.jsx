@@ -11,7 +11,6 @@ import Coaches from './components/Coaches'
 import Locations from './components/Locations'
 import ContentManagement from './components/ContentManagement'
 import MembershipPlans from './components/MembershipPlans'
-import Exercises from './components/Exercises'
 import Catalogo from './components/Catalogo'
 import Equipamiento from './components/Equipamiento'
 import Routines from './components/Routines'
@@ -101,7 +100,7 @@ function App() {
     const role = userRole // 'super_admin', 'admin', 'front_desk', 'coach'
 
     // Fitness routes are restricted to specific emails
-    if (['/exercises', '/routines', '/catalogo', '/equipamiento'].includes(route)) {
+    if (['/routines', '/catalogo', '/equipamiento'].includes(route)) {
       return canSeeFitness
     }
 
@@ -250,8 +249,11 @@ function AuthenticatedShell({
               )}
 
               {/* Fitness Routes */}
+              {/* Ejercicios se fusionó con Catálogo — Catálogo cubre todo lo que esta pantalla
+                  hacía para un humano (el comentario de Exercises.jsx ya lo decía). La ruta
+                  vieja redirige en vez de desaparecer, para no romper un link guardado. */}
               {canSeeFitness && (
-                <Route path="/exercises" element={<Exercises />} />
+                <Route path="/exercises" element={<Navigate to="/catalogo" replace />} />
               )}
               {canSeeFitness && (
                 <Route path="/catalogo" element={<Catalogo />} />
