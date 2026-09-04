@@ -2,293 +2,20 @@ import { supabase } from '../lib/supabase'
 import { BLOQUE_SEG } from '../lib/formatos'
 
 /**
- * Service for routine auto-generation and coach overrides
+ * Genera el resto del mes a partir de las sesiones que el coach escribió a mano
+ * (botón "Generar Sesiones"/"Regenerar" en Rutinas).
+ *
+ * Nota para la próxima sesión que mire este archivo: `exercises_catalogo` NO es una tabla
+ * separada de `exercises` — es una VIEW sobre la misma tabla (`SELECT ... FROM exercises e`,
+ * con `elementos` calculado desde exercise_elementos). Mismo id, mismas columnas de
+ * clasificación (patron, musculo, family_code, complejidad_tecnica, intensidad_relativa). Así
+ * que leer `exercises` acá abajo (perfilesDeEsfuerzo) y pedir candidatos por
+ * `sustitutos_para_ejercicio` (que expone exercises_catalogo) usan exactamente la misma data —
+ * no hace falta "migrar" nada entre las dos, y por eso este archivo perdió sin uso cerca de 600
+ * líneas heredadas de un diseño de motor anterior (grupos de ejercicio, box_groups, overrides
+ * de coach, log de generación...) que nada en la plataforma llama: verificado con grep sobre
+ * todo el admin antes de borrarlas, no a ojo.
  */
-
-// =====================================================
-// EXERCISE GROUPS
-// =====================================================
-
-export const getExerciseGroups = async () => {
-  const { data, error } = await supabase
-    .from('exercise_groups')
-    .select(`
-      *,
-      body_zones (id, name)
-    `)
-    .order('display_order')
-  
-  if (error) throw error
-  return data
-}
-
-export const createExerciseGroup = async (groupData) => {
-  const { data, error } = await supabase
-    .from('exercise_groups')
-    .insert([groupData])
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-export const updateExerciseGroup = async (id, groupData) => {
-  const { data, error } = await supabase
-    .from('exercise_groups')
-    .update(groupData)
-    .eq('id', id)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// PRODUCTION LINES
-// =====================================================
-
-export const getProductionLines = async (locationId = null) => {
-  let query = supabase
-    .from('production_lines')
-    .select(`
-      *,
-      locations (id, name),
-      boxes (id, name, box_number)
-    `)
-    .order('line_number')
-  
-  if (locationId) {
-    query = query.eq('location_id', locationId)
-  }
-  
-  const { data, error } = await query
-  if (error) throw error
-  return data
-}
-
-export const createProductionLine = async (lineData) => {
-  const { data, error } = await supabase
-    .from('production_lines')
-    .insert([lineData])
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-export const updateProductionLine = async (id, lineData) => {
-  const { data, error } = await supabase
-    .from('production_lines')
-    .update(lineData)
-    .eq('id', id)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// LINE BOX STATUS (Real-time queue management)
-// =====================================================
-
-export const getLineBoxStatus = async (productionLineId = null) => {
-  let query = supabase
-    .from('line_box_status')
-    .select(`
-      *,
-      production_lines (id, name, line_number),
-      boxes (id, name, box_number),
-      users (id, first_name, last_name)
-    `)
-  
-  if (productionLineId) {
-    query = query.eq('production_line_id', productionLineId)
-  }
-  
-  const { data, error } = await query
-  if (error) throw error
-  return data
-}
-
-export const updateLineBoxStatus = async (id, statusData) => {
-  const { data, error } = await supabase
-    .from('line_box_status')
-    .update({
-      ...statusData,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// SIMILAR EXERCISES (for auto-generation)
-// =====================================================
-
-export const getSimilarExercises = async (exerciseId, userId, boxId, excludeIds = []) => {
-  const { data, error } = await supabase
-    .rpc('get_similar_exercises', {
-      p_exercise_id: exerciseId,
-      p_user_id: userId,
-      p_box_id: boxId,
-      p_exclude_ids: excludeIds
-    })
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// COACH OVERRIDES
-// =====================================================
-
-/**
- * Override an auto-generated exercise with a coach-selected one
- * @param {number} sessionExerciseId - The session_exercise to modify
- * @param {number} newExerciseId - The new exercise to use
- * @param {string} coachId - The coach's auth user ID
- * @param {boolean} lockExercise - Whether to lock this from future regeneration
- */
-export const overrideExercise = async (sessionExerciseId, newExerciseId, coachId, lockExercise = true) => {
-  const { data, error } = await supabase
-    .rpc('override_session_exercise', {
-      p_session_exercise_id: sessionExerciseId,
-      p_new_exercise_id: newExerciseId,
-      p_coach_id: coachId,
-      p_lock_exercise: lockExercise
-    })
-  
-  if (error) throw error
-  return data
-}
-
-/**
- * Revert a coach override back to the original auto-generated exercise
- */
-export const revertExerciseOverride = async (sessionExerciseId, coachId) => {
-  const { data, error } = await supabase
-    .rpc('revert_exercise_override', {
-      p_session_exercise_id: sessionExerciseId,
-      p_coach_id: coachId
-    })
-  
-  if (error) throw error
-  return data
-}
-
-/**
- * Lock/unlock an exercise from being regenerated
- */
-export const toggleExerciseLock = async (sessionExerciseId, isLocked) => {
-  const { data, error } = await supabase
-    .from('session_exercises')
-    .update({ 
-      is_locked: isLocked,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', sessionExerciseId)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// SESSION EXERCISES WITH OVERRIDE INFO
-// =====================================================
-
-export const getSessionExercisesWithOverrides = async (sessionId) => {
-  const { data, error } = await supabase
-    .from('session_exercises')
-    .select(`
-      *,
-      exercises!session_exercises_exercise_id_fkey (
-        id, name, description, difficulty_level,
-        exercise_groups (id, name, body_zones (id, name))
-      ),
-      original_exercise:exercises!session_exercises_original_exercise_id_fkey (
-        id, name
-      ),
-      boxes (id, name, box_number)
-    `)
-    .eq('session_id', sessionId)
-    .order('box_number')
-    .order('exercise_order')
-  
-  if (error) throw error
-  
-  // Add computed fields
-  return data.map(se => ({
-    ...se,
-    sourceDescription: getSourceDescription(se),
-    canRevert: se.is_coach_override && se.original_exercise_id != null
-  }))
-}
-
-function getSourceDescription(sessionExercise) {
-  if (sessionExercise.is_coach_override) return 'Coach Override'
-  if (sessionExercise.is_auto_generated) {
-    switch (sessionExercise.generation_source) {
-      case 'similar': return 'Auto (Similar)'
-      case 'random': return 'Auto (Random)'
-      case 'template': return 'From Template'
-      default: return 'Auto-generated'
-    }
-  }
-  return 'Manual'
-}
-
-// =====================================================
-// ROUTINE GENERATION
-// =====================================================
-
-/**
- * Get exercises suitable for a specific box based on user profile
- */
-export const getExercisesForBox = async (boxId, userId) => {
-  // First get the user's fitness profile
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('fitness_capacity, fitness_intensity, age_category_id')
-    .eq('id', userId)
-    .single()
-  
-  if (userError) throw userError
-  
-  // Get groups available for this box
-  const { data: boxGroups, error: bgError } = await supabase
-    .from('box_groups')
-    .select('group_id')
-    .eq('box_id', boxId)
-  
-  if (bgError) throw bgError
-  
-  const groupIds = boxGroups.map(bg => bg.group_id)
-  
-  // Get exercises from those groups
-  const { data: exercises, error: exError } = await supabase
-    .from('exercises')
-    .select(`
-      *,
-      exercise_groups (id, name, body_zones (id, name))
-    `)
-    .in('group_id', groupIds.length > 0 ? groupIds : [0])
-    .eq('is_active', true)
-    .order('priority', { ascending: false })
-  
-  if (exError) throw exError
-  
-  return exercises
-}
 
 // Deterministic string hash (FNV-1a) — same inputs always produce the same pick, so
 // regenerating a routine is reproducible instead of silently landing on a different exercise
@@ -321,6 +48,29 @@ async function getProposedWeight(userId, exerciseId) {
 }
 
 /**
+ * Los techos que le pone el arquetipo del socio.
+ *
+ * Un arquetipo no dice qué entrenar, dice hasta dónde: alguien que arranca no debería recibir lo
+ * más técnico del catálogo por más que el patrón de movimiento coincida. Sin arquetipo cargado no
+ * hay techo y el motor se comporta como siempre.
+ */
+async function techosDelSocio(userId) {
+  if (!userId) return null
+  const { data } = await supabase.rpc('techos_del_socio', { p_user_id: userId })
+  return data?.[0] ?? null
+}
+
+async function perfilesDeEsfuerzo() {
+  // El catálogo entero en una sola query en vez de una consulta por estación generada: un mes
+  // de cinco estaciones es 125 de ellas, y esto son 312 filas de tres columnas chicas.
+  const { data } = await supabase
+    .from('exercises')
+    .select('id, complejidad_tecnica, intensidad_relativa, family_code')
+    .eq('is_active', true)
+  return new Map((data || []).map((e) => [e.id, e]))
+}
+
+/**
  * Which timed formats a given exercise can be run as.
  *
  * The three formats are not interchangeable, and the difference is the exercise, not the taste
@@ -340,32 +90,9 @@ async function getProposedWeight(userId, exerciseId) {
  *   intensidad_relativa  — can this be sustained for eight minutes? Burpees are the textbook
  *                          Tabata and a terrible AMRAP; that is intensidad 3, not complexity.
  *
- * Both are 1-3 and filled in for 298 of the 310 exercises. Missing means EMOM only — the
+ * Both are 1-3 and filled in for most of the catalog. Missing means EMOM only — the
  * conservative one — rather than a guess made from an empty field.
  */
-/**
- * Los techos que le pone el arquetipo del socio.
- *
- * Un arquetipo no dice qué entrenar, dice hasta dónde: alguien que arranca no debería recibir lo
- * más técnico del catálogo por más que el patrón de movimiento coincida. Sin arquetipo cargado no
- * hay techo y el motor se comporta como siempre.
- */
-async function techosDelSocio(userId) {
-  if (!userId) return null
-  const { data } = await supabase.rpc('techos_del_socio', { p_user_id: userId })
-  return data?.[0] ?? null
-}
-
-async function perfilesDeEsfuerzo() {
-  // The whole catalog in one query rather than a lookup per generated station: a month of five
-  // stations is 125 of them, and this is 310 rows of three small columns.
-  const { data } = await supabase
-    .from('exercises')
-    .select('id, complejidad_tecnica, intensidad_relativa, family_code')
-    .eq('is_active', true)
-  return new Map((data || []).map((e) => [e.id, e]))
-}
-
 function formatosPosibles(ejercicio) {
   const posibles = ['EMOM']
   const complejidad = ejercicio?.complejidad_tecnica
@@ -747,123 +474,4 @@ async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, traba
       is_cooldown: te.is_cooldown || false,
       generation_source: fuente,
   }])
-}
-
-// =====================================================
-// GENERATION LOG
-// =====================================================
-
-export const getGenerationLog = async (routineId) => {
-  const { data, error } = await supabase
-    .from('routine_generation_log')
-    .select(`
-      *,
-      routine_sessions (id, title, session_number),
-      original:exercises!routine_generation_log_original_exercise_id_fkey (id, name),
-      new:exercises!routine_generation_log_new_exercise_id_fkey (id, name),
-      sellers!routine_generation_log_performed_by_fkey (id, first_name, last_name)
-    `)
-    .eq('routine_id', routineId)
-    .order('created_at', { ascending: false })
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// ROUTINE GENERATION SUMMARY
-// =====================================================
-
-export const getRoutineGenerationSummary = async (routineId = null) => {
-  let query = supabase
-    .from('training_routines')
-    .select(`
-      id,
-      title,
-      generation_status,
-      total_sessions,
-      template_sessions,
-      users (id, first_name, last_name),
-      routine_sessions (
-        id,
-        session_exercises (
-          id,
-          is_auto_generated,
-          is_coach_override,
-          is_locked,
-          generation_source
-        )
-      )
-    `)
-  
-  if (routineId) {
-    query = query.eq('id', routineId)
-  }
-  
-  const { data, error } = await query
-  if (error) throw error
-  
-  // Calculate summary stats
-  return data.map(routine => {
-    let totalExercises = 0
-    let autoGenerated = 0
-    let coachOverrides = 0
-    let locked = 0
-    
-    routine.routine_sessions?.forEach(session => {
-      session.session_exercises?.forEach(se => {
-        totalExercises++
-        if (se.is_auto_generated) autoGenerated++
-        if (se.is_coach_override) coachOverrides++
-        if (se.is_locked) locked++
-      })
-    })
-    
-    return {
-      id: routine.id,
-      title: routine.title,
-      generationStatus: routine.generation_status,
-      clientName: routine.users ? `${routine.users.first_name} ${routine.users.last_name}` : 'N/A',
-      totalSessions: routine.routine_sessions?.length || 0,
-      totalExercises,
-      autoGenerated,
-      coachOverrides,
-      locked
-    }
-  })
-}
-
-export default {
-  // Exercise Groups
-  getExerciseGroups,
-  createExerciseGroup,
-  updateExerciseGroup,
-  
-  // Production Lines
-  getProductionLines,
-  createProductionLine,
-  updateProductionLine,
-  
-  // Line Box Status
-  getLineBoxStatus,
-  updateLineBoxStatus,
-  
-  // Similar Exercises
-  getSimilarExercises,
-  
-  // Coach Overrides
-  overrideExercise,
-  revertExerciseOverride,
-  toggleExerciseLock,
-  
-  // Session Exercises with Overrides
-  getSessionExercisesWithOverrides,
-  
-  // Routine Generation
-  getExercisesForBox,
-  generateRoutineSessions,
-  
-  // Generation Log
-  getGenerationLog,
-  getRoutineGenerationSummary
 }
