@@ -15,6 +15,7 @@ import Exercises from './components/Exercises'
 import Catalogo from './components/Catalogo'
 import Equipamiento from './components/Equipamiento'
 import Routines from './components/Routines'
+import Arquetipos from './components/Arquetipos'
 import CheckIn from './components/CheckIn'
 import MemberAccess from './components/MemberAccess'
 import AccessLogs from './components/AccessLogs'
@@ -252,6 +253,9 @@ function AuthenticatedShell({
               )}
               {canSeeFitness && (
                 <Route path="/routines" element={<Routines />} />
+              )}
+              {canSeeFitness && (
+                <Route path="/arquetipos" element={<Arquetipos />} />
               )}
               {canSeeFitness && (
                 <Route path="/equipamiento" element={<Equipamiento />} />
