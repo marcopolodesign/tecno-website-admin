@@ -25,6 +25,7 @@ import QueueTv from './components/QueueTv'
 import Sidebar from './components/Sidebar'
 import ShellGlow from './components/ShellGlow'
 import { authService } from './services/authService'
+import { SedeProvider } from './contexts/SedeContext'
 
 // Emails allowed to see fitness section (beta feature)
 const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
@@ -181,6 +182,10 @@ function AuthenticatedShell({
     // El shell: rojo de marca con el resplandor detrás, y el contenido flotando encima en un
     // contenedor blanco redondeado. La barra global de Header desapareció — cada pantalla ya
     // trae su propio <h1> y sus acciones, y tener las dos cosas era un título arriba de otro.
+    //
+    // SedeProvider envuelve todo el shell autenticado: la sede activa es global a la
+    // plataforma, no algo que cada pantalla resuelve por su cuenta.
+    <SedeProvider>
     <div className="relative min-h-screen flex bg-shell p-2.5">
       <ShellGlow />
       <Sidebar
@@ -291,6 +296,7 @@ function AuthenticatedShell({
         </main>
       </div>
     </div>
+    </SedeProvider>
   )
 }
 

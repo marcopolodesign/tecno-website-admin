@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import SedeSwitcher from './SedeSwitcher'
 import {
   HomeIcon,
   DocumentTextIcon,
@@ -216,6 +217,8 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLog
           </div>
         </div>
       )}
+
+      <SedeSwitcher />
 
       {/* Navigation */}
       <nav className="flex-1 pt-3 space-y-0.5 overflow-y-auto">
