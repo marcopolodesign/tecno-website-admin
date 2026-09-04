@@ -32,6 +32,94 @@ import PanelSustitutos from './PanelSustitutos'
 import PesoSugerido from './PesoSugerido'
 import Sidecart from './Sidecart'
 
+// Los ejercicios de una estación, como bloques que se reordenan arrastrando o con flechas.
+// Un solo componente para las dos pantallas que necesitan esto — el panel de "agregar
+// ejercicio" (mientras se arma) y el panel de "ver estación" (una vez armada) — así que
+// reordenar se comporta igual en los dos lugares en vez de mantenerse por separado.
+//
+// Tocar el nombre abre el editor completo del ejercicio: no hay un lápiz aparte, el bloque
+// entero es el botón de editar.
+function ListaBloques({ filas, onReordenar, onEditar, onEliminar, onCambiar }) {
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+
+  return (
+    <div className="space-y-2">
+      {filas.map((se, idx) => {
+        const enDrag = dragOverIndex === idx && dragIndex !== null && dragIndex !== idx
+        const meta = [se.setsReps, se.weightKg ? `${se.weightKg}kg` : null].filter(Boolean).join(' · ')
+        return (
+          <div
+            key={se.id}
+            draggable
+            onDragStart={() => setDragIndex(idx)}
+            onDragOver={(e) => {
+              e.preventDefault()
+              if (dragIndex !== null && dragIndex !== idx) setDragOverIndex(idx)
+            }}
+            onDrop={() => {
+              if (dragIndex !== null && dragIndex !== idx) onReordenar(dragIndex, idx)
+              setDragIndex(null)
+              setDragOverIndex(null)
+            }}
+            onDragEnd={() => {
+              setDragIndex(null)
+              setDragOverIndex(null)
+            }}
+            className={`p-2.5 rounded-xl border text-xs ${
+              enDrag ? 'border-brand border-dashed bg-brand/5' : 'border-border-default bg-bg-secondary'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              <Bars2Icon className="h-3.5 w-4 text-text-muted mt-0.5 flex-shrink-0 cursor-grab" />
+              <span className="w-[18px] h-[18px] rounded-full border border-text-primary text-[10px] font-bold text-text-primary flex items-center justify-center flex-shrink-0 mt-px">
+                {idx + 1}
+              </span>
+              <button type="button" onClick={() => onEditar(se)} className="flex-1 min-w-0 text-left">
+                <p className="font-medium text-text-primary line-clamp-2 hover:text-brand">{se.exercises?.name}</p>
+                {meta && <p className="text-text-tertiary truncate mt-0.5">{meta}</p>}
+              </button>
+              <div className="flex gap-0.5 flex-shrink-0">
+                {onCambiar && (
+                  <button
+                    type="button"
+                    onClick={() => onCambiar(se)}
+                    className="p-0.5 text-text-tertiary hover:text-brand"
+                    title="Cambiar por otro del mismo patrón"
+                  >
+                    <ArrowPathIcon className="h-3 w-3" />
+                  </button>
+                )}
+                <button type="button" onClick={() => onEliminar(se)} className="p-0.5 text-text-tertiary hover:text-error">
+                  <TrashIcon className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-1 mt-1.5">
+              <button
+                type="button"
+                disabled={idx === 0}
+                onClick={() => onReordenar(idx, idx - 1)}
+                className="p-1 rounded border border-border-default text-text-secondary disabled:opacity-30"
+              >
+                <ChevronUpIcon className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                disabled={idx === filas.length - 1}
+                onClick={() => onReordenar(idx, idx + 1)}
+                className="p-1 rounded border border-border-default text-text-secondary disabled:opacity-30"
+              >
+                <ChevronDownIcon className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Routines() {
   const [routines, setRoutines] = useState([])
   const [users, setUsers] = useState([])
@@ -101,9 +189,9 @@ export default function Routines() {
     trabajoSeg: 360,
     descansoSeg: 0
   })
-  // Reordenar los bloques de la estación arrastrando.
-  const [dragIndex, setDragIndex] = useState(null)
-  const [dragOverIndex, setDragOverIndex] = useState(null)
+  // La estación que se está viendo/editando en su propio panel (drag para reordenar, cambiar y
+  // borrar ejercicios) — distinto del panel de arriba, que es para cargar un ejercicio nuevo.
+  const [estacionAbierta, setEstacionAbierta] = useState(null) // { sessionId, boxNumber } | null
 
   // Expanded sessions
   const [expandedSessions, setExpandedSessions] = useState({})
@@ -543,15 +631,19 @@ export default function Routines() {
     }
   }
 
-  // Los ejercicios ya cargados de la estación que se está armando en el panel — es lo que se ve
-  // como bloques a la derecha, y aparece recién con el primero.
-  const filasEstacionActual = (() => {
-    if (exerciseForm.isCooldown || !exerciseForm.boxNumber) return []
-    const sesion = selectedRoutine?.routineSessions?.find((x) => x.id === exerciseForm.sessionId)
+  // Los ejercicios de una estación, en orden — la usan tanto el panel de agregar ejercicio
+  // (aparecen a la derecha en cuanto hay uno) como el panel de ver la estación entera.
+  const filasDeEstacion = (sessionId, boxNumber) => {
+    if (!boxNumber) return []
+    const sesion = selectedRoutine?.routineSessions?.find((x) => x.id === sessionId)
     return (sesion?.sessionExercises || [])
-      .filter((se) => se.boxNumber === exerciseForm.boxNumber)
+      .filter((se) => se.boxNumber === boxNumber)
       .sort((a, b) => a.exerciseOrder - b.exerciseOrder)
-  })()
+  }
+
+  const filasEstacionActual = exerciseForm.isCooldown
+    ? []
+    : filasDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber)
 
   const removeExerciseFromSession = async (sessionExerciseId) => {
     if (!confirm('¿Quitar este ejercicio de la sesión?')) return
@@ -896,14 +988,34 @@ export default function Routines() {
                                 const ocupado = duracionEstacionSeg(boxExercises)
                                 const pasado = ocupado > BLOQUE_SEG
 
+                                const primera = boxExercises[0]
+                                const modalidadTexto = primera
+                                  ? esPorTiempo(primera.formato)
+                                    ? comoTexto(primera.formato, primera)
+                                    : 'Series × reps'
+                                  : null
+
                                 return (
                                   <div key={boxNum} className="bg-bg-secondary min-h-[150px]">
-                                    {/* Station Header */}
+                                    {/* Station Header — un solo botón de editar acá, no uno por
+                                        ejercicio: cambiar/borrar cada uno vive en ese panel. */}
                                     <div className="bg-brand/10 px-2 py-1.5 border-b border-border-default">
-                                      <div className="flex items-baseline justify-center gap-1.5">
+                                      <div className="flex items-center justify-center gap-1.5">
                                         <span className="text-xs font-semibold text-brand">Estación {boxNum}</span>
                                         <span className="text-xs text-text-tertiary">({boxExercises.length})</span>
+                                        <button
+                                          onClick={() => setEstacionAbierta({ sessionId: session.id, boxNumber: boxNum })}
+                                          className="p-0.5 text-text-tertiary hover:text-brand"
+                                          title="Editar estación"
+                                        >
+                                          <PencilIcon className="h-3 w-3" />
+                                        </button>
                                       </div>
+                                      {modalidadTexto && (
+                                        <p className="mt-0.5 text-center text-[10px] font-medium text-brand truncate">
+                                          {modalidadTexto}
+                                        </p>
+                                      )}
                                       {ocupado > 0 && (
                                         <>
                                           <div className="mt-1 h-1 rounded-full bg-brand/20 overflow-hidden">
@@ -921,60 +1033,22 @@ export default function Routines() {
                                         </>
                                       )}
                                     </div>
-                                    
-                                    {/* Exercises in Station */}
+
+                                    {/* Exercises in Station — sólo lectura: cambiar, borrar y
+                                        reordenar viven en el panel de "Editar estación". */}
                                     <div className="p-2 space-y-1.5">
                                       {boxExercises.map((se, idx) => (
-                                        <div 
-                                          key={se.id} 
-                                          className="bg-bg-surface p-2 rounded text-xs group hover:bg-bg-surface/70"
-                                        >
-                                          {/* Apilado, no en dos columnas: la estación mide ~200px
-                                              y con el nombre y los botones peleando por el mismo
-                                              renglón los ejercicios quedaban en "1. Sen…". El
-                                              nombre se lleva el ancho completo y usa dos líneas. */}
-                                          <div className="flex flex-col gap-1">
-                                            <div className="min-w-0">
-                                              <p className="font-medium text-text-primary line-clamp-2" title={se.exercises?.name}>
-                                                {idx + 1}. {se.exercises?.name}
-                                              </p>
-                                              <p className="text-text-tertiary truncate">
-                                                {se.setsReps}
-                                                {se.weightKg && ` • ${se.weightKg}kg`}
-                                              </p>
-                                              {/* Sin esto un Tabata y unas series sueltas se
-                                                  veían igual en la grilla. */}
-                                              {esPorTiempo(se.formato) && (
-                                                <p className="mt-1 inline-flex items-center whitespace-nowrap rounded bg-brand/10 px-1.5 py-px text-[10px] font-medium text-brand">
-                                                  {comoTexto(se.formato, se)} · {mmss(duracionSeg(se))}
-                                                </p>
-                                              )}
-                                            </div>
-                                            <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                              <button
-                                                onClick={() => setSustituyendo({ fila: se, estacion: boxNum, boxId: se.box_id })}
-                                                className="p-0.5 text-text-tertiary hover:text-brand"
-                                                title="Cambiar por otro del mismo patrón"
-                                              >
-                                                <ArrowPathIcon className="h-3 w-3" />
-                                              </button>
-                                              <button
-                                                onClick={() => openExerciseModal(session.id, se, boxNum)}
-                                                className="p-0.5 text-text-tertiary hover:text-brand"
-                                              >
-                                                <PencilIcon className="h-3 w-3" />
-                                              </button>
-                                              <button
-                                                onClick={() => removeExerciseFromSession(se.id)}
-                                                className="p-0.5 text-text-tertiary hover:text-error"
-                                              >
-                                                <TrashIcon className="h-3 w-3" />
-                                              </button>
-                                            </div>
-                                          </div>
+                                        <div key={se.id} className="bg-bg-surface p-2 rounded text-xs">
+                                          <p className="font-medium text-text-primary line-clamp-2" title={se.exercises?.name}>
+                                            {idx + 1}. {se.exercises?.name}
+                                          </p>
+                                          <p className="text-text-tertiary truncate">
+                                            {se.setsReps}
+                                            {se.weightKg && ` • ${se.weightKg}kg`}
+                                          </p>
                                         </div>
                                       ))}
-                                      
+
                                       {/* Add exercise to station */}
                                       <button
                                         onClick={() => openExerciseModal(session.id, null, boxNum)}
@@ -1477,85 +1551,91 @@ export default function Routines() {
               <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-3">
                 Ejercicios de la estación
               </p>
-              <div className="space-y-2">
-                {filasEstacionActual.map((se, idx) => {
-                  const enDrag = dragOverIndex === idx && dragIndex !== null && dragIndex !== idx
-                  const meta = [se.setsReps, se.weightKg ? `${se.weightKg}kg` : null].filter(Boolean).join(' · ')
-                  return (
-                    <div
-                      key={se.id}
-                      draggable
-                      onDragStart={() => setDragIndex(idx)}
-                      onDragOver={(e) => {
-                        e.preventDefault()
-                        if (dragIndex !== null && dragIndex !== idx) setDragOverIndex(idx)
-                      }}
-                      onDrop={() => {
-                        if (dragIndex !== null && dragIndex !== idx) {
-                          moverEjercicioDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber, filasEstacionActual, dragIndex, idx)
-                        }
-                        setDragIndex(null)
-                        setDragOverIndex(null)
-                      }}
-                      onDragEnd={() => {
-                        setDragIndex(null)
-                        setDragOverIndex(null)
-                      }}
-                      className={`p-2.5 rounded-xl border text-xs ${
-                        enDrag ? 'border-brand border-dashed bg-brand/5' : 'border-border-default bg-bg-secondary'
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <Bars2Icon className="h-3.5 w-4 text-text-muted mt-0.5 flex-shrink-0 cursor-grab" />
-                        <span className="w-[18px] h-[18px] rounded-full border border-text-primary text-[10px] font-bold text-text-primary flex items-center justify-center flex-shrink-0 mt-px">
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-text-primary line-clamp-2">{se.exercises?.name}</p>
-                          {meta && <p className="text-text-tertiary truncate mt-0.5">{meta}</p>}
-                        </div>
-                        <div className="flex gap-0.5 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openExerciseModal(exerciseForm.sessionId, se, exerciseForm.boxNumber)}
-                            className="p-0.5 text-text-tertiary hover:text-brand"
-                          >
-                            <PencilIcon className="h-3 w-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeExerciseFromSession(se.id)}
-                            className="p-0.5 text-text-tertiary hover:text-error"
-                          >
-                            <TrashIcon className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-1 mt-1.5">
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={() => moverEjercicioDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber, filasEstacionActual, idx, idx - 1)}
-                          className="p-1 rounded border border-border-default text-text-secondary disabled:opacity-30"
-                        >
-                          <ChevronUpIcon className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={idx === filasEstacionActual.length - 1}
-                          onClick={() => moverEjercicioDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber, filasEstacionActual, idx, idx + 1)}
-                          className="p-1 rounded border border-border-default text-text-secondary disabled:opacity-30"
-                        >
-                          <ChevronDownIcon className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              <ListaBloques
+                filas={filasEstacionActual}
+                onReordenar={(desde, hacia) =>
+                  moverEjercicioDeEstacion(exerciseForm.sessionId, exerciseForm.boxNumber, filasEstacionActual, desde, hacia)
+                }
+                onEditar={(se) => openExerciseModal(exerciseForm.sessionId, se, exerciseForm.boxNumber)}
+                onEliminar={(se) => removeExerciseFromSession(se.id)}
+                onCambiar={(se) => setSustituyendo({ fila: se, estacion: exerciseForm.boxNumber, boxId: se.boxId })}
+              />
             </div>
           )}
         </div>
+      </Sidecart>
+
+      {/* Ver/editar la estación entera: modalidad + los ejercicios ya cargados, reordenables.
+          Se abre desde el único botón de editar del título de cada estación en el grid —
+          cambiar y borrar un ejercicio puntual vive acá, no suelto en el grid. */}
+      <Sidecart
+        isOpen={Boolean(estacionAbierta)}
+        onClose={() => setEstacionAbierta(null)}
+        title={`Estación ${estacionAbierta?.boxNumber ?? ''}`}
+        subtitle={(() => {
+          const sesion = selectedRoutine?.routineSessions?.find((s) => s.id === estacionAbierta?.sessionId)
+          return sesion?.sessionNumber ? `Sesión ${sesion.sessionNumber}` : undefined
+        })()}
+        size="md"
+        footer={
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setEstacionAbierta(null)} className="btn-secondary">
+              Cerrar
+            </button>
+          </div>
+        }
+      >
+        {estacionAbierta && (() => {
+          const filas = filasDeEstacion(estacionAbierta.sessionId, estacionAbierta.boxNumber)
+          const primera = filas[0]
+          const timed = primera && esPorTiempo(primera.formato)
+          const duracion = timed ? duracionSeg(primera) : 0
+          const excede = duracion > BLOQUE_SEG
+          return (
+            <div className="space-y-5">
+              {primera ? (
+                <div
+                  className={`p-3 rounded-xl border text-sm ${
+                    excede ? 'bg-red-50 border-red-200 text-red-800' : 'bg-brand/5 border-brand/20 text-text-primary'
+                  }`}
+                >
+                  <span className="font-semibold">
+                    {timed ? comoTexto(primera.formato, primera) : 'Series × reps'}
+                  </span>
+                  {timed && (
+                    <span className={excede ? 'text-red-700' : 'text-text-tertiary'}>
+                      {' · '}
+                      {mmss(duracion)} de {mmss(BLOQUE_SEG)}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-text-tertiary">Todavía no tiene ejercicios cargados.</p>
+              )}
+
+              {filas.length > 0 && (
+                <ListaBloques
+                  filas={filas}
+                  onReordenar={(desde, hacia) =>
+                    moverEjercicioDeEstacion(estacionAbierta.sessionId, estacionAbierta.boxNumber, filas, desde, hacia)
+                  }
+                  onEditar={(se) => openExerciseModal(estacionAbierta.sessionId, se, estacionAbierta.boxNumber)}
+                  onEliminar={(se) => removeExerciseFromSession(se.id)}
+                  onCambiar={(se) => setSustituyendo({ fila: se, estacion: estacionAbierta.boxNumber, boxId: se.boxId })}
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={() => openExerciseModal(estacionAbierta.sessionId, null, estacionAbierta.boxNumber)}
+                className="w-full py-2 border border-dashed border-border-default rounded-lg text-xs text-text-tertiary hover:text-brand hover:border-brand transition-colors flex items-center justify-center gap-1"
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                Agregar ejercicio
+              </button>
+            </div>
+          )
+        })()}
       </Sidecart>
     </div>
   )
