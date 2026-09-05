@@ -144,12 +144,14 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLog
   const SidebarContent = () => (
     // Sin fondo ni borde propios: el sidebar es el shell rojo que se ve a través de él.
     <div className="flex flex-col h-full px-2.5 pb-1.5">
-      {/* Logo/Brand — el cuadrado se invierte, blanco con la T roja: el rojo de marca sobre
-          rojo de marca no se veía. */}
+      {/* Logo/Brand — el isologo real de TecnoFit (mismo trazo que el favicon de la web),
+          blanco sobre el cuadrado invertido: el rojo de marca sobre rojo de marca no se veía. */}
       <div className="flex items-center justify-between h-12 px-2.5">
         <div className="flex items-center gap-2.5">
           <div className="w-[26px] h-[26px] bg-white rounded-lg flex items-center justify-center">
-            <span className="text-shell font-bold text-sm">T</span>
+            <svg viewBox="0 0 284 200" className="w-3.5 h-3.5 text-shell" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path d="M0 45.97H72.88L36.34 199.37H103.56L158.52 125.68H229.83L246.24 79.69H176.41C158.49 79.69 143.57 83.96 129.12 95.89C122.8 101.1 117.4 107.33 112.84 114.14L95.97 139.29L119.55 45.98H267.46L283.24 0H12.62L0 45.97Z" />
+            </svg>
           </div>
           <span className="text-white font-semibold text-[15px] tracking-tight">TecnoFit</span>
         </div>
@@ -160,6 +162,11 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLog
           <XMarkIcon className="h-5 w-5 text-white/60" />
         </button>
       </div>
+
+      {/* Selector de sede primero — es el contexto que enmarca todo lo demás (a qué gimnasio
+          pertenece el equipamiento, los prospectos, la cola). Fitness/Gestión es una elección
+          DENTRO de esa sede, así que va después, no antes. */}
+      <SedeSwitcher />
 
       {/* Space switcher — only when there is more than one space to switch to */}
       {espacios.length > 1 && espacioActual && (
@@ -215,8 +222,6 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLog
           </div>
         </div>
       )}
-
-      <SedeSwitcher />
 
       {/* Navigation */}
       <nav className="flex-1 pt-3 space-y-0.5 overflow-y-auto">
