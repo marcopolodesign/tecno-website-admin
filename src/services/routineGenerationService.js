@@ -156,21 +156,17 @@ function dentroDelTecho(ejercicio, techos) {
 }
 
 /**
- * How a station of BLOQUE_SEG runs under each format: how long the circuit prefers to be, and
- * what one turn of one exercise costs.
+ * How a station of BLOQUE_SEG runs under each format: cuántos ejercicios prefiere el circuito y
+ * cuánto dura cada intervalo — la cantidad TOTAL de intervalos en 6:00 es del formato, no de
+ * cuántos ejercicios entraron (ver trabajoDelBloque): un Tabata siempre son 12 turnos de 20/10,
+ * los reparta entre 3 ejercicios o entre 4 — igual que el preset que ve el coach armando a mano
+ * (SelectorFormato/PRESETS en formatos.js) y que la cola/TV, que cuentan el total como
+ * rondas × (trabajo + descanso) sin mirar cuántos ejercicios hay.
  *
- * Locking every station to three exercises is a limitation of Tabata, not of the gym — with a
- * clock per round it is the count that divides evenly. EMOM and AMRAP do not have that problem,
- * so the circuit length changes with the format and the member stops recognising the station by
- * its shape.
- *
- *   Tabata  4 × (20s + 10s) × 3 vueltas = 6:00   — el clásico, con un ejercicio más
- *   EMOM    3 × 60s × 2 vueltas          = 6:00   — un movimiento por minuto
- *   AMRAP   4 ejercicios en 6:00 corridos         — las vueltas las pone el socio
- *   Series  lo que escribió el coach, sin reloj   — carga y repeticiones
- *
- * `rondas` no está acá: sale de dividir los seis minutos por lo que ocupa una vuelta del
- * circuito, así el bloque cierra en 6:00 aunque queden menos ejercicios de los preferidos.
+ *   Tabata  12 turnos de 20s + 10s = 6:00   — el clásico, repartido entre los ejercicios que haya
+ *   EMOM    6 turnos de 60s        = 6:00   — un movimiento por minuto
+ *   AMRAP   6:00 corridos                   — las vueltas las pone el socio, no hay turnos fijos
+ *   Series  lo que escribió el coach, sin reloj — carga y repeticiones
  */
 const CIRCUITO = {
   Tabata: { ejercicios: 4, celda: 30, trabajo: 20, descanso: 10, reps: 'máx por ronda' },
@@ -182,20 +178,27 @@ const CIRCUITO = {
  * El trabajo de una estación: cuántas vueltas y cuánto dura cada turno, para que el bloque cierre
  * en seis minutos con los ejercicios que efectivamente entraron.
  *
- * En AMRAP el reloj es uno solo para todo el bloque — el socio da las vueltas que pueda. Se
- * reparte igual entre los ejercicios porque la duración de la estación es lo que la cola tiene
- * que poder consultar, y una estación que dice durar veinticuatro minutos rompe la línea.
+ * `rondas`/`trabajo_seg` son del FORMATO, no de la cantidad de ejercicios — mismo criterio que
+ * PRESETS en formatos.js (EMOM siempre 6 rondas de 60s, Tabata siempre 12 de 20/10) y que
+ * duracionSeg/faseDelFormato (admin y TV), que calculan el total como rondas × (trabajo +
+ * descanso) SIN multiplicar por la cantidad de ejercicios — eso ya se sacó a propósito una vez
+ * (ver duracionEstacionSeg: "sumar como antes multiplicaba el tiempo por la cantidad de
+ * ejercicios... daban 18:00, que no existe"). Este generador dividía por `cantidad` para
+ * compensar esa vieja multiplicación — pero como ya no existe del otro lado, el resultado real
+ * era una estación que decía (y corría) menos de 6:00 apenas había más de un ejercicio: un EMOM
+ * de 3 ejercicios cerraba en 2:00, un AMRAP de 4 en 1:30. Encontrado generando una rutina real
+ * completa y comparando contra lo que muestra el armador manual para el mismo formato.
+ *
+ * En AMRAP el reloj es uno solo para todo el bloque — el socio da las vueltas que pueda, no hay
+ * un turno fijo por ejercicio que repartir.
  */
-function trabajoDelBloque(formato, cantidad) {
+function trabajoDelBloque(formato) {
   const c = CIRCUITO[formato]
   if (formato === 'AMRAP') {
-    const parte = Math.round(BLOQUE_SEG / cantidad)
-    return { formato, rondas: 1, trabajo_seg: parte, descanso_seg: 0, sets_reps: c.reps }
+    return { formato, rondas: 1, trabajo_seg: BLOQUE_SEG, descanso_seg: 0, sets_reps: c.reps }
   }
-  // floor y no round: redondear para arriba pasa el bloque, no lo ajusta. Hoy no se nota
-  // porque el circuito se recorta antes a los 3-4 ejercicios que el formato prefiere, pero con
-  // round un cambio en esa preferencia (EMOM a 4) devolvía ocho minutos sin que nada avisara.
-  const rondas = Math.max(1, Math.floor(BLOQUE_SEG / (cantidad * c.celda)))
+  // floor y no round: redondear para arriba pasa el bloque, no lo ajusta.
+  const rondas = Math.max(1, Math.floor(BLOQUE_SEG / c.celda))
   return {
     formato, rondas, trabajo_seg: c.trabajo, descanso_seg: c.descanso, sets_reps: c.reps,
   }
@@ -524,7 +527,7 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
       ? candidatos.slice(0, CIRCUITO[formatoFinal].ejercicios)
       : candidatos
     // Rounds come from how many exercises actually made it in, so the block still closes at 6:00.
-    const trabajo = formatoFinal ? trabajoDelBloque(formatoFinal, delBloque.length) : null
+    const trabajo = formatoFinal ? trabajoDelBloque(formatoFinal) : null
 
     for (const [i, exerciseId] of delBloque.entries()) {
       orden += 1
