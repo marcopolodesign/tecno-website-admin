@@ -60,6 +60,14 @@ async function techosDelSocio(userId) {
   return data?.[0] ?? null
 }
 
+// Elementos que implican una carga real que se trackea en kg — no cable ni banda. La rutina
+// real de un socio en CENTRAL nunca puso carga_kg en polea o banda elástica, sólo en barra y
+// mancuerna; el motor sigue esa misma convención al decidir qué ejercicio "necesita" un peso.
+const ELEMENTOS_CON_PESO = [
+  'Barra', 'Barra en rack', 'Mancuernas', 'Keteball', 'Sand bag', 'Medicin ball',
+  'Pelota de carga', 'Landmine',
+]
+
 async function perfilesDeEsfuerzo() {
   // El catálogo entero en una sola query en vez de una consulta por estación generada: un mes
   // de cinco estaciones es 125 de ellas, y esto son 312 filas de tres columnas chicas.
@@ -67,7 +75,25 @@ async function perfilesDeEsfuerzo() {
     .from('exercises')
     .select('id, complejidad_tecnica, intensidad_relativa, family_code')
     .eq('is_active', true)
-  return new Map((data || []).map((e) => [e.id, e]))
+
+  // Qué ejercicios necesitan un peso real, para poder avisar cuando no hay ninguno de dónde
+  // sacarlo — sin esto, un ejercicio con barra sin peso es indistinguible de uno de peso
+  // corporal que correctamente no lleva ninguno.
+  const { data: elementosConPeso } = await supabase
+    .from('elementos')
+    .select('id')
+    .in('nombre', ELEMENTOS_CON_PESO)
+  const idsElementosConPeso = (elementosConPeso || []).map((e) => e.id)
+  const idsNecesitanCarga = new Set()
+  if (idsElementosConPeso.length) {
+    const { data: relaciones } = await supabase
+      .from('exercise_elementos')
+      .select('exercise_id')
+      .in('elemento_id', idsElementosConPeso)
+    for (const r of relaciones || []) idsNecesitanCarga.add(r.exercise_id)
+  }
+
+  return new Map((data || []).map((e) => [e.id, { ...e, necesitaCarga: idsNecesitanCarga.has(e.id) }]))
 }
 
 /**
@@ -187,12 +213,25 @@ function trabajoDelBloque(formato, cantidad) {
  * Series is left alone. The coach prescribing sets and reps decided the station is strength work;
  * turning it into a Tabata changes what the station is for, not how it is measured.
  */
-function formatoDelBloque(plantilla, semilla, techos) {
+function formatoDelBloque(plantilla, semilla, techos, perfiles) {
   if (!plantilla.formato || plantilla.formato === 'Series') return null
   // Las que prefiere el arquetipo, si declaró alguna. Sigue eligiendo entre varias: una sola
   // modalidad para todo el mes es el problema que vinimos a resolver.
   const preferidas = (techos?.formatos_preferidos || []).filter((f) => CIRCUITO[f])
-  const opciones = preferidas.length ? preferidas : Object.keys(CIRCUITO)
+  let opciones = preferidas.length ? preferidas : Object.keys(CIRCUITO)
+
+  // Una estación cuyo primer ejercicio necesita carga real (barra, mancuerna, sandbag...) no
+  // debería poder sortear un formato que ESE ejercicio no tolera: si lo hace, la sustitución de
+  // más abajo no le baja el formato al ejercicio, le cambia el ejercicio entero — se pierde el
+  // ancla de progreso de la estación, no sólo el ritmo. Se acota antes del sorteo, sólo para
+  // estaciones de carga; las de peso corporal siguen rotando entre las tres como siempre.
+  const perfilAncla = perfiles?.get(plantilla.exercise_id)
+  if (perfilAncla?.necesitaCarga) {
+    const tolerados = formatosPosibles(perfilAncla)
+    const restringidas = opciones.filter((f) => tolerados.includes(f))
+    if (restringidas.length) opciones = restringidas
+  }
+
   return opciones[seededIndex(semilla, opciones.length)]
 }
 
@@ -334,13 +373,13 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
         trabajo_seg: cabeza.trabajo_seg,
         descanso_seg: cabeza.descanso_seg,
         sets_reps: cabeza.sets_reps,
-      }, await getProposedWeight(clientId, cabeza.exercise_id))
+      }, await getProposedWeight(clientId, cabeza.exercise_id), perfiles?.get(cabeza.exercise_id)?.necesitaCarga || false)
       usados.push(cabeza.exercise_id)
       continue
     }
 
     const semillaEstacion = `${routineId}-${sessionNumber}-f${cabeza.box_number}`
-    const formato = formatoDelBloque(cabeza, semillaEstacion, techos)
+    const formato = formatoDelBloque(cabeza, semillaEstacion, techos, perfiles)
     // Series keeps the circuit the coach wrote; a timed format sizes it to fill the six minutes.
     const cupo = formato ? CIRCUITO[formato].ejercicios : plantillas.length
 
@@ -444,7 +483,8 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
           descanso_seg: null,
           sets_reps: te.sets_reps,
         },
-        await getProposedWeight(clientId, exerciseId)
+        await getProposedWeight(clientId, exerciseId),
+        perfiles?.get(exerciseId)?.necesitaCarga || false
       )
     }
   }
@@ -453,7 +493,18 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
 }
 
 /** Una fila de session_exercises. La forma sale de la plantilla; el trabajo, del bloque. */
-async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, trabajo, peso) {
+async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, trabajo, peso, necesitaCarga) {
+  const pesoFinal = peso ?? te.weight_kg
+
+  // Silencio no es lo mismo que "no lleva peso": un ejercicio con barra sin ningún peso de
+  // referencia (ni historial real vía peso_sugerido, ni la plantilla) es un hueco que el coach
+  // tiene que llenar antes de que el socio llegue a la estación, no un peso corporal legítimo.
+  // exercise_logs está vacío en todo el sistema hoy, así que esto va a aparecer seguido hasta
+  // que se resuelva quién carga el peso real levantado (pendiente ya anotado en el catchup).
+  const notas = []
+  if (fuente === 'template' && te.notes) notas.push(te.notes)
+  if (necesitaCarga && pesoFinal == null) notas.push('Sin peso de referencia — revisar antes de la sesión')
+
   await supabase.from('session_exercises').insert([{
       session_id: sessionId,
       exercise_id: exerciseId,
@@ -464,12 +515,13 @@ async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, traba
       rest_time: te.rest_time,
       repetition_time: te.repetition_time,
       micro_pause: te.micro_pause,
-      weight_kg: peso ?? te.weight_kg,
+      weight_kg: pesoFinal,
       // Same minutes at the station, a different way of spending them.
       formato: trabajo.formato,
       rondas: trabajo.rondas,
       trabajo_seg: trabajo.trabajo_seg,
       descanso_seg: trabajo.descanso_seg,
+      notes: notas.length ? notas.join(' · ') : null,
       is_auto_generated: true,
       is_cooldown: te.is_cooldown || false,
       generation_source: fuente,
