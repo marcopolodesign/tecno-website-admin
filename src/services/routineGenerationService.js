@@ -494,7 +494,13 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
 
 /** Una fila de session_exercises. La forma sale de la plantilla; el trabajo, del bloque. */
 async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, trabajo, peso, necesitaCarga) {
-  const pesoFinal = peso ?? te.weight_kg
+  // te.weight_kg es el peso de la plantilla — pero es el peso del ejercicio QUE HABÍA en esa
+  // posición del circuito, no necesariamente el que termina eligiéndose acá. Un sustituto de
+  // peso corporal (una "Gluteos elevación cadera colchoneta", por ejemplo) heredaba el peso del
+  // Peso Muerto con barra que ocupaba esa misma posición en la plantilla — un número sin
+  // sentido en un ejercicio que no usa ninguna carga. Sólo se hereda cuando el que realmente se
+  // eligió necesita carga.
+  const pesoFinal = peso ?? (necesitaCarga ? te.weight_kg : null)
 
   // Silencio no es lo mismo que "no lleva peso": un ejercicio con barra sin ningún peso de
   // referencia (ni historial real vía peso_sugerido, ni la plantilla) es un hueco que el coach
