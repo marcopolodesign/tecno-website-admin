@@ -92,7 +92,7 @@ const VACIO = {
   name: '', tipo: 'Ejercicio', patron: '', rol: '', musculo: '', lateralidad: '',
   posicion: '', vector: '', impacto: '', intensidad_relativa: '', complejidad_tecnica: '',
   contraindicaciones: [], elementos: [], video_estado: 'Sin filmar', family_code: '',
-  nota_interna: '', is_active: true,
+  movimiento_madre: '', nota_interna: '', is_active: true,
 }
 
 function desdeFila(ej) {
@@ -113,6 +113,7 @@ function desdeFila(ej) {
     elementos: ej.elementos ?? [],
     video_estado: ej.video_estado ?? 'Sin filmar',
     family_code: ej.family_code ?? '',
+    movimiento_madre: ej.movimiento_madre ?? '',
     nota_interna: ej.nota_interna ?? '',
     is_active: ej.is_active ?? true,
   }
@@ -202,6 +203,7 @@ export default function EjercicioEditor({ ejercicio, opcionesElemento, onElement
         p_family_code: nulo(f.family_code.trim()),
         p_nota_interna: nulo(f.nota_interna.trim()),
         p_is_active: f.is_active,
+        p_movimiento_madre: nulo(f.movimiento_madre.trim()),
       })
       if (err) throw err
       setGuardado(true)
@@ -327,11 +329,20 @@ export default function EjercicioEditor({ ejercicio, opcionesElemento, onElement
             </div>
           </Campo>
 
-          <Campo etiqueta="Familia" ayuda="Mismo movimiento base con otro implemento. Sólo agrupa: el video es uno por ejercicio.">
+          <Campo etiqueta="Familia" ayuda="Código interno del catálogo (patrón + variante + implemento). Sólo agrupa video: el video es uno por ejercicio. Para que el motor no repita el mismo movimiento en una estación, usar el campo Movimiento madre de abajo.">
             <input
               value={f.family_code}
               onChange={(ev) => set('family_code')(ev.target.value)}
               placeholder="ROD_SENTADILLA"
+              style={s.input}
+            />
+          </Campo>
+
+          <Campo etiqueta="Movimiento madre" ayuda="El movimiento real (Sentadilla, Bíceps, Remo...) sin importar el implemento. El motor de rutinas lo usa para no ofrecer dos ejercicios del mismo movimiento en la misma estación, aunque tengan materiales distintos.">
+            <input
+              value={f.movimiento_madre}
+              onChange={(ev) => set('movimiento_madre')(ev.target.value)}
+              placeholder="Sentadilla"
               style={s.input}
             />
           </Campo>

@@ -73,7 +73,7 @@ async function perfilesDeEsfuerzo() {
   // de cinco estaciones es 125 de ellas, y esto son 312 filas de tres columnas chicas.
   const { data } = await supabase
     .from('exercises')
-    .select('id, complejidad_tecnica, intensidad_relativa, family_code')
+    .select('id, complejidad_tecnica, intensidad_relativa, family_code, movimiento_madre')
     .eq('is_active', true)
 
   // Qué ejercicios necesitan un peso real, para poder avisar cuando no hay ninguno de dónde
@@ -399,6 +399,11 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
     // extra slots reuse the template's movements in order — the fourth exercise of a Tabata
     // rotates the first one's pattern again, into a different movement.
     const candidatos = []
+    // Qué movimientos ya entraron a ESTA estación, hoy — no por id de ejercicio (eso ya lo
+    // cubre p_excluir más abajo) sino por movimiento_madre: "Biceps polea baja con barra" y
+    // "Biceps con mancuernas sentado" son ejercicios distintos pero el mismo movimiento con
+    // otro material, y un socio no debería ver bíceps dos veces en el mismo circuito.
+    const movimientosEnEstacion = new Set()
     for (let i = 0; i < cupo; i++) {
       const te = plantillas[i % plantillas.length]
 
@@ -407,6 +412,8 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
         // ejercicio siempre. El peso y el formato de la estación se siguen calculando como
         // siempre — sólo la identidad del ejercicio queda afuera de la rotación.
         candidatos.push(te.exercise_id)
+        const movPin = perfiles?.get(te.exercise_id)?.movimiento_madre
+        if (movPin) movimientosEnEstacion.add(movPin)
         continue
       }
 
@@ -426,7 +433,9 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
       // Las concesiones tienen orden, y el orden es por lo que le cuesta al socio.
       //
       //   1. Contraindicaciones — no se ceden nunca; filtran del lado de la base.
-      //   2. No repetir dentro del circuito de hoy — lo peor de ver en el piso.
+      //   2. No repetir dentro del circuito de hoy — lo peor de ver en el piso. Por movimiento,
+      //      no por id: dos ejercicios de bíceps con materiales distintos siguen siendo bíceps
+      //      dos veces en el mismo circuito.
       //   3. El techo del arquetipo — al que arranca no se le ofrece lo más técnico, aunque el
       //      patrón coincida. Cede antes que 2 y después que 4.
       //   4. No repetir el movimiento de ayer — molesto, pero es lo más barato de resolver.
@@ -438,7 +447,7 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
 
       // Un id distinto no es un movimiento distinto. El catálogo lo dice con family_code:
       // sentadilla con sandbag y sentadilla con kettlebell son una sentadilla agarrando otra cosa.
-      const otraFamilia = (lista) => {
+      const otraFamiliaQueAyer = (lista) => {
         const fuera = lista.filter((o) => {
           const fam = perfiles?.get(o.id)?.family_code
           return !fam || !familiasAyer.has(fam)
@@ -446,15 +455,29 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
         return fuera.length ? fuera : lista
       }
 
+      // A diferencia de otraFamiliaQueAyer, ésta NO tiene fallback propio — es la concesión que
+      // más cuesta ceder, así que la cascada de abajo la sostiene incluso cuando ya cedió techo
+      // y ayer, y sólo la deja caer como último recurso.
+      const sinRepetirMovimientoHoy = (lista) =>
+        lista.filter((o) => {
+          const mov = perfiles?.get(o.id)?.movimiento_madre
+          return !mov || !movimientosEnEstacion.has(mov)
+        })
+
       const conAyerFuera = await pedir([...usados, ...evitar, ...candidatos])
-      let opciones = bajoTecho(otraFamilia(conAyerFuera))
+      let opciones = sinRepetirMovimientoHoy(bajoTecho(otraFamiliaQueAyer(conAyerFuera)))
 
       if (!opciones.length) {
-        // Se afloja lo de ayer, manteniendo el techo.
+        // Se afloja lo de ayer, manteniendo el techo y no repetir movimiento hoy.
         const conAyerAdentro = await pedir([...usados, ...candidatos])
-        opciones = bajoTecho(conAyerAdentro)
-        // Y recién si tampoco hay nada bajo techo, se cede el techo.
-        if (!opciones.length) opciones = conAyerAdentro
+        opciones = sinRepetirMovimientoHoy(bajoTecho(conAyerAdentro))
+        if (!opciones.length) {
+          // Se afloja también el techo, pero seguimos sin repetir movimiento hoy.
+          opciones = sinRepetirMovimientoHoy(conAyerAdentro)
+          // Y sólo si de verdad no queda ninguna otra opción se repite un movimiento dentro de
+          // la estación — preferible a un hueco en el circuito, pero es la última concesión.
+          if (!opciones.length) opciones = conAyerAdentro
+        }
       }
 
       // Only movements that tolerate the station's format get into the station's circuit.
@@ -463,15 +486,22 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
       )
       const elegibles = admiten.length ? admiten : opciones
 
+      let elegidoId = null
       if (elegibles.length) {
         // The engine's own order is the same every time for a given member and station, so the
         // session number is what makes session 7 differ from session 12. seededIndex keeps it
         // reproducible: same routine, same month, every time.
         const semilla = `${semillaEstacion}-s${i}`
-        candidatos.push(elegibles[seededIndex(semilla, elegibles.length)].id)
+        elegidoId = elegibles[seededIndex(semilla, elegibles.length)].id
+        candidatos.push(elegidoId)
       } else if (i < plantillas.length && !candidatos.includes(te.exercise_id)) {
         // No substitute available: the coach's own choice is better than a hole in the circuit.
-        candidatos.push(te.exercise_id)
+        elegidoId = te.exercise_id
+        candidatos.push(elegidoId)
+      }
+      if (elegidoId != null) {
+        const movElegido = perfiles?.get(elegidoId)?.movimiento_madre
+        if (movElegido) movimientosEnEstacion.add(movElegido)
       }
     }
     if (!candidatos.length) continue
