@@ -603,10 +603,17 @@ export default function Routines() {
       }
       // El panel se queda abierto: se sigue armando la estación agregando el próximo ejercicio.
       // Cierra recién con Cancelar, Confirmar entrenamiento o la X.
+      //
+      // exerciseOrder es único POR SESIÓN (no por estación) — si se dejaba el mismo valor con
+      // el que se acababa de guardar, el segundo ejercicio de cualquier estación chocaba contra
+      // ese mismo número y el insert fallaba con un 409 silencioso. No hace falta esperar el
+      // refetch para saber el próximo: si prev.exerciseOrder se usó y se guardó bien, el
+      // siguiente libre es ese +1 — nadie más edita esta sesión al mismo tiempo desde acá.
       setEditingItem(null)
       setExerciseForm((prev) => ({
         ...prev,
         exerciseId: '',
+        exerciseOrder: prev.exerciseOrder + 1,
         setsReps: '3x12',
         restTime: '60s',
         repetitionTime: '',
