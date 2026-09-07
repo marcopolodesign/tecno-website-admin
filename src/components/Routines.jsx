@@ -32,6 +32,23 @@ import PanelSustitutos from './PanelSustitutos'
 import PesoSugerido from './PesoSugerido'
 import Sidecart from './Sidecart'
 
+// No hay ícono de alfiler/thumbtack en Heroicons — se dibuja a mano, en el mismo estilo
+// (viewBox 24, trazo redondeado) que el resto de los íconos de este panel. Relleno cuando está
+// fijado, sólo el trazo cuando no — la misma convención que "guardado/no guardado" en cualquier
+// lado.
+function PinIcon({ filled, className }) {
+  return filled ? (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 2a1 1 0 0 1 1 1v1.35a4.5 4.5 0 0 1 3.25 4.33v3.02l1.66 2.49a1 1 0 0 1-.83 1.56H13v5.25a1 1 0 1 1-2 0v-5.25H6.92a1 1 0 0 1-.83-1.56l1.66-2.49V8.68A4.5 4.5 0 0 1 11 4.35V3a1 1 0 0 1 1-1Z" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 2v2.35m0 0a4.5 4.5 0 0 0-3.25 4.33v3.02l-1.66 2.49a1 1 0 0 0 .83 1.56h8.16a1 1 0 0 0 .83-1.56l-1.66-2.49V8.68A4.5 4.5 0 0 0 12 4.35Z" />
+      <path d="M12 15.67V21" />
+    </svg>
+  )
+}
+
 // Los ejercicios de una estación, como bloques que se reordenan arrastrando o con flechas.
 // Un solo componente para las dos pantallas que necesitan esto — el panel de "agregar
 // ejercicio" (mientras se arma) y el panel de "ver estación" (una vez armada) — así que
@@ -39,7 +56,7 @@ import Sidecart from './Sidecart'
 //
 // Tocar el nombre abre el editor completo del ejercicio: no hay un lápiz aparte, el bloque
 // entero es el botón de editar.
-function ListaBloques({ filas, onReordenar, onEditar, onEliminar, onCambiar }) {
+function ListaBloques({ filas, onReordenar, onEditar, onEliminar, onCambiar, onTogglePin }) {
   const [dragIndex, setDragIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
 
@@ -80,6 +97,20 @@ function ListaBloques({ filas, onReordenar, onEditar, onEliminar, onCambiar }) {
                 {meta && <p className="text-text-tertiary truncate mt-0.5">{meta}</p>}
               </button>
               <div className="flex gap-0.5 flex-shrink-0">
+                {onTogglePin && (
+                  <button
+                    type="button"
+                    onClick={() => onTogglePin(se)}
+                    className={`p-0.5 ${se.isPinned ? 'text-brand' : 'text-text-tertiary hover:text-brand'}`}
+                    title={
+                      se.isPinned
+                        ? 'Fijo — no rota entre sesiones. El peso se puede seguir ajustando cada semana. Tocá para soltarlo.'
+                        : 'Fijar — el motor nunca sustituye este ejercicio en sesiones futuras (el peso sigue pudiendo cambiar). Tocá para fijarlo.'
+                    }
+                  >
+                    <PinIcon filled={!!se.isPinned} className="h-3 w-3" />
+                  </button>
+                )}
                 {onCambiar && (
                   <button
                     type="button"
@@ -175,7 +206,8 @@ export default function Routines() {
     weightKg: '',
     microPause: '',
     notes: '',
-    isCooldown: false
+    isCooldown: false,
+    isPinned: false
   })
 
   // La modalidad es de la ESTACIÓN, no de cada ejercicio — un solo control arriba de todo del
@@ -503,7 +535,8 @@ export default function Routines() {
         weightKg: sessionExercise.weightKg || '',
         microPause: sessionExercise.microPause || '',
         notes: sessionExercise.notes || '',
-        isCooldown: sessionExercise.isCooldown || false
+        isCooldown: sessionExercise.isCooldown || false,
+        isPinned: sessionExercise.isPinned || false
       })
     } else {
       const selectedBox = boxes.find(b => b.boxNumber === boxNumber)
@@ -520,7 +553,8 @@ export default function Routines() {
         weightKg: '',
         microPause: '',
         notes: '',
-        isCooldown: isCooldown
+        isCooldown: isCooldown,
+        isPinned: false
       })
     }
     setShowExerciseModal(true)
@@ -628,6 +662,18 @@ export default function Routines() {
       Sentry.captureException(error, { extra: { context: 'Error reordering station exercises' } })
       toast.error(error?.message || String(error), toastOptions)
       fetchRoutineDetail(selectedRoutine.id)
+    }
+  }
+
+  // Fijar/soltar un ejercicio directamente desde el bloque, sin abrir el editor completo — el
+  // coach lo hace tanto armando la rutina como mirándola ya armada.
+  const togglePinEjercicio = async (se) => {
+    try {
+      await routinesService.updateSessionExercise(se.id, { isPinned: !se.isPinned })
+      fetchRoutineDetail(selectedRoutine.id)
+    } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error toggling exercise pin' } })
+      toast.error(error?.message || String(error), toastOptions)
     }
   }
 
@@ -1487,6 +1533,26 @@ export default function Routines() {
               />
             </div>
 
+            {!exerciseForm.isCooldown && (
+              <button
+                type="button"
+                onClick={() => setExerciseForm({ ...exerciseForm, isPinned: !exerciseForm.isPinned })}
+                title={
+                  exerciseForm.isPinned
+                    ? 'Fijo — el motor nunca sustituye este ejercicio en sesiones futuras. El peso se puede seguir ajustando cada semana. Tocá para soltarlo.'
+                    : 'Fijar — el motor nunca va a sustituir este ejercicio en sesiones futuras (el peso sigue pudiendo cambiar semana a semana). Tocá para fijarlo.'
+                }
+                className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-lg px-2.5 py-1.5 border ${
+                  exerciseForm.isPinned
+                    ? 'border-brand text-brand bg-brand/5'
+                    : 'border-border-default text-text-tertiary hover:text-brand'
+                }`}
+              >
+                <PinIcon filled={exerciseForm.isPinned} className="h-3.5 w-3.5" />
+                {exerciseForm.isPinned ? 'Fijo — no rota' : 'Fijar ejercicio'}
+              </button>
+            )}
+
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="form-label">Series x Reps *</label>
@@ -1595,6 +1661,7 @@ export default function Routines() {
                 onEditar={(se) => openExerciseModal(exerciseForm.sessionId, se, exerciseForm.boxNumber)}
                 onEliminar={(se) => removeExerciseFromSession(se.id)}
                 onCambiar={(se) => setSustituyendo({ fila: se, estacion: exerciseForm.boxNumber, boxId: se.boxId })}
+                onTogglePin={togglePinEjercicio}
               />
             </div>
           )}
@@ -1658,6 +1725,7 @@ export default function Routines() {
                   onEditar={(se) => openExerciseModal(estacionAbierta.sessionId, se, estacionAbierta.boxNumber)}
                   onEliminar={(se) => removeExerciseFromSession(se.id)}
                   onCambiar={(se) => setSustituyendo({ fila: se, estacion: estacionAbierta.boxNumber, boxId: se.boxId })}
+                  onTogglePin={togglePinEjercicio}
                 />
               )}
 

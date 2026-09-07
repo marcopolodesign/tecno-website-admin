@@ -213,23 +213,35 @@ function trabajoDelBloque(formato, cantidad) {
  * Series is left alone. The coach prescribing sets and reps decided the station is strength work;
  * turning it into a Tabata changes what the station is for, not how it is measured.
  */
-function formatoDelBloque(plantilla, semilla, techos, perfiles) {
-  if (!plantilla.formato || plantilla.formato === 'Series') return null
+function formatoDelBloque(plantillas, semilla, techos, perfiles) {
+  const cabeza = plantillas[0]
+  if (!cabeza.formato || cabeza.formato === 'Series') return null
   // Las que prefiere el arquetipo, si declaró alguna. Sigue eligiendo entre varias: una sola
   // modalidad para todo el mes es el problema que vinimos a resolver.
   const preferidas = (techos?.formatos_preferidos || []).filter((f) => CIRCUITO[f])
   let opciones = preferidas.length ? preferidas : Object.keys(CIRCUITO)
 
-  // Una estación cuyo primer ejercicio necesita carga real (barra, mancuerna, sandbag...) no
-  // debería poder sortear un formato que ESE ejercicio no tolera: si lo hace, la sustitución de
-  // más abajo no le baja el formato al ejercicio, le cambia el ejercicio entero — se pierde el
-  // ancla de progreso de la estación, no sólo el ritmo. Se acota antes del sorteo, sólo para
-  // estaciones de carga; las de peso corporal siguen rotando entre las tres como siempre.
-  const perfilAncla = perfiles?.get(plantilla.exercise_id)
-  if (perfilAncla?.necesitaCarga) {
-    const tolerados = formatosPosibles(perfilAncla)
-    const restringidas = opciones.filter((f) => tolerados.includes(f))
-    if (restringidas.length) opciones = restringidas
+  // Los ejercicios que el coach fijó ("pin") no rotan nunca — ver más abajo, en el loop de
+  // candidatos. El formato de la estación tiene que ser uno que TODOS los fijados toleren, o la
+  // sustitución no le cambia el formato al ejercicio fijado, se lo cambia a él: exactamente lo
+  // que el pin existe para evitar. Con más de uno fijado se acota a lo que todos toleran juntos.
+  const fijados = plantillas.filter((p) => p.is_pinned)
+  if (fijados.length) {
+    const toleradosPorTodos = fijados.reduce((acc, p) => {
+      const tolerados = formatosPosibles(perfiles?.get(p.exercise_id))
+      return acc.filter((f) => tolerados.includes(f))
+    }, opciones)
+    if (toleradosPorTodos.length) opciones = toleradosPorTodos
+  } else {
+    // Sin nada fijado todavía en la estación, se mantiene la heurística anterior como red de
+    // seguridad: una estación cuyo primer ejercicio necesita carga real (barra, mancuerna,
+    // sandbag...) no debería poder sortear un formato que ESE ejercicio no tolera.
+    const perfilAncla = perfiles?.get(cabeza.exercise_id)
+    if (perfilAncla?.necesitaCarga) {
+      const tolerados = formatosPosibles(perfilAncla)
+      const restringidas = opciones.filter((f) => tolerados.includes(f))
+      if (restringidas.length) opciones = restringidas
+    }
   }
 
   return opciones[seededIndex(semilla, opciones.length)]
@@ -373,13 +385,13 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
         trabajo_seg: cabeza.trabajo_seg,
         descanso_seg: cabeza.descanso_seg,
         sets_reps: cabeza.sets_reps,
-      }, await getProposedWeight(clientId, cabeza.exercise_id), perfiles?.get(cabeza.exercise_id)?.necesitaCarga || false)
+      }, await getProposedWeight(clientId, cabeza.exercise_id), perfiles?.get(cabeza.exercise_id)?.necesitaCarga || false, cabeza.is_pinned || false)
       usados.push(cabeza.exercise_id)
       continue
     }
 
     const semillaEstacion = `${routineId}-${sessionNumber}-f${cabeza.box_number}`
-    const formato = formatoDelBloque(cabeza, semillaEstacion, techos, perfiles)
+    const formato = formatoDelBloque(plantillas, semillaEstacion, techos, perfiles)
     // Series keeps the circuit the coach wrote; a timed format sizes it to fill the six minutes.
     const cupo = formato ? CIRCUITO[formato].ejercicios : plantillas.length
 
@@ -389,6 +401,15 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
     const candidatos = []
     for (let i = 0; i < cupo; i++) {
       const te = plantillas[i % plantillas.length]
+
+      if (te.is_pinned) {
+        // Fijado por el coach: nunca pasa por sustitutos_para_ejercicio, se mantiene el mismo
+        // ejercicio siempre. El peso y el formato de la estación se siguen calculando como
+        // siempre — sólo la identidad del ejercicio queda afuera de la rotación.
+        candidatos.push(te.exercise_id)
+        continue
+      }
+
       const pedir = async (excluir) => {
         const { data } = await supabase.rpc('sustitutos_para_ejercicio', {
           p_exercise_id: te.exercise_id,
@@ -484,7 +505,8 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
           sets_reps: te.sets_reps,
         },
         await getProposedWeight(clientId, exerciseId),
-        perfiles?.get(exerciseId)?.necesitaCarga || false
+        perfiles?.get(exerciseId)?.necesitaCarga || false,
+        te.is_pinned || false
       )
     }
   }
@@ -493,7 +515,7 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
 }
 
 /** Una fila de session_exercises. La forma sale de la plantilla; el trabajo, del bloque. */
-async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, trabajo, peso, necesitaCarga) {
+async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, trabajo, peso, necesitaCarga, isPinned) {
   // te.weight_kg es el peso de la plantilla — pero es el peso del ejercicio QUE HABÍA en esa
   // posición del circuito, no necesariamente el que termina eligiéndose acá. Un sustituto de
   // peso corporal (una "Gluteos elevación cadera colchoneta", por ejemplo) heredaba el peso del
@@ -531,5 +553,6 @@ async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, traba
       is_auto_generated: true,
       is_cooldown: te.is_cooldown || false,
       generation_source: fuente,
+      is_pinned: isPinned || false,
   }])
 }

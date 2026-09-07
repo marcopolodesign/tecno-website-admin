@@ -116,6 +116,7 @@ export const routinesService = {
               rondas,
               trabajo_seg,
               descanso_seg,
+              is_pinned,
               boxes (
                 id,
                 name,
@@ -345,6 +346,7 @@ export const routinesService = {
         micro_pause: sessionExerciseData.microPause || 0,
         notes: sessionExerciseData.notes || null,
         is_cooldown: sessionExerciseData.isCooldown || false,
+        is_pinned: sessionExerciseData.isPinned || false,
         // Series leaves these null on purpose — the CHECK on session_exercises rejects a timed
         // format with no duration, and rejects Series carrying one.
         formato: sessionExerciseData.formato || 'Series',
