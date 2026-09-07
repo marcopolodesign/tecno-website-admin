@@ -23,12 +23,25 @@ export const PRESETS = {
   AMRAP: { rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 },
   // EMOM has no stored rest — the rest is whatever is left of the minute after the reps.
   EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0 },
-  Tabata: { rondas: 8, trabajoSeg: 20, descansoSeg: 10 },
+  // 12 × (20+10) = 6:00 exacto. Antes eran 8 rondas (4:00) — el default dejaba 2:00 de la
+  // estación sin usar hasta que el coach subiera "Rondas" a mano; ningún otro preset tiene
+  // este problema (EMOM/AMRAP/A completar ya cierran justo en 6:00 desde el default).
+  Tabata: { rondas: 12, trabajoSeg: 20, descansoSeg: 10 },
   // Sin estructura fija: el coach carga los ejercicios que quiera (sin el tope de 3 de AMRAP)
   // y describe la submodalidad a mano en las notas (ej. "escalera 1-1-2-2-3-3"). El bloque de
   // seis minutos es el mismo que el resto de los formatos por tiempo.
   'A completar': { rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 },
 }
+
+// Cuántos ejercicios distintos arma un circuito por tiempo, y qué dice cada vuelta en vez de
+// "3x12" — un circuito corre con UN reloj compartido por todas sus filas (ver SelectorFormato),
+// así que "series x reps" por ejercicio no significa nada ahí: confundía al coach armando el
+// circuito a mano ("¿por qué me pide reps si esto es por tiempo?"). Serie/A completar no tienen
+// cupo fijo — el coach carga los que quiera. Debe coincidir con CIRCUITO en
+// routineGenerationService.js (ejercicios/reps) — están duplicados a propósito, igual que los
+// PRESETS de arriba, no por descuido.
+export const CUPO_POR_FORMATO = { Tabata: 4, EMOM: 3, AMRAP: 4 }
+export const REPS_POR_FORMATO = { Tabata: 'máx por ronda', EMOM: '10 por minuto', AMRAP: '10 por vuelta' }
 
 export const esPorTiempo = (formato) => Boolean(formato) && formato !== 'Series'
 

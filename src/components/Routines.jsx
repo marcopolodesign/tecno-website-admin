@@ -23,7 +23,7 @@ import routinesService from '../services/routinesService'
 import exercisesService from '../services/exercisesService'
 import { generateRoutineSessions } from '../services/routineGenerationService'
 import { supabase, toCamelCase } from '../lib/supabase'
-import { BLOQUE_SEG, comoTexto, duracionEstacionSeg, duracionSeg, esPorTiempo, mmss } from '../lib/formatos'
+import { BLOQUE_SEG, CUPO_POR_FORMATO, REPS_POR_FORMATO, comoTexto, duracionEstacionSeg, duracionSeg, esPorTiempo, mmss } from '../lib/formatos'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
 import SelectorEjercicio from './SelectorEjercicio'
@@ -580,7 +580,15 @@ export default function Routines() {
       return
     }
 
-    const payload = { ...exerciseForm, ...(exerciseForm.isCooldown ? {} : estacionFormato) }
+    // Para un circuito por tiempo, "series x reps" no lo escribe el coach por ejercicio — lo
+    // define el formato entero (ver el input deshabilitado de arriba). Se fuerza acá también
+    // por si el estado quedó de un ejercicio anterior con otro formato.
+    const repsDelFormato = REPS_POR_FORMATO[estacionFormato.formato]
+    const payload = {
+      ...exerciseForm,
+      ...(repsDelFormato ? { setsReps: repsDelFormato } : {}),
+      ...(exerciseForm.isCooldown ? {} : estacionFormato),
+    }
 
     try {
       setSaving(true)
@@ -1510,6 +1518,20 @@ export default function Routines() {
             <p className="text-[11px] font-bold uppercase tracking-wide text-brand mb-1">Paso 1</p>
             <label className="form-label">Modalidad de la estación</label>
             <SelectorFormato valor={estacionFormato} onChange={setEstacionFormato} turnoSeg={turnoSeg} />
+            {CUPO_POR_FORMATO[estacionFormato.formato] && (
+              // El circuito comparte un solo reloj entre todos sus ejercicios (por eso el
+              // formato pide una cantidad fija, no "los que quieras hasta llenar 6:00") — sin
+              // esto no había forma de saber cuántos ejercicios le faltan a la estación.
+              <p className="mt-2 text-xs text-text-tertiary">
+                {estacionFormato.formato} — circuito de{' '}
+                <strong className="text-text-secondary">{CUPO_POR_FORMATO[estacionFormato.formato]} ejercicios</strong>
+                {filasEstacionActual.length >= CUPO_POR_FORMATO[estacionFormato.formato]
+                  ? ' — completo.'
+                  : ` — llevás ${filasEstacionActual.length}, faltan ${
+                      CUPO_POR_FORMATO[estacionFormato.formato] - filasEstacionActual.length
+                    }.`}
+              </p>
+            )}
           </div>
         )}
 
@@ -1563,14 +1585,26 @@ export default function Routines() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="form-label">Series x Reps *</label>
-                <input
-                  type="text"
-                  value={exerciseForm.setsReps}
-                  onChange={(e) => setExerciseForm({ ...exerciseForm, setsReps: e.target.value })}
-                  className="form-input"
-                  placeholder="3x12"
-                  required
-                />
+                {REPS_POR_FORMATO[estacionFormato.formato] ? (
+                  // Un circuito por tiempo corre con un solo reloj compartido por toda la
+                  // estación (ver SelectorFormato) — "series x reps" por ejercicio no
+                  // significa nada acá. Se muestra lo que realmente hace cada vuelta, fijo.
+                  <input
+                    type="text"
+                    value={REPS_POR_FORMATO[estacionFormato.formato]}
+                    className="form-input"
+                    disabled
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={exerciseForm.setsReps}
+                    onChange={(e) => setExerciseForm({ ...exerciseForm, setsReps: e.target.value })}
+                    className="form-input"
+                    placeholder="3x12"
+                    required
+                  />
+                )}
               </div>
               <div>
                 <label className="form-label">Descanso</label>
