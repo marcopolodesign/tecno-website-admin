@@ -406,8 +406,14 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
     const movimientosEnEstacion = new Set()
     for (let i = 0; i < cupo; i++) {
       const te = plantillas[i % plantillas.length]
+      // Sólo la ocurrencia LITERAL que el coach escribió mantiene el pin — no sus clones de
+      // wrap-around. Si la estación tiene un solo ejercicio escrito (fijado) y el formato pide
+      // 3 o 4 slots, sin este chequeo el mismo ejercicio se clonaba idéntico en cada slot extra
+      // (three "Peso Muerto con barra" en una sola estación) en vez de rotar variedad alrededor
+      // de esa ancla, que es lo que ya hacía un wrap-around no pineado.
+      const esOcurrenciaEscrita = i < plantillas.length
 
-      if (te.is_pinned) {
+      if (te.is_pinned && esOcurrenciaEscrita) {
         // Fijado por el coach: nunca pasa por sustitutos_para_ejercicio, se mantiene el mismo
         // ejercicio siempre. El peso y el formato de la estación se siguen calculando como
         // siempre — sólo la identidad del ejercicio queda afuera de la rotación.
@@ -536,7 +542,10 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
         },
         await getProposedWeight(clientId, exerciseId),
         perfiles?.get(exerciseId)?.necesitaCarga || false,
-        te.is_pinned || false
+        // Mismo criterio que arriba: sólo la ocurrencia literal que escribió el coach queda
+        // marcada como fija — un clon de wrap-around que se sustituyó normalmente no es "el
+        // ejercicio fijado", aunque comparta plantilla con el que sí lo es.
+        (i < plantillas.length && te.is_pinned) || false
       )
     }
   }
