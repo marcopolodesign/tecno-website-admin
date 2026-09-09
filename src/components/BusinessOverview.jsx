@@ -251,7 +251,7 @@ export default function BusinessOverview() {
       {/* Header + selector de período */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-text-primary">Negocio</h1>
           <p className="text-sm text-text-secondary mt-1">
             {sede ? sede.name : 'Todas las sedes'} · cómo viene el negocio, de lo general a la trazabilidad por coach y por recepción
           </p>
