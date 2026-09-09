@@ -49,9 +49,7 @@ const usuariosNav = [
   { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Socios', href: '/users', icon: UserCircleIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
-  // Funnel entra acá en cuanto exista la pantalla (se está construyendo en paralelo). Un item
-  // de menú que lleva a una pantalla en blanco es peor que un item que todavía no está.
-  // { name: 'Funnel', href: '/funnel', icon: ChartBarSquareIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Embudo', href: '/funnel', icon: ChartBarSquareIcon, roles: ['super_admin', 'admin', 'front_desk'] },
 ]
 
 // Lo que hace funcionar la sede todos los días: con qué se cobra, quién atiende, quién entra.

@@ -3,6 +3,7 @@ import { Bars3Icon } from '@heroicons/react/24/outline'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
 import Hoy from './components/Hoy'
+import Funnel from './components/Funnel'
 import BusinessOverview from './components/BusinessOverview'
 import Prospects from './components/Prospects'
 import Leads from './components/Leads'
@@ -218,6 +219,9 @@ function AuthenticatedShell({
                 }
               />
 
+              {canAccess('/funnel') && (
+                <Route path="/funnel" element={<Funnel />} />
+              )}
               {canAccess('/hoy') && (
                 <Route path="/hoy" element={<Hoy />} />
               )}
