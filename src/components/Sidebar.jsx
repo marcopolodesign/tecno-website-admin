@@ -34,19 +34,44 @@ import {
 // Emails allowed to see fitness section (beta feature)
 const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
 
-const managementNav = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, roles: ['super_admin', 'admin'] },
-  { name: 'Métricas de negocio', href: '/metricas-negocio', icon: ChartBarSquareIcon, roles: ['super_admin', 'admin'] },
-  { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+// La estructura de Gestión la definió Mateo (2026-09-09): primero el día de hoy, después
+// las personas, después la sede, y al final lo que sólo toca un super admin. Los subtítulos
+// no son decorativos — son la diferencia entre una lista de doce items y cuatro decisiones.
+
+// Sin subtítulo a propósito: es la portada, no una categoría.
+const hoyNav = [
+  { name: 'Hoy', href: '/hoy', icon: HomeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+]
+
+// El recorrido de una persona, en orden: primero es un lead, después un prospecto que dejó
+// sus datos, después un socio. El Funnel es esa misma historia mirada de arriba.
+const usuariosNav = [
   { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-  { name: 'Usuarios', href: '/users', icon: UserCircleIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
+  { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Socios', href: '/users', icon: UserCircleIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
+  { name: 'Funnel', href: '/funnel', icon: ChartBarSquareIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+]
+
+// Lo que hace funcionar la sede todos los días: con qué se cobra, quién atiende, quién entra.
+const sedeNav = [
   { name: 'Membresías', href: '/membership-plans', icon: CreditCardIcon, roles: ['super_admin', 'admin'] },
   { name: 'Vendedores', href: '/sellers', icon: UsersIcon, roles: ['super_admin', 'admin'] },
   { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
-  { name: 'Sedes', href: '/locations', icon: MapPinIcon, roles: ['super_admin', 'admin'] },
-  { name: 'Contenido', href: '/content', icon: DocumentTextIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
   { name: 'Check-in', href: '/check-in', icon: QrCodeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Accesos', href: '/access-logs', icon: ClockIcon, roles: ['super_admin', 'admin'] },
+]
+
+// Cosas que se tocan una vez y afectan a todos: el sitio público y el alta de sedes nuevas.
+// Antes las veía hasta un coach; ahora sólo super admin.
+const superAdminNav = [
+  { name: 'Contenido', href: '/content', icon: DocumentTextIcon, roles: ['super_admin'] },
+  { name: 'Sedes', href: '/locations', icon: MapPinIcon, roles: ['super_admin'] },
+]
+
+// Negocio es su propio espacio: la pregunta "¿cómo venimos?" no se contesta en el medio de
+// la operación del día. Dashboard y Métricas se unificaron en una sola pantalla.
+const negocioNav = [
+  { name: 'Métricas', href: '/negocio', icon: ChartBarSquareIcon, roles: ['super_admin', 'admin'] },
 ]
 
 const catalogoNav = [
@@ -61,17 +86,29 @@ const queueNav = [
   { name: 'Configuración', href: '/lista-espera/config', icon: Cog6ToothIcon, roles: ['super_admin', 'admin'] },
 ]
 
-// Two products under one login, not one menu with eleven things in it. Front desk and the
-// floor are different jobs: the person taking payments never touches the exercise catalog,
-// and the coach filming movements never opens a membership. Splitting them means each
-// person sees a short list of their own work instead of scrolling past someone else's.
+// Tres espacios bajo un mismo login, en vez de un menú con dieciocho cosas. Recepción, el
+// dueño y el piso son trabajos distintos: quien cobra no abre el catálogo de ejercicios, y
+// quien filma movimientos no mira la retención del mes. Separarlos hace que cada uno vea una
+// lista corta de su propio trabajo en vez de scrollear por el de otro.
 const ESPACIOS = [
   {
     id: 'gestion',
     nombre: 'Gestión',
-    detalle: 'Socios y ventas',
+    detalle: 'El día a día del gimnasio',
     icono: BuildingStorefrontIcon,
-    grupos: [{ items: managementNav }],
+    grupos: [
+      { items: hoyNav },
+      { titulo: 'Usuarios', items: usuariosNav },
+      { titulo: 'Sede', items: sedeNav },
+      { titulo: 'Super Admin', items: superAdminNav },
+    ],
+  },
+  {
+    id: 'negocio',
+    nombre: 'Negocio',
+    detalle: 'Cómo viene el mes',
+    icono: ChartBarSquareIcon,
+    grupos: [{ items: negocioNav }],
   },
   {
     id: 'fitness',
