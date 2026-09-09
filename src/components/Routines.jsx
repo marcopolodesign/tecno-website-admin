@@ -3,11 +3,9 @@ import {
   PlusIcon, 
   PencilIcon, 
   TrashIcon, 
-  XMarkIcon,
   MagnifyingGlassIcon,
   ClipboardDocumentListIcon,
   CalendarIcon,
-  UserIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   ChevronRightIcon,
@@ -915,20 +913,14 @@ export default function Routines() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Detail Header */}
+                {/* El nombre y el socio ya los dice el encabezado del sidecart; acá queda sólo
+                    lo que ese encabezado no cubre: estado, vigencia y las acciones. */}
                 <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-lg font-semibold text-text-primary">{selectedRoutine.title}</h2>
-                      {getStatusBadge(selectedRoutine.status)}
-                    </div>
-                    <p className="text-sm text-text-secondary">
-                      <UserIcon className="h-4 w-4 inline mr-1" />
-                      {selectedRoutine.users?.firstName} {selectedRoutine.users?.lastName}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-1">
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(selectedRoutine.status)}
+                    <span className="text-xs text-text-tertiary">
                       {formatDate(selectedRoutine.validFrom)} - {formatDate(selectedRoutine.validUntil)}
-                    </p>
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -944,12 +936,6 @@ export default function Routines() {
                       title="Eliminar rutina"
                     >
                       <TrashIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setSelectedRoutine(null)}
-                      className="p-2 text-text-tertiary hover:text-text-primary hover:bg-bg-surface rounded transition-colors"
-                    >
-                      <XMarkIcon className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
