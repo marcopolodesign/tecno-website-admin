@@ -107,27 +107,32 @@ function ExercisePanel({ exercise, exercises, entradaIso }) {
   }
   const fase = useFase(entradaIso, formato)
 
-  // EMOM con más de un ejercicio compartiendo el minuto ("10 push ups + 30s de plancha, en el
-  // mismo minuto"): la ronda del reloj de arriba ES el minuto, y filasDelMinuto (formatos.js)
-  // ya sabe qué grupo de la estación le toca a esa ronda — rotando por grupos si hay más
-  // ejercicios que los que entran en uno solo. `sets_reps` de cada fila ya trae el texto hecho
-  // ("10 reps", "30s": lo escribe el coach al guardar, con el mismo prescripcionTexto de acá),
-  // así que no hace falta recalcularlo — sólo agruparlo y mostrarlo.
+  // Qué ejercicio(s) le tocan a ESTE minuto. `ejercicio` (el singular que ya mandaba tv_linea)
+  // es siempre la primera fila de la estación — antes era lo único que existía, así que un
+  // EMOM de "3 ejercicios, uno por minuto rotando" se quedaba pegado al primero las seis
+  // rondas, y uno de "10 push ups + 30s de plancha en el mismo minuto" sólo mostraba los push
+  // ups. La ronda del reloj de arriba ES el minuto, y filasDelMinuto (formatos.js) ya sabe qué
+  // grupo de la estación completa (`ejercicios`, lo nuevo que manda tv_linea) le toca a esa
+  // ronda — rotando por grupos si hay más ejercicios que los que entran en uno solo.
   //
-  // Con un ejercicio por minuto (el caso de siempre hasta ahora) esto no cambia nada: cae
-  // derecho al render de un solo ejercicio, con video y todo, igual que antes.
-  const porMinuto = ex.formato === 'EMOM' ? ex.ejercicios_por_minuto || 1 : 1
-  const filasMinuto =
-    porMinuto > 1 && fase && !fase.terminado
-      ? filasDelMinuto(exercises?.length ? exercises : [ex], porMinuto, fase.ronda)
-      : null
+  // Con una sola fila en la estación esto da [ex] en todos los minutos: no cambia nada.
+  const estacion = exercises?.length ? exercises : [ex]
+  const porMinuto = ex.formato === 'EMOM' ? Math.max(1, ex.ejercicios_por_minuto || 1) : 1
+  const delMinuto =
+    ex.formato === 'EMOM' && fase && !fase.terminado
+      ? filasDelMinuto(estacion, porMinuto, fase.ronda)
+      : [ex]
 
-  if (filasMinuto?.length) {
+  // Con varios ejercicios en el mismo minuto no entra un video por cada uno en la columna del
+  // box: se listan como texto grande, para leerse de lejos. `sets_reps` de cada fila ya trae
+  // el texto hecho ("10 reps", "30s" — lo escribe el coach al guardar, con el mismo
+  // prescripcionTexto de acá), así que no hace falta recalcularlo, sólo mostrarlo.
+  if (delMinuto.length > 1) {
     return (
       <div style={panelStyles.wrapper}>
         <RelojFormato fase={fase} formato={formato} />
         <div style={panelStyles.minuto}>
-          {filasMinuto.map((f) => (
+          {delMinuto.map((f) => (
             <div key={f.exercise_order ?? f.name} style={panelStyles.minutoFila}>
               <span style={panelStyles.minutoFilaPrescripcion}>
                 {f.sets_reps || prescripcionTexto({ segundos: f.segundos_por_ejercicio })}
@@ -140,9 +145,13 @@ function ExercisePanel({ exercise, exercises, entradaIso }) {
     )
   }
 
+  // Un solo ejercicio en el minuto en curso: se ve como siempre (con video), pero mostrando el
+  // que le toca a ESTA ronda — que en un EMOM rotando de a uno puede no ser el primero de la
+  // estación.
+  const actual = delMinuto[0] || ex
   // The TV gets the TV rendition and the TV framing. Anything the gym has not filmed yet
   // still falls back to whatever link the exercise was carrying.
-  const media = exerciseMedia(ex, 'tv')
+  const media = exerciseMedia(actual, 'tv')
 
   return (
     <div style={panelStyles.wrapper}>
@@ -161,25 +170,25 @@ function ExercisePanel({ exercise, exercises, entradaIso }) {
             src={`https://www.youtube.com/embed/${media.embedId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${media.embedId}`}
             style={panelStyles.mediaEl}
             allow="autoplay; encrypted-media"
-            title={ex?.name}
+            title={actual?.name}
           />
         ) : media.kind === 'image' ? (
-          <img src={media.src} alt={ex?.name} style={panelStyles.mediaEl} />
+          <img src={media.src} alt={actual?.name} style={panelStyles.mediaEl} />
         ) : (
           <div style={{ ...panelStyles.mediaEl, background: 'rgba(255,255,255,0.06)' }} />
         )}
       </div>
-      <span style={panelStyles.exerciseName}>{ex?.name ?? 'Ejercicio'}</span>
+      <span style={panelStyles.exerciseName}>{actual?.name ?? 'Ejercicio'}</span>
       {fase ? (
         <>
           <RelojFormato fase={fase} formato={formato} />
           <span style={panelStyles.exerciseMeta}>
-            {[comoTexto(ex.formato, formato), ex.sets_reps].filter(Boolean).join(' · ')}
+            {[comoTexto(ex.formato, formato), actual.sets_reps].filter(Boolean).join(' · ')}
           </span>
         </>
       ) : (
         <span style={panelStyles.exerciseMeta}>
-          {[ex.sets_reps, ex.rest_time ? `descanso ${ex.rest_time}s` : null]
+          {[actual.sets_reps, actual.rest_time ? `descanso ${actual.rest_time}s` : null]
             .filter(Boolean)
             .join(' · ')}
         </span>
