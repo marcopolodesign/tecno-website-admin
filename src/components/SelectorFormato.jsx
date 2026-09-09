@@ -128,7 +128,7 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
 
           <span style={s.ayuda}>
             {formato === 'EMOM'
-              ? 'En EMOM el descanso es lo que sobra del minuto después de las reps — por eso no se carga.'
+              ? 'Cuántos ejercicios comparten cada minuto. El descanso es lo que sobre del minuto después de hacerlos, por eso no se carga aparte.'
               : formato === 'AMRAP'
                 ? 'Las vueltas que entren en ese tiempo. Las reps por vuelta van en Series x Reps.'
                 : formato === 'A completar'
