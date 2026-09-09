@@ -336,11 +336,16 @@ function pushToLocalQueue(documento, centralClienteId, source = 'qr') {
 }
 
 // Log an access event to Supabase access_logs
-function logAccess(userId, { granted, reason = null, method = 'kiosk_qr', sucursalId = 2 } = {}) {
+//
+// La sede NO se manda desde acá. El kiosco es una ruta pública sin login, así que ni
+// siquiera puede leer `locations` (RLS le devuelve vacío) — cualquier número que pusiera
+// sería adivinado. Antes había un `2` fijo, que con una sola sede pasaba desapercibido y
+// con dos habría marcado todos los ingresos como Palermo para siempre.
+// La completa el trigger `completar_sede_de_access_log` al insertar.
+function logAccess(userId, { granted, reason = null, method = 'kiosk_qr' } = {}) {
   if (!userId) return
   supabase.from('access_logs').insert({
     user_id: userId,
-    sucursal_id: sucursalId,
     method,
     granted,
     denied_reason: reason ?? null,

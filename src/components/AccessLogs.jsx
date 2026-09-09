@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowPathIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { supabase } from '../lib/supabase'
+import { useSede } from '../contexts/SedeContext'
 
 const PAGE_SIZE = 50
 
@@ -13,6 +14,7 @@ function formatTs(ts) {
 }
 
 export default function AccessLogs() {
+  const { sedeId, sedes } = useSede()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // 'all' | 'granted' | 'denied'
@@ -26,7 +28,7 @@ export default function AccessLogs() {
       let query = supabase
         .from('access_logs')
         .select(`
-          id, scanned_at, method, granted, denied_reason, sucursal_id,
+          id, scanned_at, method, granted, denied_reason, sucursal_id, location_id,
           users:user_id (id, first_name, last_name, email)
         `, { count: 'exact' })
         .order('scanned_at', { ascending: false })
@@ -34,6 +36,14 @@ export default function AccessLogs() {
 
       if (filter === 'granted') query = query.eq('granted', true)
       if (filter === 'denied')  query = query.eq('granted', false)
+      // Los ingresos viejos se grabaron antes de que existiera location_id: se los sigue
+      // reconociendo por el número de sucursal legacy de esta sede, para no esconderlos.
+      if (sedeId) {
+        const legacyId = sedes.find(s => s.id === sedeId)?.legacy_sucursal_id
+        query = legacyId
+          ? query.or(`location_id.eq.${sedeId},and(location_id.is.null,sucursal_id.eq.${legacyId})`)
+          : query.eq('location_id', sedeId)
+      }
 
       const { data, error, count } = await query
       if (error) throw error
@@ -44,7 +54,7 @@ export default function AccessLogs() {
     } finally {
       setLoading(false)
     }
-  }, [filter, page])
+  }, [filter, page, sedeId, sedes])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
@@ -147,7 +157,9 @@ export default function AccessLogs() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-text-secondary">
-                      Palermo #{log.sucursal_id}
+                      {sedes.find(s => s.id === log.location_id)?.name
+                        ?? sedes.find(s => s.legacy_sucursal_id === log.sucursal_id)?.name
+                        ?? '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-bg-surface text-text-secondary">
