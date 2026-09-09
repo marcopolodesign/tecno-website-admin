@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
 import { exerciseMedia } from '../lib/exerciseMedia'
-import { esPorTiempo, faseDelFormato, comoTexto } from '../lib/formatos'
+import { esPorTiempo, faseDelFormato, comoTexto, filasDelMinuto, prescripcionTexto } from '../lib/formatos'
 import VideoEjercicio from './VideoEjercicio'
 
 // Drift-free countdown: derives remaining time from an absolute target
@@ -89,7 +89,7 @@ function RelojFormato({ fase, formato }) {
   )
 }
 
-function ExercisePanel({ exercise, entradaIso }) {
+function ExercisePanel({ exercise, exercises, entradaIso }) {
   if (!exercise) {
     return (
       <div style={panelStyles.empty}>
@@ -106,6 +106,40 @@ function ExercisePanel({ exercise, entradaIso }) {
     descansoSeg: ex.descanso_seg,
   }
   const fase = useFase(entradaIso, formato)
+
+  // EMOM con más de un ejercicio compartiendo el minuto ("10 push ups + 30s de plancha, en el
+  // mismo minuto"): la ronda del reloj de arriba ES el minuto, y filasDelMinuto (formatos.js)
+  // ya sabe qué grupo de la estación le toca a esa ronda — rotando por grupos si hay más
+  // ejercicios que los que entran en uno solo. `sets_reps` de cada fila ya trae el texto hecho
+  // ("10 reps", "30s": lo escribe el coach al guardar, con el mismo prescripcionTexto de acá),
+  // así que no hace falta recalcularlo — sólo agruparlo y mostrarlo.
+  //
+  // Con un ejercicio por minuto (el caso de siempre hasta ahora) esto no cambia nada: cae
+  // derecho al render de un solo ejercicio, con video y todo, igual que antes.
+  const porMinuto = ex.formato === 'EMOM' ? ex.ejercicios_por_minuto || 1 : 1
+  const filasMinuto =
+    porMinuto > 1 && fase && !fase.terminado
+      ? filasDelMinuto(exercises?.length ? exercises : [ex], porMinuto, fase.ronda)
+      : null
+
+  if (filasMinuto?.length) {
+    return (
+      <div style={panelStyles.wrapper}>
+        <RelojFormato fase={fase} formato={formato} />
+        <div style={panelStyles.minuto}>
+          {filasMinuto.map((f) => (
+            <div key={f.exercise_order ?? f.name} style={panelStyles.minutoFila}>
+              <span style={panelStyles.minutoFilaPrescripcion}>
+                {f.sets_reps || prescripcionTexto({ segundos: f.segundos_por_ejercicio })}
+              </span>
+              <span style={panelStyles.minutoFilaNombre}>{f.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   // The TV gets the TV rendition and the TV framing. Anything the gym has not filmed yet
   // still falls back to whatever link the exercise was carrying.
   const media = exerciseMedia(ex, 'tv')
@@ -176,6 +210,17 @@ const panelStyles = {
   // part anyone reads.
   formatoSeg: { fontSize: 40, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1 },
   formatoRonda: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+  // Un EMOM con varios ejercicios por minuto no tiene lugar para un video por ejercicio en una
+  // columna de box — así que en vez de video, cada ejercicio del minuto es una tarjeta de
+  // texto grande: lo que tiene que hacer (prescripción) arriba, y con qué (nombre) abajo.
+  minuto: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%' },
+  minutoFila: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+    padding: '10px 8px', borderRadius: 10,
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+  },
+  minutoFilaPrescripcion: { color: '#F45F37', fontSize: 20, fontWeight: 800, fontFamily: 'monospace' },
+  minutoFilaNombre: { color: 'white', fontSize: 14, fontWeight: 700, textAlign: 'center' },
 }
 
 function BoxSlot({ box, lineNumber }) {
@@ -184,6 +229,9 @@ function BoxSlot({ box, lineNumber }) {
   // The exercise arrives with the box in a single payload — no per-box fetch, so five
   // boxes changing at once is one request, not six.
   const exercise = box.ejercicio
+  // Todos los ejercicios de la estación (para EMOM con más de uno por minuto). `ejercicio`
+  // arriba sigue siendo el primero solo, para lo que no lo necesita.
+  const exercises = box.ejercicios
 
   return (
     <div
@@ -212,7 +260,7 @@ function BoxSlot({ box, lineNumber }) {
           <span style={{ color: '#F45F37', fontSize: 22, fontWeight: 800, fontFamily: 'monospace' }}>
             {countdown}
           </span>
-          <ExercisePanel exercise={exercise} entradaIso={box.entered_at} />
+          <ExercisePanel exercise={exercise} exercises={exercises} entradaIso={box.entered_at} />
         </>
       ) : (
         <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>Libre</span>
