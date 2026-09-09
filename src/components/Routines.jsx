@@ -813,7 +813,7 @@ export default function Routines() {
 
       <div className="flex gap-6">
         {/* Routines List */}
-        <div className={`${selectedRoutine ? 'w-1/3' : 'w-full'} space-y-4 transition-all`}>
+        <div className="w-full space-y-4">
           {/* Filters */}
           <div className="flex flex-col gap-3">
             <div className="relative">
@@ -889,9 +889,26 @@ export default function Routines() {
           </div>
         </div>
 
-        {/* Routine Detail Panel */}
+        {/*
+          La rutina abre como sidecart, no como columna al lado de la lista: al elegir un socio
+          lo que importa es su rutina, y la lista sólo servía para volver. Es el primero de la
+          pila — la estación abre encima (`zIndex` mayor), y adentro de ella el ejercicio.
+          Un paso más ancho que el de estación: acá entran cinco estaciones en fila, allá una sola.
+        */}
+        <Sidecart
+          isOpen={Boolean(selectedRoutine)}
+          onClose={() => setSelectedRoutine(null)}
+          title={selectedRoutine?.title ?? ''}
+          subtitle={
+            selectedRoutine
+              ? `${selectedRoutine.users?.firstName ?? ''} ${selectedRoutine.users?.lastName ?? ''}`.trim() || undefined
+              : undefined
+          }
+          size="lg"
+          zIndex={40}
+        >
         {selectedRoutine && (
-          <div className="flex-1 card">
+          <div>
             {loadingDetail ? (
               <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -1272,12 +1289,14 @@ export default function Routines() {
             )}
           </div>
         )}
+        </Sidecart>
       </div>
 
       {/* Routine Modal */}
       <Sidecart
         isOpen={showRoutineModal}
         onClose={() => setShowRoutineModal(false)}
+        zIndex={70}
         title={editingItem ? 'Editar rutina' : 'Nueva rutina'}
         subtitle={'Para quién es y desde cuándo corre'}
         size="lg"
@@ -1400,6 +1419,7 @@ export default function Routines() {
       <Sidecart
         isOpen={showSessionModal}
         onClose={() => setShowSessionModal(false)}
+        zIndex={70}
         title={editingItem ? 'Editar sesión' : 'Nueva sesión'}
         subtitle={'Una sesión es un día de la rutina'}
         size="lg"
@@ -1456,6 +1476,7 @@ export default function Routines() {
       <Sidecart
         isOpen={Boolean(sustituyendo)}
         onClose={() => setSustituyendo(null)}
+        zIndex={70}
         title="Cambiar el ejercicio"
         subtitle={
           sustituyendo
@@ -1481,6 +1502,7 @@ export default function Routines() {
 
       <Sidecart
         isOpen={Boolean(registrandoResultados)}
+        zIndex={70}
         onClose={() => setRegistrandoResultados(null)}
         title="Resultados reales"
         subtitle={
@@ -1508,6 +1530,7 @@ export default function Routines() {
       */}
       <Sidecart
         isOpen={showExerciseModal}
+        zIndex={70}
         onClose={() => setShowExerciseModal(false)}
         title={
           exerciseForm.isCooldown
@@ -1755,6 +1778,7 @@ export default function Routines() {
           return sesion?.sessionNumber ? `Sesión ${sesion.sessionNumber}` : undefined
         })()}
         size="md"
+        zIndex={60}
         footer={
           <div className="flex justify-end">
             <button type="button" onClick={() => setEstacionAbierta(null)} className="btn-secondary">
