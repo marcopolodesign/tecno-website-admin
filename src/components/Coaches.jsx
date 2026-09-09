@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { supabase, isServiceRole } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { locationsService } from '../services/locationsService'
+import { staffAuthService } from '../services/staffAuthService'
 import { useSede } from '../contexts/SedeContext'
-import { PlusIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import Modal from './Modal'
 
 const Coaches = () => {
@@ -101,25 +102,24 @@ const Coaches = () => {
 
         // Update password if provided
         if (formData.password && editingCoach.auth_user_id) {
-          const { error: authError } = await supabase.auth.admin.updateUserById(
-            editingCoach.auth_user_id,
-            { password: formData.password }
-          )
-          if (authError) console.error('Error updating password:', authError)
+          try {
+            await staffAuthService.updatePassword({
+              auth_user_id: editingCoach.auth_user_id,
+              password: formData.password
+            })
+          } catch (authError) {
+            console.error('Error updating password:', authError)
+          }
         }
       } else {
-        // Create new coach with auth user using admin API
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        // Create new coach's auth account via Edge Function (service role stays server-side)
+        const authData = await staffAuthService.createAccount({
+          target: 'coach',
           email: formData.email,
           password: formData.password,
-          email_confirm: true, // Auto-confirm email
-          user_metadata: {
-            first_name: formData.first_name,
-            last_name: formData.last_name
-          }
+          first_name: formData.first_name,
+          last_name: formData.last_name
         })
-
-        if (authError) throw authError
 
         // Create coach record
         const { error: coachError } = await supabase
@@ -149,10 +149,11 @@ const Coaches = () => {
     try {
       // Delete auth user (will cascade to coach)
       if (coach.auth_user_id) {
-        const { error: authError } = await supabase.auth.admin.deleteUser(
-          coach.auth_user_id
-        )
-        if (authError) console.error('Error deleting auth user:', authError)
+        try {
+          await staffAuthService.deleteAccount({ auth_user_id: coach.auth_user_id })
+        } catch (authError) {
+          console.error('Error deleting auth user:', authError)
+        }
       }
 
       // Delete coach record
@@ -213,23 +214,6 @@ const Coaches = () => {
 
   return (
     <div className="p-6">
-      {!isServiceRole && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" aria-hidden="true" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                Advertencia: No se detectó la clave de servicio (Service Role Key). No podrás crear nuevos coaches.
-                <br />
-                Asegúrate de configurar <code className="font-mono font-bold">VITE_SUPABASE_SERVICE_ROLE_KEY</code> en tu archivo .env (local) o en Vercel.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="sm:flex sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Coaches</h1>

@@ -349,6 +349,35 @@ function logAccess(userId, { granted, reason = null, method = 'kiosk_qr', sucurs
   })
 }
 
+// Kiosk visitors aren't signed in yet, so this can't be a plain `.auth.admin.*` call —
+// that would need the service role key in the browser bundle (the exact hole this whole
+// flow used to have). The kiosk-set-password Edge Function holds that key server-side
+// and only ever does this one narrow thing: set a password for one specific member row.
+// VITE_KIOSK_ACCESS_TOKEN is a shared token (not a real secret — it's still bundle-visible)
+// that just keeps this endpoint scoped to the kiosk UI instead of the open internet.
+const KIOSK_ACCESS_TOKEN = import.meta.env.VITE_KIOSK_ACCESS_TOKEN
+
+async function setKioskPassword({ member_id, password, new_email }) {
+  const { data, error } = await supabase.functions.invoke('kiosk-set-password', {
+    body: { member_id, password, new_email },
+    headers: { Authorization: `Bearer ${KIOSK_ACCESS_TOKEN}` },
+  })
+
+  if (error) {
+    let message = error.message
+    try {
+      const body = await error.context?.json?.()
+      if (body?.error) message = body.error
+    } catch {
+      // ignore — fall back to error.message
+    }
+    throw new Error(message)
+  }
+  if (data?.error) throw new Error(data.error)
+
+  return data
+}
+
 export default function MemberAccess() {
   const [step, setStep] = useState('loading') // check session first
   const [member, setMember] = useState(null)
@@ -475,27 +504,19 @@ export default function MemberAccess() {
   }
 
   // ── Step 2b: Change email ────────────────────────────────────────────────────
-  const handleEmailChange = async (e) => {
+  // Not persisted here — the visitor isn't signed in yet, so a direct table write
+  // would need to bypass RLS (which is exactly what the leaked service-role client
+  // used to do). It's persisted by kiosk-set-password in the next step instead, once
+  // we're also setting the password in that same server-side call.
+  const handleEmailChange = (e) => {
     e.preventDefault()
     setError('')
     if (newEmail !== newEmail2) {
       setError('Los emails no coinciden.')
       return
     }
-    setLoading(true)
-    try {
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ email: newEmail.trim().toLowerCase() })
-        .eq('id', member.id)
-      if (updateError) throw updateError
-      setMember((prev) => ({ ...prev, email: newEmail.trim().toLowerCase() }))
-      setStep('create_password')
-    } catch {
-      setError('No se pudo actualizar el email. Intentá de nuevo.')
-    } finally {
-      setLoading(false)
-    }
+    setMember((prev) => ({ ...prev, email: newEmail.trim().toLowerCase() }))
+    setStep('create_password')
   }
 
   // ── Step 3: Create password / sign up ────────────────────────────────────────
@@ -512,80 +533,38 @@ export default function MemberAccess() {
     }
     setLoading(true)
 
-    // Determine email to use (may have been updated in step 2b)
-    const email = member.email || (() => {
-      // email_masked isn't the real email — we need it from the DB
-      // If they didn't change email, we must fetch it via service-role
-      return null
-    })()
-
     try {
-      // Fetch actual email if we only have the masked version
-      let realEmail = member.email
-      if (!realEmail) {
-        const { data: userRow } = await supabase
-          .from('users')
-          .select('email')
-          .eq('id', member.id)
-          .single()
-        realEmail = userRow?.email
-      }
-
-      if (!realEmail) {
-        setError('No se encontró el email. Hablá con recepción.')
+      if (!member?.id) {
+        setError('No pudimos identificar tu perfil. Hablá con recepción.')
         setLoading(false)
         return
       }
 
-      // Create auth account, or update password if account already exists
-      const { data: created, error: createErr } =
-        await supabase.auth.admin.createUser({
-          email: realEmail,
-          password,
-          email_confirm: true,
-        })
-
-      if (createErr) {
-        // 422 = user already registered — update their password instead
-        if (createErr.status === 422 || createErr.message?.toLowerCase().includes('already')) {
-          const { data: userRow } = await supabase
-            .from('users').select('auth_user_id').eq('id', member.id).single()
-
-          const existingAuthId = userRow?.auth_user_id
-
-          if (existingAuthId) {
-            const { error: updateErr } = await supabase.auth.admin.updateUserById(
-              existingAuthId, { password }
-            )
-            if (updateErr) throw updateErr
-          } else {
-            // auth_user_id not set yet — look it up via admin API by email
-            const { data: { users: authUsers } } = await supabase.auth.admin.listUsers()
-            const authUser = authUsers?.find(u => u.email?.toLowerCase() === realEmail.toLowerCase())
-            if (!authUser) throw new Error('No se encontró la cuenta. Hablá con recepción.')
-            await supabase.auth.admin.updateUserById(authUser.id, { password })
-          }
-        } else {
-          throw createErr
-        }
-      }
+      // Sets/creates the password server-side (kiosk-set-password holds the service
+      // role key — never in the browser). Also persists an email change from step 2b,
+      // if the visitor went through it (member.email is only ever set by that step).
+      const { email: realEmail } = await setKioskPassword({
+        member_id: member.id,
+        password,
+        new_email: member.email || undefined,
+      })
 
       // Sign in with the new password
-      const { data: signInData, error: signInErr } =
+      const { error: signInErr } =
         await supabase.auth.signInWithPassword({ email: realEmail, password })
       if (signInErr) throw signInErr
 
-      // Link auth_user_id + sync DNI/central_cliente_id back to Supabase
-      const authUserId = signInData.user?.id
-      if (authUserId && member.id) {
-        const updatePayload = { auth_user_id: authUserId }
-        if (member.source === 'central' && member.dni) {
-          updatePayload.dni = member.dni
-          if (member.central_cliente_id) updatePayload.central_cliente_id = member.central_cliente_id
-        }
-        if (member.source === 'email' && member.pending_dni) {
-          updatePayload.dni = member.pending_dni
-        }
+      // Sync DNI/central_cliente_id back to Supabase now that we have a session —
+      // auth_user_id itself was already linked server-side by kiosk-set-password.
+      const updatePayload = {}
+      if (member.source === 'central' && member.dni) {
+        updatePayload.dni = member.dni
+        if (member.central_cliente_id) updatePayload.central_cliente_id = member.central_cliente_id
+      }
+      if (member.source === 'email' && member.pending_dni) {
+        updatePayload.dni = member.pending_dni
+      }
+      if (Object.keys(updatePayload).length > 0) {
         await supabase.from('users').update(updatePayload).eq('id', member.id)
       }
 
