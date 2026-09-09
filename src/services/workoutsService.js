@@ -77,7 +77,7 @@ export const workoutsService = {
             session_exercises (
               id,
               sets_reps,
-              exercises (
+              exercises!session_exercises_exercise_id_fkey (
                 id,
                 name
               )
@@ -217,7 +217,7 @@ export const workoutsService = {
           session_exercises (
             id,
             sets_reps,
-            exercises (
+            exercises!session_exercises_exercise_id_fkey (
               id,
               name
             )
