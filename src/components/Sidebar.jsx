@@ -64,10 +64,11 @@ const sedeNav = [
 ]
 
 // Cosas que se tocan una vez y afectan a todos: el sitio público y el alta de sedes nuevas.
-// Antes las veía hasta un coach; ahora sólo super admin.
+// Antes las veía hasta un coach — eso sí se corrigió. El admin las sigue viendo: es quien
+// abre una sede nueva, y sacárselas lo dejaría sin poder hacerlo.
 const superAdminNav = [
-  { name: 'Contenido', href: '/content', icon: DocumentTextIcon, roles: ['super_admin'] },
-  { name: 'Sedes', href: '/locations', icon: MapPinIcon, roles: ['super_admin'] },
+  { name: 'Contenido', href: '/content', icon: DocumentTextIcon, roles: ['super_admin', 'admin'] },
+  { name: 'Sedes', href: '/locations', icon: MapPinIcon, roles: ['super_admin', 'admin'] },
 ]
 
 // Negocio es su propio espacio: la pregunta "¿cómo venimos?" no se contesta en el medio de

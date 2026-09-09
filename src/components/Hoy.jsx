@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import {
   CalendarDaysIcon,
   ExclamationTriangleIcon,
@@ -235,8 +236,11 @@ export default function Hoy() {
         isEmpty={!asistidosLoading && !asistidosError && asistidos.length === 0}
         emptyLabel="Todavía no hay ingresos registrados hoy."
       >
-        <div className="max-h-72 overflow-y-auto -mx-1 px-1 space-y-1">
-          {asistidos.map((a) => (
+        {/* Los últimos que entraron, no todos: una caja con scroll propio en el medio de la
+            portada se come la rueda del mouse y deja al que scrollea trabado sobre una lista
+            que no estaba mirando. El resto vive en Accesos, que es la pantalla de eso. */}
+        <div className="space-y-1">
+          {asistidos.slice(0, 6).map((a) => (
             <div key={a.id} className="flex items-center justify-between text-sm px-3 py-2 rounded-md bg-bg-surface">
               <span className="text-text-primary">
                 {a.users ? `${a.users.first_name} ${a.users.last_name}` : 'Socio'}
@@ -245,6 +249,11 @@ export default function Hoy() {
             </div>
           ))}
         </div>
+        {asistidos.length > 6 && (
+          <Link to="/access-logs" className="mt-3 inline-block text-sm text-brand hover:underline">
+            Ver los {asistidos.length} ingresos de hoy
+          </Link>
+        )}
       </SectionCard>
 
       {/* 4. Clases de prueba de hoy */}
