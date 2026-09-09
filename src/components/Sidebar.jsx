@@ -14,6 +14,7 @@ import {
   XMarkIcon,
   QrCodeIcon,
   ClockIcon,
+  CalendarDaysIcon,
   // Fitness icons
   ClipboardDocumentListIcon,
   RectangleGroupIcon,
@@ -59,6 +60,8 @@ const sedeNav = [
   { name: 'Membresías', href: '/membership-plans', icon: CreditCardIcon, roles: ['super_admin', 'admin'] },
   { name: 'Vendedores', href: '/sellers', icon: UsersIcon, roles: ['super_admin', 'admin'] },
   { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
+  // Va pegado a Coaches y Vendedores porque es sobre ellos: qué turno hace cada uno.
+  { name: 'Horas', href: '/horas', icon: CalendarDaysIcon, roles: ['super_admin', 'admin'] },
   { name: 'Check-in', href: '/check-in', icon: QrCodeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Accesos', href: '/access-logs', icon: ClockIcon, roles: ['super_admin', 'admin'] },
 ]

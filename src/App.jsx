@@ -19,6 +19,7 @@ import Arquetipos from './components/Arquetipos'
 import CheckIn from './components/CheckIn'
 import MemberAccess from './components/MemberAccess'
 import AccessLogs from './components/AccessLogs'
+import Horas from './components/Horas'
 import QueueMonitor from './components/QueueMonitor'
 import QueueConfig from './components/QueueConfig'
 import QueueTv from './components/QueueTv'
@@ -109,7 +110,7 @@ function App() {
     if (role === 'super_admin' || role === 'admin') return true
 
     // Common restrictions for non-admins
-    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs', '/lista-espera/config', '/negocio'].includes(route)) return false
+    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs', '/horas', '/lista-espera/config', '/negocio'].includes(route)) return false
 
     // Seller (Front Desk)
     if (role === 'front_desk') {
@@ -280,6 +281,9 @@ function AuthenticatedShell({
                 <Route path="/equipamiento" element={<Equipamiento />} />
               )}
 
+              {canAccess('/horas') && (
+                <Route path="/horas" element={<Horas />} />
+              )}
               {canAccess('/access-logs') && (
                 <Route path="/access-logs" element={<AccessLogs />} />
               )}
