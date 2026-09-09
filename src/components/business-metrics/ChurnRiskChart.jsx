@@ -84,7 +84,7 @@ export default function ChurnRiskChart({ sedeId, benchmarkDays }) {
               verticalAlign="middle"
               formatter={(value) => <span className="text-xs text-text-secondary">{value}</span>}
             />
-            <Pie data={chartData} dataKey="value" nameKey="name" cx="35%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={2} cornerRadius={4}>
+            <Pie isAnimationActive={false} data={chartData} dataKey="value" nameKey="name" cx="35%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={2} cornerRadius={4}>
               {chartData.map((d) => (
                 <Cell key={d.key} fill={d.fill} />
               ))}

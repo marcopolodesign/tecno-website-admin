@@ -69,7 +69,7 @@ export default function TrialToMemberChart({ sedeId, start, end, benchmark }) {
                   )
                 }}
               />
-              <Bar dataKey="tasa" fill="var(--color-brand)" radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive={false} dataKey="tasa" fill="var(--color-brand)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

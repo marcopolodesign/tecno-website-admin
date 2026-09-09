@@ -72,7 +72,7 @@ export default function RetentionChart({ by, sedeId, start, end, benchmark }) {
                 )
               }}
             />
-            <Bar dataKey="tasa" fill="var(--color-brand)" radius={[4, 4, 0, 0]} />
+            <Bar isAnimationActive={false} dataKey="tasa" fill="var(--color-brand)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
