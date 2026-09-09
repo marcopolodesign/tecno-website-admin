@@ -3,6 +3,7 @@ import { Bars3Icon } from '@heroicons/react/24/outline'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
+import BusinessMetrics from './components/BusinessMetrics'
 import Prospects from './components/Prospects'
 import Leads from './components/Leads'
 import Users from './components/Users'
@@ -108,7 +109,7 @@ function App() {
     if (role === 'super_admin' || role === 'admin') return true
 
     // Common restrictions for non-admins
-    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs', '/lista-espera/config'].includes(route)) return false
+    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs', '/lista-espera/config', '/metricas-negocio'].includes(route)) return false
 
     // Seller (Front Desk)
     if (role === 'front_desk') {
@@ -219,6 +220,9 @@ function AuthenticatedShell({
 
               {canAccess('/dashboard') && (
                 <Route path="/dashboard" element={<Dashboard />} />
+              )}
+              {canAccess('/metricas-negocio') && (
+                <Route path="/metricas-negocio" element={<BusinessMetrics />} />
               )}
               {canAccess('/prospects') && (
                 <Route path="/prospects" element={<Prospects />} />

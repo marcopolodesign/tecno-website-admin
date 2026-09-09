@@ -28,6 +28,7 @@ import {
   BoltIcon,
   ArrowRightOnRectangleIcon,
   UserGroupIcon,
+  ChartBarSquareIcon,
 } from '@heroicons/react/24/outline'
 
 // Emails allowed to see fitness section (beta feature)
@@ -35,6 +36,7 @@ const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
 
 const managementNav = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, roles: ['super_admin', 'admin'] },
+  { name: 'Métricas de negocio', href: '/metricas-negocio', icon: ChartBarSquareIcon, roles: ['super_admin', 'admin'] },
   { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Usuarios', href: '/users', icon: UserCircleIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
