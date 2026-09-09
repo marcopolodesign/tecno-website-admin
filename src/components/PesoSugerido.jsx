@@ -41,12 +41,18 @@ export default function PesoSugerido({ clientId, exerciseId, valorActual, onUsar
   const dias = sug.ultima_fecha
     ? Math.max(0, Math.round((Date.now() - new Date(sug.ultima_fecha)) / 86400000))
     : null
+  // es_real: exercise_logs.weight_used_kg, lo que el socio efectivamente levantó (cargado en
+  // "Resultados reales"). Sin eso, sug.kg es session_exercises.weight_kg — el plan del coach,
+  // nunca confirmado — y decir "levantó" ahí sería inventarlo.
+  const esReal = Boolean(sug.es_real)
+
+  const colorLinea = estancado ? s.lineaAtencion : esReal ? s.lineaReal : s.lineaPlan
 
   return (
-    <div style={{ ...s.caja, ...(estancado ? s.cajaAtencion : {}) }}>
+    <div style={{ ...s.caja, ...(esReal ? s.cajaReal : s.cajaPlan), ...(estancado ? s.cajaAtencion : {}) }}>
       <div style={s.texto}>
-        <span style={s.linea}>
-          La última vez levantó <strong>{Number(sug.kg)} kg</strong>
+        <span style={colorLinea}>
+          {esReal ? 'Levantó' : 'Prescripto'} <strong>{Number(sug.kg)} kg</strong>
           {dias === 0 ? ' hoy' : dias === 1 ? ' ayer' : dias != null ? ` hace ${dias} días` : ''}
         </span>
         <span style={s.detalle}>
@@ -54,7 +60,9 @@ export default function PesoSugerido({ clientId, exerciseId, valorActual, onUsar
             ? `Tomado de "${sug.desde_ejercicio}", que es el mismo movimiento con otro implemento.`
             : estancado
               ? `Viene con el mismo peso hace ${sug.veces_igual} sesiones seguidas — puede estar para subir.`
-              : 'En este mismo ejercicio.'}
+              : esReal
+                ? 'Cargado como resultado real en este mismo ejercicio.'
+                : 'Prescripto en este mismo ejercicio — todavía sin resultado real cargado.'}
         </span>
       </div>
       {!yaPuesto && (
@@ -69,11 +77,18 @@ export default function PesoSugerido({ clientId, exerciseId, valorActual, onUsar
 const s = {
   caja: {
     display: 'flex', alignItems: 'center', gap: 10, marginTop: 6,
-    padding: '8px 10px', borderRadius: 10, background: '#F0FDF4', border: '1px solid #BBF7D0',
+    padding: '8px 10px', borderRadius: 10, border: '1px solid transparent',
   },
+  // Verde = dato real, cargado en "Resultados reales". Gris = todavía es sólo el plan del
+  // coach — la misma distinción que hace la frase de arriba, para que no haga falta leer el
+  // texto para saber cuál es cuál de un vistazo.
+  cajaReal: { background: '#F0FDF4', borderColor: '#BBF7D0' },
+  cajaPlan: { background: '#F9FAFB', borderColor: '#E5E7EB' },
   cajaAtencion: { background: '#FFFBEB', borderColor: '#FDE68A' },
   texto: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 },
-  linea: { fontSize: 13, color: '#166534' },
+  lineaReal: { fontSize: 13, color: '#166534' },
+  lineaPlan: { fontSize: 13, color: '#4b5563' },
+  lineaAtencion: { fontSize: 13, color: '#92400E' },
   detalle: { fontSize: 11, color: '#6b7280', lineHeight: 1.4 },
   boton: {
     border: '1px solid #e5e7eb', background: 'white', borderRadius: 8, padding: '6px 12px',

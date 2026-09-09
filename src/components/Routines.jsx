@@ -30,6 +30,7 @@ import SelectorEjercicio from './SelectorEjercicio'
 import SelectorFormato from './SelectorFormato'
 import PanelSustitutos from './PanelSustitutos'
 import PesoSugerido from './PesoSugerido'
+import RegistrarResultados from './RegistrarResultados'
 import Sidecart from './Sidecart'
 
 // No hay ícono de alfiler/thumbtack en Heroicons — se dibuja a mano, en el mismo estilo
@@ -229,6 +230,10 @@ export default function Routines() {
   const [expandedSessions, setExpandedSessions] = useState({})
   const [generating, setGenerating] = useState(false)
   const [sustituyendo, setSustituyendo] = useState(null)
+  // La sesión sobre la que se está cargando el peso/reps real que el socio efectivamente
+  // levantó — separado de sustituyendo/exerciseForm porque no edita el plan, registra lo que
+  // pasó. Ver RegistrarResultados.
+  const [registrandoResultados, setRegistrandoResultados] = useState(null)
   // How long a member actually stays in a box, read from the queue rather than assumed: it is
   // what decides whether a Tabata fits, and a wrong number here is worse than no warning.
   const [turnoSeg, setTurnoSeg] = useState(0)
@@ -1055,6 +1060,13 @@ export default function Routines() {
                                session.status === 'unlocked' ? 'Desbloqueada' : 'Bloqueada'}
                             </span>
                             <button
+                              onClick={() => setRegistrandoResultados(session)}
+                              className="p-1 text-text-tertiary hover:text-brand"
+                              title="Cargar lo que el socio realmente levantó"
+                            >
+                              <ClipboardDocumentListIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
                               onClick={() => openSessionModal(selectedRoutine.id, session)}
                               className="p-1 text-text-tertiary hover:text-brand"
                             >
@@ -1463,6 +1475,28 @@ export default function Routines() {
               toast.success('Ejercicio cambiado', toastOptions)
               fetchRoutineDetail(selectedRoutine.id)
             }}
+          />
+        )}
+      </Sidecart>
+
+      <Sidecart
+        isOpen={Boolean(registrandoResultados)}
+        onClose={() => setRegistrandoResultados(null)}
+        title="Resultados reales"
+        subtitle={
+          registrandoResultados
+            ? `Sesión ${registrandoResultados.sessionNumber}${
+                selectedRoutine?.users ? ` · ${selectedRoutine.users.firstName} ${selectedRoutine.users.lastName}` : ''
+              }`
+            : undefined
+        }
+        size="lg"
+      >
+        {registrandoResultados && (
+          <RegistrarResultados
+            session={registrandoResultados}
+            clientId={selectedRoutine?.clientId}
+            onGuardado={() => fetchRoutineDetail(selectedRoutine.id)}
           />
         )}
       </Sidecart>
