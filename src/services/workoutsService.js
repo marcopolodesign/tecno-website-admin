@@ -71,8 +71,8 @@ export const workoutsService = {
             target_reps,
             actual_reps,
             weight_used_kg,
-            difficulty_rating,
-            notes,
+            perceived_effort,
+            exercise_notes,
             completed_at,
             session_exercises (
               id,
@@ -172,8 +172,8 @@ export const workoutsService = {
         target_reps: logData.targetReps || null,
         actual_reps: logData.actualReps,
         weight_used_kg: logData.weightUsedKg || null,
-        difficulty_rating: logData.difficultyRating || null,
-        notes: logData.notes || null,
+        perceived_effort: logData.perceivedEffort ?? null,
+        exercise_notes: logData.notes || null,
         completed_at: new Date().toISOString()
       }
 
