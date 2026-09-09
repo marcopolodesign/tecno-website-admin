@@ -64,7 +64,7 @@ export default function RetentionChart({ by, sedeId, start, end, benchmark }) {
                 if (!active || !payload?.length) return null
                 const d = payload[0].payload
                 return (
-                  <div className="bg-white border border-border-default rounded-md px-3 py-2 shadow-lg text-xs">
+                  <div className="bg-white rounded-md px-3 py-2 shadow-lg text-xs">
                     <p className="font-medium text-text-primary">{d.name}</p>
                     <p className="text-text-secondary">{d.renovadas} de {d.vencidas} membresías se renovaron</p>
                     <p className="text-brand font-semibold">{d.tasa}%</p>

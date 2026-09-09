@@ -71,7 +71,7 @@ export default function ChurnRiskChart({ sedeId, benchmarkDays }) {
                 if (!active || !payload?.length) return null
                 const d = payload[0].payload
                 return (
-                  <div className="bg-white border border-border-default rounded-md px-3 py-2 shadow-lg text-xs">
+                  <div className="bg-white rounded-md px-3 py-2 shadow-lg text-xs">
                     <p className="font-medium text-text-primary">{d.name}</p>
                     <p className="font-semibold" style={{ color: d.fill }}>{d.value} socio{d.value !== 1 ? 's' : ''}</p>
                   </div>

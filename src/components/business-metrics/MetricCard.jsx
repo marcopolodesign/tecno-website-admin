@@ -1,20 +1,16 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import BenchmarkTooltip from './BenchmarkTooltip'
 
 // Wrapper común a las 6 métricas: título, descripción, benchmark (si hay) y el estado de
 // carga/error/vacío resuelto en un solo lugar. Sin barrita de color a la izquierda —
 // convención del proyecto — el estado se comunica con texto e íconos, no con un acento.
 export default function MetricCard({ title, description, benchmarkLabel, loading, error, isEmpty, emptyLabel, children, footer }) {
   return (
-    <div className="card">
+    <div className="card border-0 shadow-none">
       <div className="mb-4">
-        <div className="flex items-start justify-between gap-3">
+        <BenchmarkTooltip label={benchmarkLabel}>
           <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-          {benchmarkLabel && (
-            <span className="status-badge bg-bg-surface text-text-secondary whitespace-nowrap">
-              {benchmarkLabel}
-            </span>
-          )}
-        </div>
+        </BenchmarkTooltip>
         {description && <p className="text-xs text-text-tertiary mt-1">{description}</p>}
       </div>
 
@@ -23,7 +19,7 @@ export default function MetricCard({ title, description, benchmarkLabel, loading
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
       ) : error ? (
-        <div className="rounded-lg bg-error/5 border border-error/20 p-4 flex items-start gap-2">
+        <div className="rounded-lg bg-error/5 p-4 flex items-start gap-2">
           <ExclamationTriangleIcon className="h-4 w-4 text-error flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-error">No se pudo cargar esta métrica</p>
@@ -38,7 +34,7 @@ export default function MetricCard({ title, description, benchmarkLabel, loading
         children
       )}
 
-      {footer && !loading && !error && <div className="mt-3 pt-3 border-t border-border-default">{footer}</div>}
+      {footer && !loading && !error && <div className="mt-4">{footer}</div>}
     </div>
   )
 }

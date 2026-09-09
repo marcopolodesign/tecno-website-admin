@@ -271,9 +271,15 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLog
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <div className="relative z-10 hidden lg:flex lg:flex-shrink-0">
-        <div className="flex flex-col w-[236px]">
+      {/*
+        Desktop Sidebar — pegado arriba: en una lista larga (rutinas, catálogo, socios) el menú
+        se iba con el scroll y para cambiar de sección había que volver hasta arriba de todo.
+        `self-start` es lo que hace que `sticky` funcione acá: sin eso el item flex se estira a
+        la altura del contenido y nunca tiene margen para pegarse. La altura descuenta el padding
+        del shell (2.5 arriba y abajo) para que no asome por debajo del borde redondeado.
+      */}
+      <div className="relative z-10 hidden lg:flex lg:flex-shrink-0 lg:sticky lg:top-2.5 lg:self-start lg:h-[calc(100vh-1.25rem)]">
+        <div className="flex flex-col w-[236px] h-full">
           <SidebarContent />
         </div>
       </div>

@@ -3,7 +3,7 @@ import { useSede } from '../contexts/SedeContext'
 import { BUSINESS_METRICS_REGISTRY } from '../config/businessMetricsCharts'
 import businessMetricsService from '../services/businessMetricsService'
 import BenchmarksPanel from './business-metrics/BenchmarksPanel'
-import { PERIOD_PRESETS, resolvePeriod } from '../utils/metricPeriods'
+import { PERIOD_PRESETS, CUSTOM_PERIOD_ID, resolvePeriod } from '../utils/metricPeriods'
 
 // Tailwind necesita clases literales en el código fuente para generarlas — un template
 // literal con colSpan interpolado no lo detecta el scanner. Mapa estático en vez de eso.
@@ -20,6 +20,7 @@ const COL_SPAN_CLASS = {
 export default function BusinessMetrics() {
   const { sedeId, sede } = useSede()
   const [periodId, setPeriodId] = useState('last_30')
+  const [rangoCustom, setRangoCustom] = useState({ start: '', end: '' })
   const [benchmarks, setBenchmarks] = useState({})
   const [benchmarksVersion, setBenchmarksVersion] = useState(0)
 
@@ -39,7 +40,7 @@ export default function BusinessMetrics() {
 
   useEffect(() => { loadBenchmarks() }, [loadBenchmarks, benchmarksVersion])
 
-  const { start, end } = resolvePeriod(periodId)
+  const { start, end } = resolvePeriod(periodId, rangoCustom)
 
   const ctx = { sedeId, start, end, benchmarks }
 
@@ -52,16 +53,49 @@ export default function BusinessMetrics() {
             {sede ? sede.name : 'Todas las sedes'} · trazabilidad de cada alumno a un coach y a quien lo recibió en recepción
           </p>
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {PERIOD_PRESETS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPeriodId(p.id)}
-              className={p.id === periodId ? 'status-badge bg-brand/10 text-brand border border-brand/20' : 'status-badge bg-bg-surface text-text-secondary hover:bg-bg-surface-hover transition-colors'}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            {[...PERIOD_PRESETS, { id: CUSTOM_PERIOD_ID, label: 'Rango a medida' }].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setPeriodId(p.id)}
+                className={
+                  p.id === periodId
+                    ? 'status-badge bg-brand/10 text-brand'
+                    : 'status-badge bg-bg-surface text-text-secondary hover:bg-bg-surface-hover transition-colors'
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Las dos fechas aparecen sólo cuando el rango a medida está elegido: ocupar
+              lugar fijo con dos inputs vacíos ensucia la fila para el caso normal. */}
+          {periodId === CUSTOM_PERIOD_ID && (
+            <div className="flex items-center gap-2 text-xs text-text-secondary">
+              <input
+                type="date"
+                value={rangoCustom.start}
+                max={rangoCustom.end || undefined}
+                onChange={(e) => setRangoCustom((r) => ({ ...r, start: e.target.value }))}
+                className="input-field py-1 px-2 text-xs"
+                aria-label="Desde"
+              />
+              <span>a</span>
+              <input
+                type="date"
+                value={rangoCustom.end}
+                min={rangoCustom.start || undefined}
+                onChange={(e) => setRangoCustom((r) => ({ ...r, end: e.target.value }))}
+                className="input-field py-1 px-2 text-xs"
+                aria-label="Hasta"
+              />
+              {(!rangoCustom.start || !rangoCustom.end) && (
+                <span className="text-text-tertiary">— mientras falte una fecha se muestra todo el historial</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

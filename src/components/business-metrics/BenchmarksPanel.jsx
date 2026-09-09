@@ -60,7 +60,7 @@ export default function BenchmarksPanel({ onChange }) {
   }
 
   return (
-    <div className="card">
+    <div className="card border-0 shadow-none">
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">Benchmarks de industria</h3>
         <p className="text-xs text-text-tertiary mt-1">
@@ -73,7 +73,7 @@ export default function BenchmarksPanel({ onChange }) {
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
       ) : error ? (
-        <div className="rounded-lg bg-error/5 border border-error/20 p-4 flex items-start gap-2">
+        <div className="rounded-lg bg-error/5 p-4 flex items-start gap-2">
           <ExclamationTriangleIcon className="h-4 w-4 text-error flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-error">No se pudieron cargar los benchmarks</p>
