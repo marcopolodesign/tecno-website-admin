@@ -22,7 +22,10 @@ export const PRESETS = {
   // AMRAP is one round with a cap: as many rounds as possible inside the time.
   AMRAP: { rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 },
   // EMOM has no stored rest — the rest is whatever is left of the minute after the reps.
-  EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0 },
+  // ejerciciosPorMinuto arranca en 1 (= EMOM_MIN_POR_MINUTO, definido más abajo junto con el
+  // resto del contrato "qué entra en un minuto") — un movimiento por minuto, que es lo que ya
+  // tenían las 1490 filas EMOM de antes de que esto fuera configurable.
+  EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0, ejerciciosPorMinuto: 1 },
   // 12 × (20+10) = 6:00 exacto. Antes eran 8 rondas (4:00) — el default dejaba 2:00 de la
   // estación sin usar hasta que el coach subiera "Rondas" a mano; ningún otro preset tiene
   // este problema (EMOM/AMRAP/A completar ya cierran justo en 6:00 desde el default).
@@ -40,8 +43,12 @@ export const PRESETS = {
 // cupo fijo — el coach carga los que quiera. Debe coincidir con CIRCUITO en
 // routineGenerationService.js (ejercicios/reps) — están duplicados a propósito, igual que los
 // PRESETS de arriba, no por descuido.
-export const CUPO_POR_FORMATO = { Tabata: 4, EMOM: 3, AMRAP: 4 }
-export const REPS_POR_FORMATO = { Tabata: 'máx por ronda', EMOM: '10 por minuto', AMRAP: '10 por vuelta' }
+//
+// EMOM quedó afuera de las dos: no tiene un cupo fijo (lo dicta ejerciciosPorMinuto × cuántos
+// minutos quiera rotar el coach) ni una sola prescripción para toda la estación (cada fila
+// tiene la suya, en reps o en segundos — ver la sección "qué entra en un minuto" más abajo).
+export const CUPO_POR_FORMATO = { Tabata: 4, AMRAP: 4 }
+export const REPS_POR_FORMATO = { Tabata: 'máx por ronda', AMRAP: '10 por vuelta' }
 
 export const esPorTiempo = (formato) => Boolean(formato) && formato !== 'Series'
 

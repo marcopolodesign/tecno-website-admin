@@ -116,6 +116,8 @@ export const routinesService = {
               rondas,
               trabajo_seg,
               descanso_seg,
+              ejercicios_por_minuto,
+              segundos_por_ejercicio,
               is_pinned,
               boxes (
                 id,
@@ -352,7 +354,11 @@ export const routinesService = {
         formato: sessionExerciseData.formato || 'Series',
         rondas: sessionExerciseData.rondas || null,
         trabajo_seg: sessionExerciseData.trabajoSeg || null,
-        descanso_seg: sessionExerciseData.descansoSeg ?? null
+        descanso_seg: sessionExerciseData.descansoSeg ?? null,
+        // De la ESTACIÓN, como formato/rondas/trabajo_seg — se replica igual en todas sus filas
+        // (ver syncEstacionFormato). segundos_por_ejercicio es de CADA fila: null = va por reps.
+        ejercicios_por_minuto: sessionExerciseData.ejerciciosPorMinuto || null,
+        segundos_por_ejercicio: sessionExerciseData.segundosPorEjercicio || null
       }
 
       const { data, error } = await supabase
@@ -427,7 +433,10 @@ export const routinesService = {
           formato: formatoData.formato || 'Series',
           rondas: formatoData.rondas || null,
           trabajo_seg: formatoData.trabajoSeg || null,
-          descanso_seg: formatoData.descansoSeg ?? null
+          descanso_seg: formatoData.descansoSeg ?? null,
+          // De la estación, igual que los tres de arriba — no de cada fila (eso es
+          // segundos_por_ejercicio, que cada fila trae y guarda por su cuenta).
+          ejercicios_por_minuto: formatoData.ejerciciosPorMinuto || null
         })
         .eq('session_id', sessionId)
         .eq('box_number', boxNumber)

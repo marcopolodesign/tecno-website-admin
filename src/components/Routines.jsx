@@ -21,7 +21,22 @@ import routinesService from '../services/routinesService'
 import exercisesService from '../services/exercisesService'
 import { generateRoutineSessions } from '../services/routineGenerationService'
 import { supabase, toCamelCase } from '../lib/supabase'
-import { BLOQUE_SEG, CUPO_POR_FORMATO, REPS_POR_FORMATO, comoTexto, duracionEstacionSeg, duracionSeg, esPorTiempo, mmss } from '../lib/formatos'
+import {
+  BLOQUE_SEG,
+  CUPO_POR_FORMATO,
+  REPS_POR_FORMATO,
+  MINUTO_SEG,
+  comoTexto,
+  duracionEstacionSeg,
+  duracionSeg,
+  esPorTiempo,
+  mmss,
+  prescripcionTexto,
+  gruposDelMinuto,
+  segundosCargados,
+  sobranteDelMinuto,
+  resumenDelMinuto,
+} from '../lib/formatos'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
 import SelectorEjercicio from './SelectorEjercicio'
@@ -46,6 +61,19 @@ function PinIcon({ filled, className }) {
       <path d="M12 15.67V21" />
     </svg>
   )
+}
+
+// Vuelve del texto guardado (sets_reps) a los dos campos que edita el coach — sólo hace falta
+// para EMOM, donde sets_reps es la prescripción real de esa fila (no un texto congelado por
+// formato, como en Tabata/AMRAP). segundosPorEjercicio manda: si está cargado, la fila es por
+// tiempo. Si no, se toma el número inicial de sets_reps ("10 reps" → 10) — el mismo formato que
+// ya escribe prescripcionTexto, y cubre también las filas viejas ("10 por minuto") que llevaban
+// otro texto pero el mismo número adelante.
+function emomPrescripcionDeFila(se) {
+  const segundos = se?.segundosPorEjercicio
+  if (segundos) return { emomModo: 'segundos', emomReps: '', emomSegundos: String(segundos) }
+  const match = String(se?.setsReps || '').match(/^(\d+)/)
+  return { emomModo: 'reps', emomReps: match ? match[1] : '', emomSegundos: '' }
 }
 
 // Los ejercicios de una estación, como bloques que se reordenan arrastrando o con flechas.
@@ -206,7 +234,14 @@ export default function Routines() {
     microPause: '',
     notes: '',
     isCooldown: false,
-    isPinned: false
+    isPinned: false,
+    // Sólo EMOM las usa: "series x reps" ahí no es un texto congelado por estación como en
+    // Tabata/AMRAP, es una prescripción por ejercicio, y en reps o en segundos (segundos
+    // manda: es lo único de lo que sale segundosPorEjercicio). emomModo decide cuál de las
+    // dos lee saveExerciseToSession al armar el texto con prescripcionTexto.
+    emomModo: 'reps',
+    emomReps: '',
+    emomSegundos: ''
   })
 
   // La modalidad es de la ESTACIÓN, no de cada ejercicio — un solo control arriba de todo del
@@ -218,7 +253,8 @@ export default function Routines() {
     formato: 'AMRAP',
     rondas: 1,
     trabajoSeg: 360,
-    descansoSeg: 0
+    descansoSeg: 0,
+    ejerciciosPorMinuto: null
   })
   // La estación que se está viendo/editando en su propio panel (drag para reordenar, cambiar y
   // borrar ejercicios) — distinto del panel de arriba, que es para cargar un ejercicio nuevo.
@@ -519,9 +555,13 @@ export default function Routines() {
           formato: filasDeLaEstacion[0].formato || 'Series',
           rondas: filasDeLaEstacion[0].rondas ?? null,
           trabajoSeg: filasDeLaEstacion[0].trabajoSeg ?? null,
-          descansoSeg: filasDeLaEstacion[0].descansoSeg ?? null
+          descansoSeg: filasDeLaEstacion[0].descansoSeg ?? null,
+          // Si no se trae acá, agregar el segundo ejercicio a una estación EMOM ya armada con
+          // (por decir) 3 por minuto la pisaba a 1 apenas se guardara — el estado de arriba
+          // vuelve a escribirse entero en cada guardado (ver saveExerciseToSession/estacionFormato).
+          ejerciciosPorMinuto: filasDeLaEstacion[0].ejerciciosPorMinuto ?? null
         }
-      : { formato: 'AMRAP', rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 }
+      : { formato: 'AMRAP', rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0, ejerciciosPorMinuto: null }
     setEstacionFormato(formatoDeLaEstacion)
 
     if (sessionExercise) {
@@ -539,7 +579,8 @@ export default function Routines() {
         microPause: sessionExercise.microPause || '',
         notes: sessionExercise.notes || '',
         isCooldown: sessionExercise.isCooldown || false,
-        isPinned: sessionExercise.isPinned || false
+        isPinned: sessionExercise.isPinned || false,
+        ...emomPrescripcionDeFila(sessionExercise)
       })
     } else {
       const selectedBox = boxes.find(b => b.boxNumber === boxNumber)
@@ -557,7 +598,10 @@ export default function Routines() {
         microPause: '',
         notes: '',
         isCooldown: isCooldown,
-        isPinned: false
+        isPinned: false,
+        emomModo: 'reps',
+        emomReps: '',
+        emomSegundos: ''
       })
     }
     setShowExerciseModal(true)
@@ -583,13 +627,67 @@ export default function Routines() {
       return
     }
 
-    // Para un circuito por tiempo, "series x reps" no lo escribe el coach por ejercicio — lo
-    // define el formato entero (ver el input deshabilitado de arriba). Se fuerza acá también
-    // por si el estado quedó de un ejercicio anterior con otro formato.
-    const repsDelFormato = REPS_POR_FORMATO[estacionFormato.formato]
+    // Para Tabata/AMRAP, "series x reps" no lo escribe el coach por ejercicio — lo define el
+    // formato entero (ver el input deshabilitado de arriba). Se fuerza acá también por si el
+    // estado quedó de un ejercicio anterior con otro formato. EMOM quedó afuera de esto: cada
+    // fila tiene su propia prescripción (ver más abajo).
+    const repsDelFormato = estacionFormato.formato === 'EMOM' ? null : REPS_POR_FORMATO[estacionFormato.formato]
+
+    // La prescripción de la fila para EMOM: en reps o en segundos, nunca las dos. setsReps se
+    // deriva con prescripcionTexto — el mismo contrato que ya leen la TV, la app y las listas
+    // del admin — en vez de guardar lo que el coach tipeó a mano en un input libre.
+    // segundosPorEjercicio se manda siempre (null incluido) cuando el formato es EMOM: si una
+    // fila que estaba en segundos pasa a reps al editarla, tiene que soltar el valor viejo, no
+    // dejarlo pisado en la base mientras el texto ya dice otra cosa.
+    let emomTexto = null
+    let segundosPorEjercicio = null
+    if (estacionFormato.formato === 'EMOM' && !exerciseForm.isCooldown) {
+      if (exerciseForm.emomModo === 'segundos') {
+        const s = Number(exerciseForm.emomSegundos)
+        if (!s || s < 1 || s > 60) {
+          toast.error('Los segundos por ejercicio van de 1 a 60 — no pueden solos pasar el minuto', toastOptions)
+          return
+        }
+        segundosPorEjercicio = s
+        emomTexto = prescripcionTexto({ segundos: s })
+      } else {
+        const r = Number(exerciseForm.emomReps)
+        if (!r || r < 1) {
+          toast.error('Cargá cuántas reps entran en el minuto', toastOptions)
+          return
+        }
+        emomTexto = prescripcionTexto({ reps: r })
+      }
+    }
+
+    // Aviso, no bloqueo (decisión de Mateo): las reps no tienen duración fija — diez push ups
+    // son otro tiempo según quién los haga — así que el sistema nunca sabe de verdad cuánto va
+    // a durar el minuto. Se avisa sobre el MINUTO al que esta fila se suma (el suyo dentro de
+    // la rotación por ejerciciosPorMinuto), no sobre la estación entera.
+    if (estacionFormato.formato === 'EMOM' && !exerciseForm.isCooldown) {
+      const porMinuto = Math.max(1, estacionFormato.ejerciciosPorMinuto || 1)
+      const filaVirtual = { id: editingItem?.id ?? '__nueva__', segundosPorEjercicio }
+      const filasSiGuardo = editingItem
+        ? filasEstacionActual.map((f) => (f.id === editingItem.id ? filaVirtual : f))
+        : [...filasEstacionActual, filaVirtual]
+      const grupoPropio =
+        gruposDelMinuto(filasSiGuardo, porMinuto).find((g) => g.some((f) => f.id === filaVirtual.id)) || [filaVirtual]
+      const cargados = segundosCargados(grupoPropio)
+      if (cargados > MINUTO_SEG) {
+        toast(`Ese minuto queda en ${cargados}s de trabajo por tiempo — se pasa de los 60. Se guarda igual.`, {
+          ...toastOptions,
+          icon: '⏱️',
+        })
+      }
+    }
+
+    // emomModo/emomReps/emomSegundos son estado del formulario, no columnas — no van al
+    // payload (updateSessionExercise manda el objeto entero a un UPDATE tal cual llega).
+    const { emomModo: _emomModo, emomReps: _emomReps, emomSegundos: _emomSegundos, ...exerciseFormSinEmom } = exerciseForm
     const payload = {
-      ...exerciseForm,
+      ...exerciseFormSinEmom,
       ...(repsDelFormato ? { setsReps: repsDelFormato } : {}),
+      ...(emomTexto ? { setsReps: emomTexto, segundosPorEjercicio } : {}),
       ...(exerciseForm.isCooldown ? {} : estacionFormato),
     }
 
@@ -630,7 +728,9 @@ export default function Routines() {
         repetitionTime: '',
         weightKg: '',
         microPause: '',
-        notes: ''
+        notes: '',
+        emomReps: '',
+        emomSegundos: ''
       }))
       fetchRoutineDetail(selectedRoutine.id)
     } catch (error) {
@@ -1561,19 +1661,55 @@ export default function Routines() {
             <p className="text-[11px] font-bold uppercase tracking-wide text-brand mb-1">Paso 1</p>
             <label className="form-label">Modalidad de la estación</label>
             <SelectorFormato valor={estacionFormato} onChange={setEstacionFormato} turnoSeg={turnoSeg} />
-            {CUPO_POR_FORMATO[estacionFormato.formato] && (
-              // El circuito comparte un solo reloj entre todos sus ejercicios (por eso el
-              // formato pide una cantidad fija, no "los que quieras hasta llenar 6:00") — sin
-              // esto no había forma de saber cuántos ejercicios le faltan a la estación.
-              <p className="mt-2 text-xs text-text-tertiary">
-                {estacionFormato.formato} — circuito de{' '}
-                <strong className="text-text-secondary">{CUPO_POR_FORMATO[estacionFormato.formato]} ejercicios</strong>
-                {filasEstacionActual.length >= CUPO_POR_FORMATO[estacionFormato.formato]
-                  ? ' — completo.'
-                  : ` — llevás ${filasEstacionActual.length}, faltan ${
-                      CUPO_POR_FORMATO[estacionFormato.formato] - filasEstacionActual.length
-                    }.`}
-              </p>
+            {estacionFormato.formato === 'EMOM' ? (
+              // EMOM no tiene cupo fijo como Tabata/AMRAP — lo que hay que ver es cuántos
+              // ejercicios entran en CADA minuto y, si la estación tiene más que esos, cómo
+              // rotan entre los seis minutos (gruposDelMinuto) — si no, el coach tiene que
+              // deducirlo a mano mirando la lista de la estación.
+              <div className="mt-2 text-xs text-text-tertiary space-y-1">
+                {(() => {
+                  const porMinuto = Math.max(1, estacionFormato.ejerciciosPorMinuto || 1)
+                  const grupos = gruposDelMinuto(filasEstacionActual, porMinuto)
+                  if (!grupos.length) {
+                    return <p>EMOM — {porMinuto} {porMinuto === 1 ? 'ejercicio' : 'ejercicios'} por minuto.</p>
+                  }
+                  return (
+                    <>
+                      <p>
+                        EMOM — <strong className="text-text-secondary">{porMinuto} por minuto</strong>
+                        {grupos.length > 1 && ` · rota en ${grupos.length} minutos distintos`}
+                      </p>
+                      {grupos.map((grupo, i) => {
+                        const sobra = sobranteDelMinuto(grupo)
+                        return (
+                          <p key={i}>
+                            Minuto {i + 1}: {resumenDelMinuto(grupo, (f) => f.exercises?.name)}
+                            {' · '}
+                            <span className={sobra < 0 ? 'text-error font-medium' : ''}>
+                              {sobra < 0 ? `se pasa ${Math.abs(sobra)}s` : `quedan ${sobra}s`}
+                            </span>
+                          </p>
+                        )
+                      })}
+                    </>
+                  )
+                })()}
+              </div>
+            ) : (
+              CUPO_POR_FORMATO[estacionFormato.formato] && (
+                // El circuito comparte un solo reloj entre todos sus ejercicios (por eso el
+                // formato pide una cantidad fija, no "los que quieras hasta llenar 6:00") — sin
+                // esto no había forma de saber cuántos ejercicios le faltan a la estación.
+                <p className="mt-2 text-xs text-text-tertiary">
+                  {estacionFormato.formato} — circuito de{' '}
+                  <strong className="text-text-secondary">{CUPO_POR_FORMATO[estacionFormato.formato]} ejercicios</strong>
+                  {filasEstacionActual.length >= CUPO_POR_FORMATO[estacionFormato.formato]
+                    ? ' — completo.'
+                    : ` — llevás ${filasEstacionActual.length}, faltan ${
+                        CUPO_POR_FORMATO[estacionFormato.formato] - filasEstacionActual.length
+                      }.`}
+                </p>
+              )
             )}
           </div>
         )}
@@ -1627,8 +1763,52 @@ export default function Routines() {
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="form-label">Series x Reps *</label>
-                {REPS_POR_FORMATO[estacionFormato.formato] ? (
+                <label className="form-label">
+                  {estacionFormato.formato === 'EMOM' ? 'En el minuto *' : 'Series x Reps *'}
+                </label>
+                {estacionFormato.formato === 'EMOM' ? (
+                  // A diferencia de Tabata/AMRAP (un texto fijo para toda la estación, ver
+                  // abajo), en EMOM cada ejercicio tiene su propia prescripción DENTRO del
+                  // minuto — en reps o en segundos, nunca las dos (por eso el toggle, no dos
+                  // inputs sueltos). El texto que se guarda (setsReps) sale de acá vía
+                  // prescripcionTexto en saveExerciseToSession, no se tipea directo.
+                  <div className="flex gap-2">
+                    <div className="flex rounded-lg border border-border-default overflow-hidden flex-shrink-0">
+                      {[
+                        { valor: 'reps', etiqueta: 'Reps' },
+                        { valor: 'segundos', etiqueta: 'Seg' },
+                      ].map(({ valor, etiqueta }) => (
+                        <button
+                          key={valor}
+                          type="button"
+                          onClick={() => setExerciseForm({ ...exerciseForm, emomModo: valor })}
+                          className={`px-3 text-sm font-medium ${
+                            exerciseForm.emomModo === valor
+                              ? 'bg-brand text-white'
+                              : 'bg-bg-secondary text-text-tertiary'
+                          }`}
+                        >
+                          {etiqueta}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      max={exerciseForm.emomModo === 'segundos' ? 60 : undefined}
+                      value={exerciseForm.emomModo === 'segundos' ? exerciseForm.emomSegundos : exerciseForm.emomReps}
+                      onChange={(e) =>
+                        setExerciseForm({
+                          ...exerciseForm,
+                          [exerciseForm.emomModo === 'segundos' ? 'emomSegundos' : 'emomReps']: e.target.value,
+                        })
+                      }
+                      className="form-input"
+                      placeholder={exerciseForm.emomModo === 'segundos' ? '30' : '10'}
+                      required
+                    />
+                  </div>
+                ) : REPS_POR_FORMATO[estacionFormato.formato] ? (
                   // Un circuito por tiempo corre con un solo reloj compartido por toda la
                   // estación (ver SelectorFormato) — "series x reps" por ejercicio no
                   // significa nada acá. Se muestra lo que realmente hace cada vuelta, fijo.

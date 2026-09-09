@@ -168,9 +168,14 @@ function dentroDelTecho(ejercicio, techos) {
  *   AMRAP   6:00 corridos                   — las vueltas las pone el socio, no hay turnos fijos
  *   Series  lo que escribió el coach, sin reloj — carga y repeticiones
  */
+// El texto de EMOM es literalmente lo que prescripcionTexto({reps:10}) de formatos.js
+// produciría — no se importa esa función acá para no atar el motor a un cambio en formatos.js
+// (el mirror de este archivo en motor-mcp no tiene ese import, y agregarlo ahí sin sincronizar
+// formatos.js también rompía el service entero, no sólo EMOM). Si prescripcionTexto cambia de
+// forma, este literal se actualiza a mano.
 const CIRCUITO = {
   Tabata: { ejercicios: 4, celda: 30, trabajo: 20, descanso: 10, reps: 'máx por ronda' },
-  EMOM: { ejercicios: 3, celda: 60, trabajo: 60, descanso: 0, reps: '10 por minuto' },
+  EMOM: { ejercicios: 3, celda: 60, trabajo: 60, descanso: 0, reps: '10 reps' },
   AMRAP: { ejercicios: 4, celda: null, trabajo: null, descanso: 0, reps: '10 por vuelta' },
 }
 
@@ -201,6 +206,12 @@ function trabajoDelBloque(formato) {
   const rondas = Math.max(1, Math.floor(BLOQUE_SEG / c.celda))
   return {
     formato, rondas, trabajo_seg: c.trabajo, descanso_seg: c.descanso, sets_reps: c.reps,
+    // El armador manual escribe 1 por default cuando el coach arma un EMOM ejercicio por
+    // ejercicio (ver PRESETS.EMOM en formatos.js) — acá pasa lo mismo: CIRCUITO.EMOM ya inserta
+    // una fila por ejercicio con rondas=6 rotando de a una, que es exactamente lo que describe
+    // ejercicios_por_minuto=1. Sin esto, una estación EMOM generada y una armada a mano decían
+    // lo mismo en pantalla pero una tenía el campo cargado y la otra no.
+    ...(formato === 'EMOM' ? { ejercicios_por_minuto: 1 } : {}),
   }
 }
 
@@ -591,6 +602,9 @@ async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, traba
       rondas: trabajo.rondas,
       trabajo_seg: trabajo.trabajo_seg,
       descanso_seg: trabajo.descanso_seg,
+      // Sólo EMOM lo trae (ver trabajoDelBloque) — el resto de los formatos generados no usa
+      // el campo, igual que el armador manual lo deja en null fuera de EMOM.
+      ejercicios_por_minuto: trabajo.ejercicios_por_minuto ?? null,
       notes: notas.length ? notas.join(' · ') : null,
       is_auto_generated: true,
       is_cooldown: te.is_cooldown || false,
