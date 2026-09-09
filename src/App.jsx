@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { Bars3Icon } from '@heroicons/react/24/outline'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
-import Dashboard from './components/Dashboard'
-import BusinessMetrics from './components/BusinessMetrics'
+import Hoy from './components/Hoy'
+import BusinessOverview from './components/BusinessOverview'
 import Prospects from './components/Prospects'
 import Leads from './components/Leads'
 import Users from './components/Users'
@@ -109,17 +109,17 @@ function App() {
     if (role === 'super_admin' || role === 'admin') return true
 
     // Common restrictions for non-admins
-    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs', '/lista-espera/config', '/metricas-negocio'].includes(route)) return false
+    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs', '/lista-espera/config', '/negocio'].includes(route)) return false
 
     // Seller (Front Desk)
     if (role === 'front_desk') {
-      if (route === '/dashboard') return false
-      return true // Access to prospects, leads, users, content
+      if (route === '/negocio') return false
+      return true // Hoy, embudo, socios, contenido
     }
 
     // Coach - has access to fitness features (but only if email is allowed)
     if (role === 'coach') {
-      if (['/dashboard', '/leads', '/prospects'].includes(route)) return false
+      if (['/negocio', '/hoy', '/leads', '/prospects', '/funnel'].includes(route)) return false
       return true // Access to users, content
     }
 
@@ -212,17 +212,25 @@ function AuthenticatedShell({
                 path="/"
                 element={
                   <Navigate
-                    to={canAccess('/dashboard') ? '/dashboard' : '/users'}
+                    to={canAccess('/hoy') ? '/hoy' : '/users'}
                     replace
                   />
                 }
               />
 
-              {canAccess('/dashboard') && (
-                <Route path="/dashboard" element={<Dashboard />} />
+              {canAccess('/hoy') && (
+                <Route path="/hoy" element={<Hoy />} />
               )}
-              {canAccess('/metricas-negocio') && (
-                <Route path="/metricas-negocio" element={<BusinessMetrics />} />
+              {/* La portada vieja y el panel viejo siguen respondiendo, redirigidos: hay
+                  links y pestañas guardadas apuntando ahí. */}
+              {canAccess('/hoy') && (
+                <Route path="/dashboard" element={<Navigate to="/hoy" replace />} />
+              )}
+              {canAccess('/negocio') && (
+                <Route path="/negocio" element={<BusinessOverview />} />
+              )}
+              {canAccess('/negocio') && (
+                <Route path="/metricas-negocio" element={<Navigate to="/negocio" replace />} />
               )}
               {canAccess('/prospects') && (
                 <Route path="/prospects" element={<Prospects />} />
@@ -292,7 +300,7 @@ function AuthenticatedShell({
                 path="*"
                 element={
                   <Navigate
-                    to={canAccess('/dashboard') ? '/dashboard' : '/users'}
+                    to={canAccess('/hoy') ? '/hoy' : '/users'}
                     replace
                   />
                 }
