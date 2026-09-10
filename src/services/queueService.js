@@ -255,6 +255,49 @@ export const queueService = {
   },
 
   // ── Realtime subscriptions ─────────────────────────────────────────────
+  // La lista de espera de la sede: una sola, sin línea (la línea se estampa recién al
+  // promover). Ver migración 20260910180000.
+  async getWaitingForLocation(locationId) {
+    try {
+      let query = supabase
+        .from('queue_entries')
+        .select('*, users (id, first_name, last_name)')
+        .eq('status', 'waiting')
+        .order('posicion', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (locationId) query = query.eq('location_id', locationId)
+
+      const { data, error } = await query
+      if (error) throw error
+      return { data }
+    } catch (error) {
+      console.error('Error fetching waiting list for location:', error)
+      throw error
+    }
+  },
+
+  // Realtime de la cola de la sede. NO se puede reusar subscribeToLine: ése filtra por
+  // `production_line_id`, y una fila en espera lo tiene en NULL — no llegaría nunca. Sin
+  // esto recepción tendría que apretar Actualizar para ver quién entró, que es justo lo
+  // que no queremos.
+  subscribeToLocationQueue(locationId, onChange) {
+    const channel = supabase
+      .channel(`queue-location-${locationId ?? 'all'}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'queue_entries',
+          ...(locationId ? { filter: `location_id=eq.${locationId}` } : {}),
+        },
+        onChange
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  },
+
   subscribeToLine(productionLineId, onChange) {
     const channel = supabase
       .channel(`queue-line-${productionLineId}`)

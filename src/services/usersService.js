@@ -5,6 +5,21 @@ import logsService from './logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
 
 export const usersService = {
+  // Ficha corta de un socio, para el sidecart del monitor de sala. No trae el historial
+  // completo (pagos, membresías anteriores) a propósito: ahí recepción sólo necesita saber
+  // quién es y si hay algo que atender ahora.
+  async getUserDetalle(userId) {
+    const { data, error } = await supabase
+      .from('users')
+      .select(
+        'id, first_name, last_name, email, phone, avatar_url, dni, membership_type, membership_status, membership_start_date, membership_end_date, notes, medical_notes, contraindicaciones, assigned_coach_id, created_at'
+      )
+      .eq('id', userId)
+      .maybeSingle()
+    if (error) throw error
+    return data
+  },
+
   async getUsers(sedeId) {
     try {
       let query = supabase
