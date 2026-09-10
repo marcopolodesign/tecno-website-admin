@@ -4,6 +4,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/Login'
 import Hoy from './components/Hoy'
 import Funnel from './components/Funnel'
+import Caja from './components/Caja'
+import Productos from './components/Productos'
+import Deuda from './components/Deuda'
 import BusinessOverview from './components/BusinessOverview'
 import Prospects from './components/Prospects'
 import Leads from './components/Leads'
@@ -121,7 +124,8 @@ function App() {
 
     // Coach - has access to fitness features (but only if email is allowed)
     if (role === 'coach') {
-      if (['/negocio', '/hoy', '/leads', '/prospects', '/funnel'].includes(route)) return false
+      // Caja/Productos/Deuda son mostrador — de recepción y administración, no del piso.
+      if (['/negocio', '/hoy', '/leads', '/prospects', '/funnel', '/caja', '/productos', '/deuda'].includes(route)) return false
       return true // Access to users, content
     }
 
@@ -230,6 +234,15 @@ function AuthenticatedShell({
                   links y pestañas guardadas apuntando ahí. */}
               {canAccess('/hoy') && (
                 <Route path="/dashboard" element={<Navigate to="/hoy" replace />} />
+              )}
+              {canAccess('/caja') && (
+                <Route path="/caja" element={<Caja userRole={userRole} />} />
+              )}
+              {canAccess('/productos') && (
+                <Route path="/productos" element={<Productos userRole={userRole} />} />
+              )}
+              {canAccess('/deuda') && (
+                <Route path="/deuda" element={<Deuda />} />
               )}
               {canAccess('/negocio') && (
                 <Route path="/negocio" element={<BusinessOverview />} />

@@ -30,6 +30,9 @@ import {
   ArrowRightOnRectangleIcon,
   UserGroupIcon,
   ChartBarSquareIcon,
+  BanknotesIcon,
+  CubeIcon,
+  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline'
 
 // Emails allowed to see fitness section (beta feature)
@@ -42,6 +45,14 @@ const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
 // Sin subtítulo a propósito: es la portada, no una categoría.
 const hoyNav = [
   { name: 'Hoy', href: '/hoy', icon: HomeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+]
+
+// La caja se abre y se cierra todos los días: es operación, no configuración. Por eso tiene
+// grupo propio y no vive dentro de "Sede", que es lo que se toca de vez en cuando.
+const cajaNav = [
+  { name: 'Caja', href: '/caja', icon: BanknotesIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Productos', href: '/productos', icon: CubeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Deuda', href: '/deuda', icon: ReceiptPercentIcon, roles: ['super_admin', 'admin', 'front_desk'] },
 ]
 
 // El recorrido de una persona, en orden: primero es un lead, después un prospecto que dejó
@@ -102,6 +113,7 @@ const ESPACIOS = [
     icono: BuildingStorefrontIcon,
     grupos: [
       { items: hoyNav },
+      { titulo: 'Caja', items: cajaNav },
       { titulo: 'Usuarios', items: usuariosNav },
       { titulo: 'Sede', items: sedeNav },
       { titulo: 'Super Admin', items: superAdminNav },
