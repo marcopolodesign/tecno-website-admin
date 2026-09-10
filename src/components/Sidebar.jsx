@@ -46,6 +46,14 @@ const hoyNav = [
   { name: 'Hoy', href: '/hoy', icon: HomeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
 ]
 
+// La caja se abre y se cierra todos los días: es operación, no configuración. Por eso tiene
+// grupo propio y no vive dentro de "Sede", que es lo que se toca de vez en cuando.
+const cajaNav = [
+  { name: 'Caja', href: '/caja', icon: BanknotesIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Productos', href: '/productos', icon: ShoppingBagIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Deuda', href: '/deuda', icon: ExclamationTriangleIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+]
+
 // El recorrido de una persona, en orden: primero es un lead, después un prospecto que dejó
 // sus datos, después un socio. El Funnel es esa misma historia mirada de arriba.
 const usuariosNav = [
@@ -107,6 +115,7 @@ const ESPACIOS = [
     icono: BuildingStorefrontIcon,
     grupos: [
       { items: hoyNav },
+      { titulo: 'Caja', items: cajaNav },
       { titulo: 'Usuarios', items: usuariosNav },
       { titulo: 'Sede', items: sedeNav },
       { titulo: 'Super Admin', items: superAdminNav },
