@@ -7,6 +7,9 @@ import {
   ArrowDownTrayIcon,
   ExclamationTriangleIcon,
   BanknotesIcon,
+  MagnifyingGlassIcon,
+  UserCircleIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
@@ -18,17 +21,17 @@ import Sidecart from './Sidecart'
 import VenderSidecart from './VenderSidecart'
 
 // La pantalla principal de la caja de mostrador: abrir/cerrar turno, ver el resumen en vivo,
-// registrar ingresos/egresos y disparar la venta (que vive en su propio Sidecart, VenderSidecart).
+// registrar ingresos/egresos, cobrar cuenta corriente y disparar la venta (que vive en su
+// propio Sidecart, VenderSidecart).
 //
-// El cierre pide UN solo número: lo que se contó en efectivo. No se declara nada de tarjeta o
-// transferencia porque eso ya lo sabe el sistema (sale_payments) y no hay nada físico que
-// pueda faltar en esos métodos — el arqueo es efectivo contado contra efectivo esperado,
-// nada más.
+// El resumen del turno NUNCA muestra ni calcula el efectivo esperado — `caja_resumen_turno`
+// directamente no lo trae. Eso se revela sólo como respuesta de `caja_cerrar_turno`, después
+// de que quien cierra ya cargó lo que contó a ciegas.
 export default function Caja({ userRole }) {
   const { sedeId, sede } = useSede()
 
   const [profile, setProfile] = useState(null)
-  const [cajaAbierta, setCajaAbierta] = useState(null)
+  const [turno, setTurno] = useState(null)
   const [resumen, setResumen] = useState(null)
   const [ventas, setVentas] = useState([])
   const [movimientos, setMovimientos] = useState([])
@@ -37,24 +40,36 @@ export default function Caja({ userRole }) {
   const [error, setError] = useState(null)
 
   const [showAbrir, setShowAbrir] = useState(false)
-  const [openingAmount, setOpeningAmount] = useState('')
+  const [montoInicial, setMontoInicial] = useState('')
   const [abriendo, setAbriendo] = useState(false)
 
   const [showCerrar, setShowCerrar] = useState(false)
-  const [countedAmount, setCountedAmount] = useState('')
-  const [closingNotes, setClosingNotes] = useState('')
+  const [efectivoContado, setEfectivoContado] = useState('')
+  const [notasCierre, setNotasCierre] = useState('')
   const [cerrando, setCerrando] = useState(false)
+  const [resultadoCierre, setResultadoCierre] = useState(null)
 
   const [showMovimiento, setShowMovimiento] = useState(false)
   const [movTipo, setMovTipo] = useState('egreso')
-  const [movAmount, setMovAmount] = useState('')
-  const [movReason, setMovReason] = useState('')
+  const [movCategoria, setMovCategoria] = useState('')
+  const [movDetalle, setMovDetalle] = useState('')
+  const [movMonto, setMovMonto] = useState('')
+  const [movMedio, setMovMedio] = useState('efectivo')
   const [enviandoMov, setEnviandoMov] = useState(false)
 
   const [showVender, setShowVender] = useState(false)
 
-  const [anulando, setAnulando] = useState(null) // venta seleccionada para anular
-  const [anularReason, setAnularReason] = useState('')
+  const [showCobrar, setShowCobrar] = useState(false)
+  const [cobrarSocio, setCobrarSocio] = useState(null)
+  const [cobrarQuery, setCobrarQuery] = useState('')
+  const [cobrarResultados, setCobrarResultados] = useState([])
+  const [cobrarSaldo, setCobrarSaldo] = useState(0)
+  const [cobrarMonto, setCobrarMonto] = useState('')
+  const [cobrarMedio, setCobrarMedio] = useState('efectivo')
+  const [enviandoCobro, setEnviandoCobro] = useState(false)
+
+  const [anulando, setAnulando] = useState(null)
+  const [anularMotivo, setAnularMotivo] = useState('')
   const [devolverEfectivo, setDevolverEfectivo] = useState(true)
   const [enviandoAnular, setEnviandoAnular] = useState(false)
 
@@ -67,14 +82,14 @@ export default function Caja({ userRole }) {
     setLoading(true)
     setError(null)
     try {
-      const { data: abierta } = await cajaService.getCajaAbierta(sedeId)
-      setCajaAbierta(abierta)
+      const abierta = await cajaService.getTurnoAbierto(sedeId)
+      setTurno(abierta)
 
       if (abierta) {
-        const [res, { data: v }, { data: m }] = await Promise.all([
-          cajaService.resumenCaja(abierta.id),
-          cajaService.ventasSesion(abierta.id),
-          cajaService.movimientosSesion(abierta.id),
+        const [res, v, m] = await Promise.all([
+          cajaService.resumenTurno(abierta.id),
+          cajaService.ventasTurno(abierta.id),
+          cajaService.movimientosTurno(abierta.id),
         ])
         setResumen(res)
         setVentas(v)
@@ -85,7 +100,7 @@ export default function Caja({ userRole }) {
         setMovimientos([])
       }
 
-      const { data: hist } = await cajaService.historialCierres(sedeId)
+      const hist = await cajaService.historialTurnos(sedeId)
       setHistorial(hist)
     } catch (err) {
       setError(err)
@@ -100,13 +115,13 @@ export default function Caja({ userRole }) {
 
   const handleAbrir = async (e) => {
     e.preventDefault()
-    if (!profile) return
     setAbriendo(true)
     try {
-      await cajaService.abrirCaja(sedeId, profile.id, Number(openingAmount) || 0)
+      await cajaService.abrirTurno(sedeId, Number(montoInicial) || 0)
       toast.success('Caja abierta', toastOptions)
       setShowAbrir(false)
-      setOpeningAmount('')
+      setMontoInicial('')
+      setResultadoCierre(null)
       cargarTurno()
     } catch (err) {
       toast.error(err.message, toastOptions)
@@ -117,18 +132,14 @@ export default function Caja({ userRole }) {
 
   const handleCerrar = async (e) => {
     e.preventDefault()
-    if (!profile || !cajaAbierta) return
+    if (!turno) return
     setCerrando(true)
     try {
-      const cerrada = await cajaService.cerrarCaja(
-        cajaAbierta.id,
-        profile.id,
-        Number(countedAmount) || 0,
-        closingNotes.trim() || null
-      )
-      const diff = Number(cerrada.difference)
+      const cerrado = await cajaService.cerrarTurno(turno.id, efectivoContado, notasCierre.trim() || null)
+      const diff = Number(cerrado.diferencia)
+      setResultadoCierre(cerrado)
       toast.success(
-        diff === 0
+        Math.abs(diff) < 0.01
           ? 'Caja cerrada — sin diferencia'
           : diff > 0
           ? `Caja cerrada — sobran ${formatARS(diff)}`
@@ -136,8 +147,8 @@ export default function Caja({ userRole }) {
         toastOptions
       )
       setShowCerrar(false)
-      setCountedAmount('')
-      setClosingNotes('')
+      setEfectivoContado('')
+      setNotasCierre('')
       cargarTurno()
     } catch (err) {
       toast.error(err.message, toastOptions)
@@ -148,24 +159,28 @@ export default function Caja({ userRole }) {
 
   const handleMovimiento = async (e) => {
     e.preventDefault()
-    if (!profile || !cajaAbierta) return
-    if (!movReason.trim()) {
-      toast.error('El motivo es obligatorio.', toastOptions)
+    if (!turno) return
+    if (!movCategoria.trim()) {
+      toast.error('La categoría es obligatoria.', toastOptions)
       return
     }
     setEnviandoMov(true)
     try {
-      await cajaService.registrarMovimiento(
-        cajaAbierta.id,
-        movTipo,
-        Number(movAmount),
-        movReason.trim(),
-        profile.id
-      )
+      await cajaService.registrarMovimiento({
+        turnoId: turno.id,
+        tipo: movTipo,
+        categoria: movCategoria.trim(),
+        detalle: movDetalle.trim() || null,
+        monto: movMonto,
+        medioPago: movMedio,
+        creadoPor: profile?.id,
+      })
       toast.success(movTipo === 'ingreso' ? 'Ingreso registrado' : 'Egreso registrado', toastOptions)
       setShowMovimiento(false)
-      setMovAmount('')
-      setMovReason('')
+      setMovCategoria('')
+      setMovDetalle('')
+      setMovMonto('')
+      setMovMedio('efectivo')
       cargarTurno()
     } catch (err) {
       toast.error(err.message, toastOptions)
@@ -174,59 +189,91 @@ export default function Caja({ userRole }) {
     }
   }
 
-  // Admin/super_admin anulan cualquier venta. Recepción sólo las de su propio turno, y sólo
-  // mientras ese turno sigue abierto — una vez cerrado, anular ya no tiene un arqueo al que
-  // volver a cuadrar.
-  const puedeAnular = (venta) => {
-    if (!venta || venta.status === 'anulada') return false
-    if (userRole === 'admin' || userRole === 'super_admin') return true
-    if (userRole !== 'front_desk') return false
-    return (
-      cajaAbierta?.status === 'abierta' &&
-      cajaAbierta.openedBy === profile?.id &&
-      venta.cashSessionId === cajaAbierta.id
-    )
+  // Cobrar cuenta corriente — mismo debounce simple que el buscador de socio de VenderSidecart.
+  useEffect(() => {
+    if (!showCobrar || !cobrarQuery || cobrarQuery.trim().length < 2) {
+      setCobrarResultados([])
+      return
+    }
+    const id = setTimeout(async () => {
+      try {
+        const resultados = await cajaService.buscarSocios(cobrarQuery)
+        setCobrarResultados(resultados)
+      } catch (err) {
+        toast.error(err.message, toastOptions)
+      }
+    }, 300)
+    return () => clearTimeout(id)
+  }, [showCobrar, cobrarQuery])
+
+  const elegirCobrarSocio = async (u) => {
+    setCobrarSocio(u)
+    setCobrarQuery('')
+    setCobrarResultados([])
+    try {
+      const saldo = await cajaService.saldoSocio(u.id)
+      setCobrarSaldo(saldo)
+      setCobrarMonto(saldo > 0 ? String(saldo) : '')
+    } catch {
+      setCobrarSaldo(0)
+    }
   }
 
-  // Cuánto se cobró EN EFECTIVO en esa venta: es lo único que puede tener que salir
-  // físicamente del cajón al anular. Lo de tarjeta se devuelve por el posnet, no de acá.
+  const cerrarCobrarSidecart = () => {
+    setShowCobrar(false)
+    setCobrarSocio(null)
+    setCobrarQuery('')
+    setCobrarResultados([])
+    setCobrarSaldo(0)
+    setCobrarMonto('')
+    setCobrarMedio('efectivo')
+  }
+
+  const handleCobrar = async (e) => {
+    e.preventDefault()
+    if (!turno || !cobrarSocio) return
+    setEnviandoCobro(true)
+    try {
+      await cajaService.cobrarCuenta(turno.id, cobrarSocio.id, cobrarMonto, cobrarMedio)
+      toast.success(`Cobro registrado — ${formatARS(cobrarMonto)}`, toastOptions)
+      cerrarCobrarSidecart()
+      cargarTurno()
+    } catch (err) {
+      toast.error(err.message, toastOptions)
+    } finally {
+      setEnviandoCobro(false)
+    }
+  }
+
+  const puedeAnular = (venta) => venta.estado !== 'anulada' && puedeOperarCaja
+
+  // Cuánto se cobró EN EFECTIVO en esa venta — es lo único que puede tener que seguir en el
+  // cajón si la anulación fue por un error de carga. Lo de tarjeta/transferencia/MP no se
+  // devuelve del cajón, así que ahí el checkbox no aplica.
   const efectivoDeVenta = (venta) =>
-    (venta?.salePayments || venta?.sale_payments || [])
-      .filter((p) => p.method === 'efectivo')
-      .reduce((acc, p) => acc + Number(p.amount || 0), 0)
+    (venta?.cajaVentaPagos || [])
+      .filter((p) => p.medioPago === 'efectivo')
+      .reduce((acc, p) => acc + Number(p.monto || 0), 0)
+
+  const abrirAnular = (venta) => {
+    setAnulando(venta)
+    setAnularMotivo('')
+    setDevolverEfectivo(true)
+  }
 
   const handleAnular = async (e) => {
     e.preventDefault()
-    if (!anulando || !profile) return
-    if (!anularReason.trim()) {
+    if (!anulando) return
+    if (!anularMotivo.trim()) {
       toast.error('El motivo es obligatorio.', toastOptions)
       return
     }
     setEnviandoAnular(true)
     try {
-      await cajaService.anularVenta(anulando.id, profile.id, anularReason.trim())
-
-      // Anular no saca la plata del cajón por sí solo, y está bien que no lo haga: a veces
-      // se anula un error de carga y el billete nunca se movió. Pero cuando SÍ se devuelve,
-      // ese egreso hay que anotarlo o el cierre va a marcar un sobrante que no existe.
-      // Preguntarlo acá es lo que evita que alguien se entere recién al contar la caja.
-      const efectivo = efectivoDeVenta(anulando)
-      if (devolverEfectivo && efectivo > 0) {
-        await cajaService.registrarMovimiento(
-          cajaAbierta.id, 'egreso', efectivo,
-          `Devolución por anulación de venta #${anulando.numero}`, profile.id
-        )
-      }
-
-      toast.success(
-        devolverEfectivo && efectivo > 0
-          ? `Venta #${anulando.numero} anulada y ${formatARS(efectivo)} devueltos`
-          : `Venta #${anulando.numero} anulada`,
-        toastOptions
-      )
+      await cajaService.anularVenta(anulando.id, anularMotivo.trim(), devolverEfectivo)
+      toast.success('Venta anulada', toastOptions)
       setAnulando(null)
-      setAnularReason('')
-      setDevolverEfectivo(true)
+      setAnularMotivo('')
       cargarTurno()
     } catch (err) {
       toast.error(err.message, toastOptions)
@@ -237,7 +284,13 @@ export default function Caja({ userRole }) {
 
   const puedeOperarCaja = ['super_admin', 'admin', 'front_desk'].includes(userRole)
 
-  if (loading && !cajaAbierta) {
+  const descripcionVenta = (v) => (v.cajaVentaItems || []).map((i) => i.descripcion).join(', ') || '—'
+  const mediosVenta = (v) =>
+    (v.cajaVentaPagos || [])
+      .map((p) => METODOS_PAGO.concat([{ value: 'cuenta_corriente', label: 'Fiado' }]).find((m) => m.value === p.medioPago)?.label || p.medioPago)
+      .join(', ') || '—'
+
+  if (loading && !turno) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -249,15 +302,18 @@ export default function Caja({ userRole }) {
     <div className="space-y-6">
       <Toaster position="top-right" />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Caja</h1>
           <p className="text-sm text-text-secondary mt-1">{sede?.name || 'Sede'}</p>
         </div>
-        {cajaAbierta && puedeOperarCaja && (
-          <div className="flex items-center gap-2">
+        {turno && puedeOperarCaja && (
+          <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setShowMovimiento(true)} className="btn-secondary">
               Ingreso / Egreso
+            </button>
+            <button onClick={() => setShowCobrar(true)} className="btn-secondary">
+              Cobrar cuenta corriente
             </button>
             <button onClick={() => setShowVender(true)} className="btn-primary flex items-center gap-2">
               <ShoppingCartIcon className="h-4 w-4" />
@@ -277,7 +333,28 @@ export default function Caja({ userRole }) {
         </div>
       )}
 
-      {!cajaAbierta ? (
+      {resultadoCierre && !turno && (
+        <div className="card border-0 shadow-none">
+          <p className="text-sm font-semibold text-text-primary mb-3">Resultado del último cierre</p>
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="Contado" value={formatARS(resultadoCierre.efectivoContado)} />
+            <Stat label="Esperado" value={formatARS(resultadoCierre.efectivoEsperado)} />
+            <Stat
+              label="Diferencia"
+              value={
+                Math.abs(Number(resultadoCierre.diferencia)) < 0.01
+                  ? 'Sin diferencia'
+                  : Number(resultadoCierre.diferencia) > 0
+                  ? `+${formatARS(resultadoCierre.diferencia)}`
+                  : formatARS(resultadoCierre.diferencia)
+              }
+              tone={Math.abs(Number(resultadoCierre.diferencia)) < 0.01 ? undefined : Number(resultadoCierre.diferencia) > 0 ? 'success' : 'warning'}
+            />
+          </div>
+        </div>
+      )}
+
+      {!turno ? (
         <div className="card border-0 shadow-none text-center py-12">
           <BanknotesIcon className="h-10 w-10 text-text-tertiary mx-auto mb-3" />
           <p className="text-text-primary font-medium">No hay una caja abierta en esta sede</p>
@@ -294,10 +371,10 @@ export default function Caja({ userRole }) {
           <div className="card border-0 shadow-none flex items-center justify-between flex-wrap gap-3">
             <div>
               <p className="text-sm font-medium text-text-primary">
-                Turno abierto por {cajaAbierta.sellers ? `${cajaAbierta.sellers.firstName} ${cajaAbierta.sellers.lastName}` : '—'}
+                Turno abierto por {turno.abiertoPorSeller ? `${turno.abiertoPorSeller.firstName} ${turno.abiertoPorSeller.lastName}` : '—'}
               </p>
               <p className="text-xs text-text-tertiary mt-0.5">
-                Desde {new Date(cajaAbierta.openedAt).toLocaleString('es-AR')} · Apertura {formatARS(cajaAbierta.openingAmount)}
+                Desde {new Date(turno.abiertoAt).toLocaleString('es-AR')} · Apertura {formatARS(turno.montoInicial)}
               </p>
             </div>
             {puedeOperarCaja && (
@@ -311,10 +388,14 @@ export default function Caja({ userRole }) {
           {resumen && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Stat label="Total vendido" value={formatARS(resumen.totalVendido)} sub={`${resumen.ventasCount} venta${resumen.ventasCount === 1 ? '' : 's'}`} />
-                <Stat label="Total cobrado" value={formatARS(resumen.totalCobrado)} />
-                <Stat label="Fiado pendiente" value={formatARS(resumen.fiadoPendiente)} tone={resumen.fiadoPendiente > 0 ? 'warning' : undefined} />
-                <Stat label="Efectivo esperado" value={formatARS(resumen.efectivoEsperado)} tone="brand" />
+                <Stat
+                  label="Total vendido"
+                  value={formatARS(resumen.totalVendido)}
+                  sub={`${resumen.ventasCount} venta${Number(resumen.ventasCount) === 1 ? '' : 's'}`}
+                />
+                <Stat label="Descuentos" value={formatARS(resumen.descuentos)} />
+                <Stat label="Fiado del turno" value={formatARS(resumen.fiado)} tone={Number(resumen.fiado) > 0 ? 'warning' : undefined} />
+                <Stat label="Ingresos / egresos" value={`${formatARS(resumen.ingresosExtra)} / ${formatARS(resumen.egresos)}`} />
               </div>
 
               <div className="card border-0 shadow-none">
@@ -323,21 +404,9 @@ export default function Caja({ userRole }) {
                   {METODOS_PAGO.map((m) => (
                     <div key={m.value} className="p-2.5 bg-bg-surface rounded-lg text-center">
                       <p className="text-xs text-text-tertiary mb-1">{m.label}</p>
-                      <p className="text-sm font-semibold text-text-primary">
-                        {formatARS(resumen[`cobrado${m.value[0].toUpperCase()}${m.value.slice(1)}`])}
-                      </p>
+                      <p className="text-sm font-semibold text-text-primary">{formatARS(resumen[m.value])}</p>
                     </div>
                   ))}
-                </div>
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="p-2.5 bg-success/5 rounded-lg text-center">
-                    <p className="text-xs text-text-tertiary mb-1">Ingresos</p>
-                    <p className="text-sm font-semibold text-success">{formatARS(resumen.ingresos)}</p>
-                  </div>
-                  <div className="p-2.5 bg-error/5 rounded-lg text-center">
-                    <p className="text-xs text-text-tertiary mb-1">Egresos</p>
-                    <p className="text-sm font-semibold text-error">{formatARS(resumen.egresos)}</p>
-                  </div>
                 </div>
               </div>
             </>
@@ -355,10 +424,14 @@ export default function Caja({ userRole }) {
                       ) : (
                         <ArrowUpTrayIcon className="h-4 w-4 text-error shrink-0" />
                       )}
-                      <span className="text-text-primary truncate">{m.reason}</span>
+                      <div className="min-w-0">
+                        <span className="text-text-primary truncate block">{m.categoria}</span>
+                        {m.detalle && <span className="text-xs text-text-tertiary truncate block">{m.detalle}</span>}
+                      </div>
                     </div>
                     <span className={`font-medium shrink-0 ${m.tipo === 'ingreso' ? 'text-success' : 'text-error'}`}>
-                      {m.tipo === 'ingreso' ? '+' : '-'}{formatARS(m.amount)}
+                      {m.tipo === 'ingreso' ? '+' : '-'}
+                      {formatARS(m.monto)}
                     </span>
                   </div>
                 ))}
@@ -375,9 +448,10 @@ export default function Caja({ userRole }) {
                 <table className="min-w-full">
                   <thead>
                     <tr>
-                      <th className="table-header">#</th>
+                      <th className="table-header">Hora</th>
+                      <th className="table-header">Qué se vendió</th>
                       <th className="table-header">Socio</th>
-                      <th className="table-header">Métodos</th>
+                      <th className="table-header">Medios</th>
                       <th className="table-header">Total</th>
                       <th className="table-header">Estado</th>
                       <th className="table-header"></th>
@@ -386,23 +460,19 @@ export default function Caja({ userRole }) {
                   <tbody>
                     {ventas.map((v) => (
                       <tr key={v.id} className="table-row">
-                        <td className="table-cell">{v.numero}</td>
-                        <td className="table-cell">{v.users ? `${v.users.firstName} ${v.users.lastName}` : 'Consumidor final'}</td>
+                        <td className="table-cell">{new Date(v.createdAt).toLocaleTimeString('es-AR')}</td>
+                        <td className={`table-cell ${v.estado === 'anulada' ? 'line-through text-text-tertiary' : ''}`}>{descripcionVenta(v)}</td>
+                        <td className="table-cell">{v.socio ? `${v.socio.firstName} ${v.socio.lastName}` : 'Consumidor final'}</td>
+                        <td className="table-cell">{mediosVenta(v)}</td>
+                        <td className={`table-cell ${v.estado === 'anulada' ? 'line-through text-text-tertiary' : ''}`}>{formatARS(v.total)}</td>
                         <td className="table-cell">
-                          {(v.salePayments || []).map((p) => METODOS_PAGO.find((m) => m.value === p.method)?.label || p.method).join(', ') || '—'}
-                        </td>
-                        <td className="table-cell">{formatARS(v.total)}</td>
-                        <td className="table-cell">
-                          <span className={`status-badge ${v.status === 'anulada' ? 'status-perdido' : 'status-convertido'}`}>
-                            {v.status === 'anulada' ? 'Anulada' : 'Completada'}
+                          <span className={`status-badge ${v.estado === 'anulada' ? 'status-perdido' : 'status-convertido'}`}>
+                            {v.estado === 'anulada' ? 'Anulada' : 'Completada'}
                           </span>
                         </td>
                         <td className="table-cell text-right">
                           {puedeAnular(v) && (
-                            <button
-                              onClick={() => setAnulando(v)}
-                              className="text-xs text-error hover:underline"
-                            >
+                            <button onClick={() => abrirAnular(v)} className="text-xs text-error hover:underline">
                               Anular
                             </button>
                           )}
@@ -419,33 +489,27 @@ export default function Caja({ userRole }) {
 
       {historial.length > 0 && (
         <div className="card border-0 shadow-none">
-          <p className="text-sm font-semibold text-text-primary mb-3">Cierres anteriores</p>
+          <p className="text-sm font-semibold text-text-primary mb-3">Turnos anteriores</p>
           <div className="overflow-x-auto -mx-1.5">
             <table className="min-w-full">
               <thead>
                 <tr>
-                  <th className="table-header">Cierre</th>
+                  <th className="table-header">Fecha</th>
                   <th className="table-header">Abrió</th>
                   <th className="table-header">Cerró</th>
-                  <th className="table-header">Apertura</th>
-                  <th className="table-header">Contado</th>
-                  <th className="table-header">Esperado</th>
                   <th className="table-header">Diferencia</th>
                 </tr>
               </thead>
               <tbody>
                 {historial.map((h) => {
-                  const diff = Number(h.difference)
+                  const diff = Number(h.diferencia)
                   return (
                     <tr key={h.id} className="table-row">
-                      <td className="table-cell">{new Date(h.closedAt).toLocaleString('es-AR')}</td>
-                      <td className="table-cell">{h.abiertaPor ? `${h.abiertaPor.firstName} ${h.abiertaPor.lastName}` : '—'}</td>
-                      <td className="table-cell">{h.cerradaPor ? `${h.cerradaPor.firstName} ${h.cerradaPor.lastName}` : '—'}</td>
-                      <td className="table-cell">{formatARS(h.openingAmount)}</td>
-                      <td className="table-cell">{formatARS(h.countedAmount)}</td>
-                      <td className="table-cell">{formatARS(h.expectedAmount)}</td>
-                      <td className={`table-cell font-medium ${diff === 0 ? '' : diff > 0 ? 'text-success' : 'text-error'}`}>
-                        {diff === 0 ? 'Sin diferencia' : diff > 0 ? `+${formatARS(diff)}` : formatARS(diff)}
+                      <td className="table-cell">{new Date(h.cerradoAt).toLocaleString('es-AR')}</td>
+                      <td className="table-cell">{h.abiertoPorSeller ? `${h.abiertoPorSeller.firstName} ${h.abiertoPorSeller.lastName}` : '—'}</td>
+                      <td className="table-cell">{h.cerradoPorSeller ? `${h.cerradoPorSeller.firstName} ${h.cerradoPorSeller.lastName}` : '—'}</td>
+                      <td className={`table-cell font-medium ${Math.abs(diff) < 0.01 ? '' : diff > 0 ? 'text-success' : 'text-error'}`}>
+                        {Math.abs(diff) < 0.01 ? 'Sin diferencia' : diff > 0 ? `+${formatARS(diff)}` : formatARS(diff)}
                       </td>
                     </tr>
                   )
@@ -465,7 +529,9 @@ export default function Caja({ userRole }) {
         size="sm"
         footer={
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setShowAbrir(false)} className="btn-secondary">Cancelar</button>
+            <button type="button" onClick={() => setShowAbrir(false)} className="btn-secondary">
+              Cancelar
+            </button>
             <button onClick={handleAbrir} disabled={abriendo} className="btn-primary disabled:opacity-50">
               {abriendo ? 'Abriendo...' : 'Abrir caja'}
             </button>
@@ -479,8 +545,8 @@ export default function Caja({ userRole }) {
               type="number"
               step="0.01"
               min="0"
-              value={openingAmount}
-              onChange={(e) => setOpeningAmount(e.target.value)}
+              value={montoInicial}
+              onChange={(e) => setMontoInicial(e.target.value)}
               className="form-input"
               placeholder="0"
               autoFocus
@@ -490,7 +556,7 @@ export default function Caja({ userRole }) {
         </form>
       </Sidecart>
 
-      {/* Cerrar caja — arqueo */}
+      {/* Cerrar caja — arqueo a ciegas: NO se muestra el esperado hasta confirmar. */}
       <Sidecart
         isOpen={showCerrar}
         onClose={() => setShowCerrar(false)}
@@ -499,14 +565,19 @@ export default function Caja({ userRole }) {
         size="sm"
         footer={
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setShowCerrar(false)} className="btn-secondary">Cancelar</button>
-            <button onClick={handleCerrar} disabled={cerrando || !countedAmount} className="btn-primary disabled:opacity-50">
+            <button type="button" onClick={() => setShowCerrar(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button onClick={handleCerrar} disabled={cerrando || efectivoContado === ''} className="btn-primary disabled:opacity-50">
               {cerrando ? 'Cerrando...' : 'Confirmar cierre'}
             </button>
           </div>
         }
       >
         <form onSubmit={handleCerrar} className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Contá el efectivo del cajón y cargá el número. El sistema recién te va a mostrar si coincide después de confirmar.
+          </p>
           <div>
             <label className="form-label">Efectivo contado *</label>
             <input
@@ -514,26 +585,16 @@ export default function Caja({ userRole }) {
               step="0.01"
               min="0"
               required
-              value={countedAmount}
-              onChange={(e) => setCountedAmount(e.target.value)}
+              value={efectivoContado}
+              onChange={(e) => setEfectivoContado(e.target.value)}
               className="form-input"
               placeholder="0"
               autoFocus
             />
           </div>
-
-          {resumen && countedAmount !== '' && (
-            <DiferenciaPreview esperado={Number(resumen.efectivoEsperado)} contado={Number(countedAmount) || 0} />
-          )}
-
           <div>
             <label className="form-label">Notas (opcional)</label>
-            <textarea
-              value={closingNotes}
-              onChange={(e) => setClosingNotes(e.target.value)}
-              className="form-textarea"
-              rows={2}
-            />
+            <textarea value={notasCierre} onChange={(e) => setNotasCierre(e.target.value)} className="form-textarea" rows={2} />
           </div>
         </form>
       </Sidecart>
@@ -546,7 +607,9 @@ export default function Caja({ userRole }) {
         size="sm"
         footer={
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setShowMovimiento(false)} className="btn-secondary">Cancelar</button>
+            <button type="button" onClick={() => setShowMovimiento(false)} className="btn-secondary">
+              Cancelar
+            </button>
             <button onClick={handleMovimiento} disabled={enviandoMov} className="btn-primary disabled:opacity-50">
               {enviandoMov ? 'Guardando...' : 'Registrar'}
             </button>
@@ -575,41 +638,171 @@ export default function Caja({ userRole }) {
             </button>
           </div>
           <div>
-            <label className="form-label">Monto *</label>
+            <label className="form-label">Categoría *</label>
             <input
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
               required
-              value={movAmount}
-              onChange={(e) => setMovAmount(e.target.value)}
+              value={movCategoria}
+              onChange={(e) => setMovCategoria(e.target.value)}
               className="form-input"
-              placeholder="0"
+              placeholder={movTipo === 'ingreso' ? 'Ej: aporte de cambio' : 'Ej: retiro, proveedor, gasto'}
             />
           </div>
           <div>
-            <label className="form-label">Motivo *</label>
-            <textarea
-              required
-              value={movReason}
-              onChange={(e) => setMovReason(e.target.value)}
-              className="form-textarea"
-              rows={2}
-              placeholder={movTipo === 'ingreso' ? 'Ej: aporte de cambio' : 'Ej: pago a proveedor'}
-            />
+            <label className="form-label">Detalle (opcional)</label>
+            <textarea value={movDetalle} onChange={(e) => setMovDetalle(e.target.value)} className="form-textarea" rows={2} />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="form-label">Monto *</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={movMonto}
+                onChange={(e) => setMovMonto(e.target.value)}
+                className="form-input"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="form-label">Medio</label>
+              <select value={movMedio} onChange={(e) => setMovMedio(e.target.value)} className="form-select">
+                {METODOS_PAGO.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </form>
+      </Sidecart>
+
+      {/* Cobrar cuenta corriente */}
+      <Sidecart
+        isOpen={showCobrar}
+        onClose={cerrarCobrarSidecart}
+        title="Cobrar cuenta corriente"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={cerrarCobrarSidecart} className="btn-secondary">
+              Cancelar
+            </button>
+            <button onClick={handleCobrar} disabled={enviandoCobro || !cobrarSocio || !cobrarMonto} className="btn-primary disabled:opacity-50">
+              {enviandoCobro ? 'Cobrando...' : 'Registrar cobro'}
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleCobrar} className="space-y-4">
+          <div>
+            <label className="form-label">Socio</label>
+            {cobrarSocio ? (
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-brand/5">
+                <UserCircleIcon className="h-8 w-8 text-brand shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">
+                    {cobrarSocio.firstName} {cobrarSocio.lastName}
+                  </p>
+                  <p className="text-xs text-text-secondary truncate">{cobrarSocio.email}</p>
+                </div>
+                <button type="button" onClick={() => setCobrarSocio(null)} className="p-1 text-text-tertiary hover:text-text-primary">
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <MagnifyingGlassIcon className="h-4 w-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={cobrarQuery}
+                  onChange={(e) => setCobrarQuery(e.target.value)}
+                  placeholder="Buscar por nombre o email"
+                  className="form-input pl-9"
+                  autoFocus
+                />
+                {cobrarResultados.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-white rounded-lg shadow-lg ring-1 ring-black/5 max-h-48 overflow-y-auto">
+                    {cobrarResultados.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => elegirCobrarSocio(u)}
+                        className="w-full text-left px-3 py-2 hover:bg-bg-surface transition-colors"
+                      >
+                        <p className="text-sm text-text-primary">
+                          {u.firstName} {u.lastName}
+                        </p>
+                        <p className="text-xs text-text-tertiary">{u.email}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {cobrarSocio && (
+            <>
+              <div className="rounded-lg bg-bg-surface p-3 text-sm flex items-center justify-between">
+                <span className="text-text-secondary">Saldo actual</span>
+                <span className={`font-semibold ${cobrarSaldo > 0 ? 'text-warning' : 'text-text-primary'}`}>{formatARS(cobrarSaldo)}</span>
+              </div>
+              {cobrarSaldo <= 0 && <p className="text-xs text-text-tertiary">Este socio no tiene saldo pendiente.</p>}
+              <div>
+                <label className="form-label">Monto a cobrar *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={cobrarMonto}
+                  onChange={(e) => setCobrarMonto(e.target.value)}
+                  className="form-input"
+                  placeholder="0"
+                />
+                <p className="text-xs text-text-tertiary mt-1">Puede ser total o parcial.</p>
+              </div>
+              <div>
+                <label className="form-label">Medio</label>
+                <select value={cobrarMedio} onChange={(e) => setCobrarMedio(e.target.value)} className="form-select">
+                  {METODOS_PAGO.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </form>
       </Sidecart>
 
       {/* Anular venta */}
       <Sidecart
         isOpen={!!anulando}
-        onClose={() => { setAnulando(null); setAnularReason('') }}
-        title={`Anular venta #${anulando?.numero || ''}`}
+        onClose={() => {
+          setAnulando(null)
+          setAnularMotivo('')
+        }}
+        title="Anular venta"
+        subtitle={anulando ? formatARS(anulando.total) : ''}
         size="sm"
         footer={
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => { setAnulando(null); setAnularReason('') }} className="btn-secondary">Cancelar</button>
+            <button
+              type="button"
+              onClick={() => {
+                setAnulando(null)
+                setAnularMotivo('')
+              }}
+              className="btn-secondary"
+            >
+              Cancelar
+            </button>
             <button onClick={handleAnular} disabled={enviandoAnular} className="btn-danger disabled:opacity-50">
               {enviandoAnular ? 'Anulando...' : 'Anular venta'}
             </button>
@@ -618,24 +811,16 @@ export default function Caja({ userRole }) {
       >
         <form onSubmit={handleAnular} className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Anular devuelve el stock de los productos de esta venta. No se puede deshacer.
+            Anular devuelve el stock de los productos de esta venta y, si estaba fiada, cancela la deuda. No se puede deshacer.
           </p>
 
           {efectivoDeVenta(anulando) > 0 && (
             <label className="flex items-start gap-2.5 rounded-lg bg-bg-surface p-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={devolverEfectivo}
-                onChange={(e) => setDevolverEfectivo(e.target.checked)}
-                className="mt-0.5"
-              />
+              <input type="checkbox" checked={devolverEfectivo} onChange={(e) => setDevolverEfectivo(e.target.checked)} className="mt-0.5" />
               <span className="text-sm">
-                <span className="text-text-primary">
-                  Devolví {formatARS(efectivoDeVenta(anulando))} en efectivo
-                </span>
+                <span className="text-text-primary">Devolví {formatARS(efectivoDeVenta(anulando))} en efectivo al cliente</span>
                 <span className="block text-xs text-text-tertiary mt-0.5">
-                  Se anota como egreso del turno. Destildalo si la plata no salió del cajón
-                  (por ejemplo, si fue un error de carga).
+                  Destildalo si fue un error de carga y la plata nunca salió del cajón — el cierre lo compensa solo.
                 </span>
               </span>
             </label>
@@ -643,56 +828,23 @@ export default function Caja({ userRole }) {
 
           <div>
             <label className="form-label">Motivo *</label>
-            <textarea
-              required
-              value={anularReason}
-              onChange={(e) => setAnularReason(e.target.value)}
-              className="form-textarea"
-              rows={3}
-              autoFocus
-            />
+            <textarea required value={anularMotivo} onChange={(e) => setAnularMotivo(e.target.value)} className="form-textarea" rows={3} autoFocus />
           </div>
         </form>
       </Sidecart>
 
-      <VenderSidecart
-        isOpen={showVender}
-        onClose={() => setShowVender(false)}
-        sedeId={sedeId}
-        sellerId={profile?.id}
-        cajaAbierta={cajaAbierta}
-        onSold={cargarTurno}
-      />
+      <VenderSidecart isOpen={showVender} onClose={() => setShowVender(false)} sedeId={sedeId} turno={turno} onSold={cargarTurno} />
     </div>
   )
 }
 
 function Stat({ label, value, sub, tone }) {
-  const toneClass = tone === 'warning' ? 'text-warning' : tone === 'brand' ? 'text-brand' : 'text-text-primary'
+  const toneClass = tone === 'warning' ? 'text-warning' : tone === 'success' ? 'text-success' : tone === 'brand' ? 'text-brand' : 'text-text-primary'
   return (
     <div className="card border-0 shadow-none">
       <p className="text-xs text-text-tertiary mb-1">{label}</p>
       <p className={`text-lg font-semibold ${toneClass}`}>{value}</p>
       {sub && <p className="text-xs text-text-tertiary mt-0.5">{sub}</p>}
-    </div>
-  )
-}
-
-function DiferenciaPreview({ esperado, contado }) {
-  const diff = contado - esperado
-  const tone = diff === 0 ? 'bg-bg-surface text-text-secondary' : diff > 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-  return (
-    <div className={`rounded-lg p-3 text-sm ${tone}`}>
-      <div className="flex items-center justify-between">
-        <span>Esperado</span>
-        <span className="font-medium">{formatARS(esperado)}</span>
-      </div>
-      <div className="flex items-center justify-between mt-1">
-        <span>Diferencia</span>
-        <span className="font-semibold">
-          {diff === 0 ? 'Sin diferencia' : diff > 0 ? `Sobran ${formatARS(diff)}` : `Faltan ${formatARS(Math.abs(diff))}`}
-        </span>
-      </div>
     </div>
   )
 }

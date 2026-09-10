@@ -10,31 +10,22 @@ import {
 import toast from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
 import { formatARS } from '../lib/dinero'
-import { supabase } from '../lib/supabase'
 import Sidecart from './Sidecart'
-import cajaService, { METODOS_PAGO } from '../services/cajaService'
+import cajaService, { METODOS_PAGO_VENTA, PRECIOS_PLAN } from '../services/cajaService'
 import productsService from '../services/productsService'
 import membershipPlansService from '../services/membershipPlansService'
 
-// El mostrador: buscar productos/planes, armar el carrito, elegir socio (o consumidor
-// final) y cobrar — con o sin pago partido.
+// El mostrador: buscar productos/planes, armar el carrito, aplicar descuento, elegir socio
+// (o consumidor final) y cobrar — con pago partido en varios medios, o fiado.
 //
-// Va en un Sidecart, no en su propia ruta, por la misma razón que el resto de lo que se
-// crea en el admin (Modal/Sidecart para editar y crear en cualquier pantalla): vender es una
-// ACCIÓN dentro de la pantalla de Caja, no una sección propia que alguien visita sola — nunca
-// se abre "a vender" sin antes tener una caja abierta a la vista. Mantenerla flotando sobre
-// Caja evita perder el resumen del turno de fondo mientras se arma la venta.
-//
-// Decisión a revisar: el precio de un plan en el carrito es el precio BASE del plan
-// (`membership_plans.price`), no el de "precio por método de pago" que usa la renovación
-// normal en Users.jsx — con pago partido no hay un único método al que atarle ese precio
-// diferencial. Si hace falta diferenciar precio por método acá también, es un cambio de
-// producto, no técnico.
-export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, cajaAbierta, onSold }) {
+// Vive en un Sidecart y no en su propia ruta por lo mismo que el resto de lo que se crea en
+// el admin: vender es una ACCIÓN de la pantalla Caja, nunca algo que se visita sin un turno
+// abierto de fondo.
+export default function VenderSidecart({ isOpen, onClose, sedeId, turno, onSold }) {
   const [cargando, setCargando] = useState(false)
   const [productos, setProductos] = useState([])
   const [planes, setPlanes] = useState([])
-  const [tab, setTab] = useState('productos') // 'productos' | 'planes'
+  const [tab, setTab] = useState('productos')
   const [busqueda, setBusqueda] = useState('')
 
   const [carrito, setCarrito] = useState([])
@@ -43,9 +34,14 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
   const [socioQuery, setSocioQuery] = useState('')
   const [socioResultados, setSocioResultados] = useState([])
   const [buscandoSocio, setBuscandoSocio] = useState(false)
+  const [saldoSocio, setSaldoSocio] = useState(0)
 
-  const [pagos, setPagos] = useState([{ method: 'efectivo', amount: '' }])
-  const [notes, setNotes] = useState('')
+  const [descuentoTipo, setDescuentoTipo] = useState('monto') // 'monto' | 'porcentaje'
+  const [descuentoValor, setDescuentoValor] = useState('')
+  const [descuentoMotivo, setDescuentoMotivo] = useState('')
+
+  const [pagos, setPagos] = useState([{ medio: 'efectivo', monto: '' }])
+  const [notas, setNotas] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   const resetForm = useCallback(() => {
@@ -53,8 +49,12 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
     setSocio(null)
     setSocioQuery('')
     setSocioResultados([])
-    setPagos([{ method: 'efectivo', amount: '' }])
-    setNotes('')
+    setSaldoSocio(0)
+    setDescuentoTipo('monto')
+    setDescuentoValor('')
+    setDescuentoMotivo('')
+    setPagos([{ medio: 'efectivo', monto: '' }])
+    setNotas('')
     setBusqueda('')
     setTab('productos')
   }, [])
@@ -79,17 +79,11 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
       setSocioResultados([])
       return
     }
-    const q = socioQuery.trim()
     setBuscandoSocio(true)
     const id = setTimeout(async () => {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('id, first_name, last_name, email, phone, current_membership_id, membership_status')
-          .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`)
-          .limit(8)
-        if (error) throw error
-        setSocioResultados(data || [])
+        const resultados = await cajaService.buscarSocios(socioQuery)
+        setSocioResultados(resultados)
       } catch (err) {
         toast.error(err.message, toastOptions)
       } finally {
@@ -102,7 +96,7 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
   const productosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     if (!q) return productos
-    return productos.filter((p) => p.name.toLowerCase().includes(q))
+    return productos.filter((p) => p.nombre.toLowerCase().includes(q))
   }, [productos, busqueda])
 
   const planesFiltrados = useMemo(() => {
@@ -111,49 +105,53 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
     return planes.filter((p) => p.name.toLowerCase().includes(q))
   }, [planes, busqueda])
 
-  const hayPlanEnCarrito = carrito.some((i) => i.kind === 'plan')
-
   const agregarProducto = (p) => {
     setCarrito((prev) => {
-      const existente = prev.find((i) => i.kind === 'producto' && i.productId === p.id)
+      const existente = prev.find((i) => i.kind === 'producto' && i.productoId === p.id)
       if (existente) {
-        return prev.map((i) =>
-          i.key === existente.key ? { ...i, quantity: i.quantity + 1 } : i
-        )
+        return prev.map((i) => (i.key === existente.key ? { ...i, cantidad: i.cantidad + 1 } : i))
       }
       return [
         ...prev,
         {
           key: `producto-${p.id}`,
           kind: 'producto',
-          productId: p.id,
-          description: p.name,
-          unitPrice: Number(p.price),
-          quantity: 1,
-          tracksStock: p.tracksStock,
-          stockDisponible: p.quantity,
+          productoId: p.id,
+          descripcion: p.nombre,
+          precioUnitario: Number(p.precio),
+          cantidad: 1,
+          llevaStock: p.llevaStock,
+          stockActual: p.stockActual,
         },
       ]
     })
   }
 
   const agregarPlan = (plan) => {
-    if (hayPlanEnCarrito) {
-      toast.error('Ya hay una membresía en el carrito — sólo se puede vender una por venta.', toastOptions)
-      return
-    }
     setCarrito((prev) => [
       ...prev,
       {
-        key: `plan-${plan.id}`,
+        key: `plan-${plan.id}-${Date.now()}`,
         kind: 'plan',
         membershipPlanId: plan.id,
-        description: `Membresía ${plan.name}`,
-        unitPrice: Number(plan.price),
-        quantity: 1,
+        descripcion: `Membresía ${plan.name}`,
+        precioBase: plan,
+        precioTipo: 'priceEfectivo',
+        precioUnitario: Number(plan.priceEfectivo ?? plan.price),
+        cantidad: 1,
         durationMonths: plan.durationMonths,
       },
     ])
+  }
+
+  const cambiarPrecioTipo = (key, tipo) => {
+    setCarrito((prev) =>
+      prev.map((i) => {
+        if (i.key !== key) return i
+        const precio = i.precioBase[tipo] ?? i.precioBase.price
+        return { ...i, precioTipo: tipo, precioUnitario: Number(precio) }
+      })
+    )
   }
 
   const cambiarCantidad = (key, next) => {
@@ -161,69 +159,103 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
       setCarrito((prev) => prev.filter((i) => i.key !== key))
       return
     }
-    setCarrito((prev) => prev.map((i) => (i.key === key ? { ...i, quantity: next } : i)))
+    setCarrito((prev) => prev.map((i) => (i.key === key ? { ...i, cantidad: next } : i)))
   }
 
   const quitarItem = (key) => setCarrito((prev) => prev.filter((i) => i.key !== key))
 
-  const total = carrito.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0)
-  const cobrado = pagos.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
-  const diferencia = total - cobrado
+  const subtotal = carrito.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0)
+  const descuentoMonto = useMemo(() => {
+    const v = Number(descuentoValor) || 0
+    if (v <= 0) return 0
+    return descuentoTipo === 'porcentaje' ? Math.round(subtotal * (v / 100) * 100) / 100 : v
+  }, [descuentoTipo, descuentoValor, subtotal])
+  const total = Math.max(subtotal - descuentoMonto, 0)
+
+  const cobrado = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
+  const diferencia = Math.round((total - cobrado) * 100) / 100
+  const hayFiado = pagos.some((p) => p.medio === 'cuenta_corriente' && Number(p.monto) > 0)
+  const hayPlan = carrito.some((i) => i.kind === 'plan')
 
   const cambiarPago = (idx, campo, valor) => {
     setPagos((prev) => prev.map((p, i) => (i === idx ? { ...p, [campo]: valor } : p)))
   }
 
   const agregarLineaPago = () => {
-    const restante = Math.max(total - cobrado, 0)
-    setPagos((prev) => [...prev, { method: 'efectivo', amount: restante ? String(restante) : '' }])
+    const restante = Math.max(Math.round((total - cobrado) * 100) / 100, 0)
+    setPagos((prev) => [...prev, { medio: 'efectivo', monto: restante ? String(restante) : '' }])
   }
 
   const quitarLineaPago = (idx) => setPagos((prev) => prev.filter((_, i) => i !== idx))
 
-  const elegirSocio = (u) => {
+  const elegirSocio = async (u) => {
     setSocio(u)
     setSocioQuery('')
     setSocioResultados([])
+    try {
+      const saldo = await cajaService.saldoSocio(u.id)
+      setSaldoSocio(saldo)
+    } catch {
+      setSaldoSocio(0)
+    }
   }
 
-  const puedeEnviar = carrito.length > 0 && !enviando && (!hayPlanEnCarrito || !!socio)
+  const puedeEnviar =
+    carrito.length > 0 &&
+    !enviando &&
+    diferencia === 0 &&
+    (!hayPlan || !!socio) &&
+    (!hayFiado || !!socio) &&
+    (descuentoMonto <= 0 || descuentoMotivo.trim())
 
   const handleSubmit = async () => {
     if (!carrito.length) return
-    // Único bloqueo que sí hacemos en el front: la RPC no sabe que un renglón es una
-    // "membresía" en el sentido de negocio (product_id/membership_plan_id le da lo mismo
-    // fiar consumidor final que a un socio), así que esto no está validado del otro lado.
-    if (hayPlanEnCarrito && !socio) {
+    if (hayPlan && !socio) {
       toast.error('Elegí un socio antes de cobrar — la membresía necesita a quién asignarse.', toastOptions)
       return
     }
+    if (hayFiado && !socio) {
+      toast.error('No se puede fiar sin socio — elegí uno o cambiá el medio de pago.', toastOptions)
+      return
+    }
+    if (descuentoMonto > 0 && !descuentoMotivo.trim()) {
+      toast.error('El descuento necesita un motivo.', toastOptions)
+      return
+    }
+    if (diferencia !== 0) {
+      toast.error(
+        diferencia > 0
+          ? `Falta cobrar ${formatARS(diferencia)}.`
+          : `Se cargó ${formatARS(-diferencia)} de más — ajustá los pagos.`,
+        toastOptions
+      )
+      return
+    }
 
-    const pagosValidos = pagos.filter((p) => Number(p.amount) > 0)
+    const pagosValidos = pagos.filter((p) => Number(p.monto) > 0).map((p) => ({ medio: p.medio, monto: Number(p.monto) }))
 
     setEnviando(true)
     try {
-      const venta = await cajaService.registrarVenta({
-        locationId: sedeId,
-        sellerId,
+      await cajaService.registrarVenta({
+        turnoId: turno.id,
         items: carrito.map((i) => ({
-          productId: i.kind === 'producto' ? i.productId : undefined,
-          membershipPlanId: i.kind === 'plan' ? i.membershipPlanId : undefined,
-          description: i.description,
-          unitPrice: i.unitPrice,
-          quantity: i.quantity,
+          tipo: i.kind,
+          id: i.kind === 'producto' ? i.productoId : i.membershipPlanId,
+          cantidad: i.cantidad,
+          precio_unitario: i.precioUnitario,
         })),
-        payments: pagosValidos.map((p) => ({ method: p.method, amount: Number(p.amount) })),
+        pagos: pagosValidos,
         userId: socio?.id || null,
-        notes: notes.trim() || null,
+        descuentoMonto,
+        descuentoMotivo: descuentoMotivo.trim() || null,
+        notas: notas.trim() || null,
       })
-      toast.success(`Venta #${venta.numero} registrada — ${formatARS(venta.total)}`, toastOptions)
+      toast.success(`Venta registrada — ${formatARS(total)}`, toastOptions)
       resetForm()
       onSold?.()
       onClose()
     } catch (err) {
-      // El mensaje ya viene en castellano desde la RPC (o desde cajaService si falló la
-      // membresía) — se muestra tal cual, sin traducir ni resumir.
+      // El motivo ya viene en castellano desde la RPC — se muestra tal cual.
       toast.error(err.message, toastOptions)
     } finally {
       setEnviando(false)
@@ -235,13 +267,23 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
       isOpen={isOpen}
       onClose={onClose}
       title="Vender"
-      subtitle={cajaAbierta ? `Turno abierto — ${cajaAbierta.sellers ? `${cajaAbierta.sellers.firstName} ${cajaAbierta.sellers.lastName}` : ''}` : ''}
+      subtitle={turno ? `Turno abierto` : ''}
       size="xl"
       zIndex={60}
       footer={
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-text-secondary">Total</span>
+            <span className="text-text-secondary">Subtotal</span>
+            <span className="text-text-primary">{formatARS(subtotal)}</span>
+          </div>
+          {descuentoMonto > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-text-secondary">Descuento</span>
+              <span className="text-error">-{formatARS(descuentoMonto)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-text-secondary font-medium">Total</span>
             <span className="font-semibold text-text-primary">{formatARS(total)}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
@@ -250,15 +292,13 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
           </div>
           {diferencia > 0.009 && (
             <div className="flex items-center justify-between text-sm rounded-lg bg-warning/10 px-3 py-2">
-              <span className="text-warning font-medium">
-                {socio ? 'Queda fiado' : 'Falta cobrar'}
-              </span>
+              <span className="text-warning font-medium">Falta asignar</span>
               <span className="text-warning font-semibold">{formatARS(diferencia)}</span>
             </div>
           )}
           {diferencia < -0.009 && (
             <div className="flex items-center justify-between text-sm rounded-lg bg-error/10 px-3 py-2">
-              <span className="text-error font-medium">Se cobró de más</span>
+              <span className="text-error font-medium">Sobra asignado</span>
               <span className="text-error font-semibold">{formatARS(-diferencia)}</span>
             </div>
           )}
@@ -314,7 +354,8 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
           ) : tab === 'productos' ? (
             <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto">
               {productosFiltrados.map((p) => {
-                const sinStock = p.tracksStock && (p.quantity ?? 0) <= 0
+                const reponer = p.llevaStock && p.stockActual <= p.stockMinimo
+                const sinStock = p.llevaStock && p.stockActual <= 0
                 return (
                   <button
                     key={p.id}
@@ -322,11 +363,11 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
                     onClick={() => agregarProducto(p)}
                     className="text-left p-2.5 rounded-lg bg-bg-surface hover:bg-bg-surface-hover transition-colors"
                   >
-                    <p className="text-sm font-medium text-text-primary truncate">{p.name}</p>
-                    <p className="text-xs text-text-secondary">{formatARS(p.price)}</p>
-                    {p.tracksStock && (
-                      <p className={`text-[11px] mt-0.5 ${sinStock ? 'text-error' : 'text-text-tertiary'}`}>
-                        {sinStock ? 'Sin stock' : `${p.quantity} en stock`}
+                    <p className="text-sm font-medium text-text-primary truncate">{p.nombre}</p>
+                    <p className="text-xs text-text-secondary">{formatARS(p.precio)}</p>
+                    {p.llevaStock && (
+                      <p className={`text-[11px] mt-0.5 ${sinStock ? 'text-error' : reponer ? 'text-warning' : 'text-text-tertiary'}`}>
+                        {sinStock ? 'Sin stock' : reponer ? `Reponer — quedan ${p.stockActual}` : `${p.stockActual} en stock`}
                       </p>
                     )}
                   </button>
@@ -346,7 +387,9 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
                   className="text-left p-2.5 rounded-lg bg-bg-surface hover:bg-bg-surface-hover transition-colors"
                 >
                   <p className="text-sm font-medium text-text-primary truncate">{plan.name}</p>
-                  <p className="text-xs text-text-secondary">{formatARS(plan.price)} · {plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'}</p>
+                  <p className="text-xs text-text-secondary">
+                    {formatARS(plan.priceEfectivo ?? plan.price)} · {plan.durationMonths} {plan.durationMonths === 1 ? 'mes' : 'meses'}
+                  </p>
                 </button>
               ))}
               {planesFiltrados.length === 0 && (
@@ -366,36 +409,48 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
           ) : (
             <div className="space-y-1.5">
               {carrito.map((item) => (
-                <div key={item.key} className="flex items-center gap-2 p-2 rounded-lg bg-bg-surface">
+                <div key={item.key} className="flex items-center gap-2 p-2 rounded-lg bg-bg-surface flex-wrap">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-text-primary truncate">{item.description}</p>
-                    <p className="text-xs text-text-tertiary">{formatARS(item.unitPrice)} c/u</p>
+                    <p className="text-sm text-text-primary truncate">{item.descripcion}</p>
+                    {item.kind === 'plan' ? (
+                      <select
+                        value={item.precioTipo}
+                        onChange={(e) => cambiarPrecioTipo(item.key, e.target.value)}
+                        className="text-xs text-text-tertiary bg-transparent border-none p-0 mt-0.5 focus:ring-0"
+                      >
+                        {PRECIOS_PLAN.map((pp) => (
+                          <option key={pp.value} value={pp.value}>
+                            Precio {pp.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-xs text-text-tertiary">{formatARS(item.precioUnitario)} c/u</p>
+                    )}
                   </div>
                   {item.kind === 'producto' ? (
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => cambiarCantidad(item.key, item.quantity - 1)}
+                        onClick={() => cambiarCantidad(item.key, item.cantidad - 1)}
                         className="p-1 rounded-md hover:bg-bg-surface-hover text-text-secondary"
                       >
                         <MinusIcon className="h-3.5 w-3.5" />
                       </button>
-                      <span className="text-sm w-5 text-center">{item.quantity}</span>
+                      <span className="text-sm w-5 text-center">{item.cantidad}</span>
                       <button
                         type="button"
-                        onClick={() => cambiarCantidad(item.key, item.quantity + 1)}
+                        onClick={() => cambiarCantidad(item.key, item.cantidad + 1)}
                         className="p-1 rounded-md hover:bg-bg-surface-hover text-text-secondary"
                       >
                         <PlusIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ) : (
-                    <span className="text-xs text-brand font-medium px-2 py-0.5 rounded-full bg-brand/10">
-                      Membresía
-                    </span>
+                    <span className="text-xs text-brand font-medium px-2 py-0.5 rounded-full bg-brand/10">Membresía</span>
                   )}
                   <span className="text-sm font-semibold text-text-primary w-20 text-right">
-                    {formatARS(item.unitPrice * item.quantity)}
+                    {formatARS(item.precioUnitario * item.cantidad)}
                   </span>
                   <button
                     type="button"
@@ -410,25 +465,60 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
           )}
         </div>
 
+        {/* Descuento */}
+        <div>
+          <p className="text-sm font-medium text-text-primary mb-2">Descuento (opcional)</p>
+          <div className="flex items-center gap-2 mb-2">
+            <select
+              value={descuentoTipo}
+              onChange={(e) => setDescuentoTipo(e.target.value)}
+              className="form-select w-36"
+            >
+              <option value="monto">Monto ($)</option>
+              <option value="porcentaje">Porcentaje (%)</option>
+            </select>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={descuentoValor}
+              onChange={(e) => setDescuentoValor(e.target.value)}
+              placeholder="0"
+              className="form-input flex-1"
+            />
+          </div>
+          {Number(descuentoValor) > 0 && (
+            <input
+              type="text"
+              value={descuentoMotivo}
+              onChange={(e) => setDescuentoMotivo(e.target.value)}
+              placeholder="Motivo del descuento (obligatorio)"
+              className="form-input"
+            />
+          )}
+        </div>
+
         {/* Socio */}
         <div>
           <p className="text-sm font-medium text-text-primary mb-2">
-            Socio {hayPlanEnCarrito && <span className="text-error">— obligatorio, hay una membresía en el carrito</span>}
+            Socio{' '}
+            {(hayPlan || hayFiado) && (
+              <span className="text-error">— obligatorio {hayPlan ? '(hay una membresía en el carrito)' : '(se está fiando)'}</span>
+            )}
           </p>
           {socio ? (
             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-brand/5">
               <UserCircleIcon className="h-8 w-8 text-brand shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">
-                  {socio.first_name} {socio.last_name}
+                  {socio.firstName} {socio.lastName}
                 </p>
                 <p className="text-xs text-text-secondary truncate">{socio.email}</p>
+                {saldoSocio > 0 && (
+                  <p className="text-xs text-warning font-medium mt-0.5">Ya debe {formatARS(saldoSocio)} en cuenta corriente</p>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => setSocio(null)}
-                className="p-1 text-text-tertiary hover:text-text-primary"
-              >
+              <button type="button" onClick={() => setSocio(null)} className="p-1 text-text-tertiary hover:text-text-primary">
                 <XMarkIcon className="h-4 w-4" />
               </button>
             </div>
@@ -439,7 +529,7 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
                 type="text"
                 value={socioQuery}
                 onChange={(e) => setSocioQuery(e.target.value)}
-                placeholder="Buscar socio por nombre o email (dejar vacío = consumidor final)"
+                placeholder="Buscar socio por nombre o email (vacío = consumidor final)"
                 className="form-input pl-9"
               />
               {buscandoSocio && (
@@ -454,7 +544,9 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
                       onClick={() => elegirSocio(u)}
                       className="w-full text-left px-3 py-2 hover:bg-bg-surface transition-colors"
                     >
-                      <p className="text-sm text-text-primary">{u.first_name} {u.last_name}</p>
+                      <p className="text-sm text-text-primary">
+                        {u.firstName} {u.lastName}
+                      </p>
                       <p className="text-xs text-text-tertiary">{u.email}</p>
                     </button>
                   ))}
@@ -470,40 +562,30 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
           <div className="space-y-2">
             {pagos.map((p, idx) => (
               <div key={idx} className="flex items-center gap-2">
-                <select
-                  value={p.method}
-                  onChange={(e) => cambiarPago(idx, 'method', e.target.value)}
-                  className="form-select flex-1"
-                >
-                  {METODOS_PAGO.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                <select value={p.medio} onChange={(e) => cambiarPago(idx, 'medio', e.target.value)} className="form-select flex-1">
+                  {METODOS_PAGO_VENTA.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
                   ))}
                 </select>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={p.amount}
-                  onChange={(e) => cambiarPago(idx, 'amount', e.target.value)}
+                  value={p.monto}
+                  onChange={(e) => cambiarPago(idx, 'monto', e.target.value)}
                   placeholder="0"
                   className="form-input w-28"
                 />
                 {pagos.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => quitarLineaPago(idx)}
-                    className="p-1.5 text-text-tertiary hover:text-error"
-                  >
+                  <button type="button" onClick={() => quitarLineaPago(idx)} className="p-1.5 text-text-tertiary hover:text-error">
                     <TrashIcon className="h-4 w-4" />
                   </button>
                 )}
               </div>
             ))}
-            <button
-              type="button"
-              onClick={agregarLineaPago}
-              className="text-sm text-brand font-medium hover:text-brand-hover"
-            >
+            <button type="button" onClick={agregarLineaPago} className="text-sm text-brand font-medium hover:text-brand-hover">
               + Agregar otro método (pago partido)
             </button>
           </div>
@@ -511,12 +593,7 @@ export default function VenderSidecart({ isOpen, onClose, sedeId, sellerId, caja
 
         <div>
           <label className="form-label">Notas (opcional)</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="form-textarea"
-            rows={2}
-          />
+          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} className="form-textarea" rows={2} />
         </div>
       </div>
     </Sidecart>
