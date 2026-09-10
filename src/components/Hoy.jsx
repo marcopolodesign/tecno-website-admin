@@ -59,7 +59,9 @@ function WhatsappLink({ phone }) {
 }
 
 function formatTime(iso) {
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+  // 24 horas explícito: `es-AR` en Chrome devuelve 12 horas, y un gimnasio que abre a las 6
+  // y cierra a las 23 lee "02:37" como la madrugada.
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatDate(iso) {
