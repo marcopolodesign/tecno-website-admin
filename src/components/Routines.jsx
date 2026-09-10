@@ -14,7 +14,8 @@ import {
   ClockIcon,
   DocumentDuplicateIcon,
   ArrowPathIcon,
-  Bars2Icon
+  Bars2Icon,
+  DevicePhoneMobileIcon,
 } from '@heroicons/react/24/outline'
 import * as Sentry from '@sentry/react'
 import routinesService from '../services/routinesService'
@@ -45,6 +46,7 @@ import PanelSustitutos from './PanelSustitutos'
 import PesoSugerido from './PesoSugerido'
 import RegistrarResultados from './RegistrarResultados'
 import Sidecart from './Sidecart'
+import PreviewApp from './PreviewApp'
 
 // No hay ícono de alfiler/thumbtack en Heroicons — se dibuja a mano, en el mismo estilo
 // (viewBox 24, trazo redondeado) que el resto de los íconos de este panel. Relleno cuando está
@@ -258,7 +260,8 @@ export default function Routines() {
   })
   // La estación que se está viendo/editando en su propio panel (drag para reordenar, cambiar y
   // borrar ejercicios) — distinto del panel de arriba, que es para cargar un ejercicio nuevo.
-  const [estacionAbierta, setEstacionAbierta] = useState(null) // { sessionId, boxNumber } | null
+  const [estacionAbierta, setEstacionAbierta] = useState(null)
+  const [previewEstacion, setPreviewEstacion] = useState(null) // { sessionId, boxNumber } | null // { sessionId, boxNumber } | null
 
   // Expanded sessions
   const [expandedSessions, setExpandedSessions] = useState({})
@@ -329,7 +332,9 @@ export default function Routines() {
       
       // Expand first session by default
       if (data.routineSessions?.length > 0) {
-        setExpandedSessions({ [data.routineSessions[0].id]: true })
+        // La primera por número, no la primera que devuelva la base.
+        const primera = [...data.routineSessions].sort((a, b) => (a.sessionNumber ?? 0) - (b.sessionNumber ?? 0))[0]
+        setExpandedSessions({ [primera.id]: true })
       }
     } catch (error) {
       Sentry.captureException(error, { extra: { context: 'Error fetching routine detail:' } })
@@ -1094,7 +1099,12 @@ export default function Routines() {
                   </div>
 
                   <div className="space-y-3">
-                    {selectedRoutine.routineSessions?.map(session => (
+                    {/* Por número de sesión, no en el orden crudo que devuelva la base: el
+                        select anidado no garantiza orden y la Sesión 1 terminaba última, que es
+                        justo al revés de como se lee una rutina. */}
+                    {[...(selectedRoutine.routineSessions ?? [])]
+                      .sort((a, b) => (a.sessionNumber ?? 0) - (b.sessionNumber ?? 0))
+                      .map(session => (
                       <div key={session.id} className="border border-border-default rounded-lg overflow-hidden">
                         {/* Session Header */}
                         <div 
@@ -1377,6 +1387,34 @@ export default function Routines() {
         )}
         </Sidecart>
       </div>
+
+      {/* Cómo lo ve el socio. Encima del de estación (60) porque se abre desde ahí. */}
+      <Sidecart
+        isOpen={Boolean(previewEstacion)}
+        onClose={() => setPreviewEstacion(null)}
+        zIndex={70}
+        size="md"
+        title="Así lo ve el socio"
+        subtitle={previewEstacion ? `Estación ${previewEstacion.boxNumber}` : undefined}
+        footer={
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setPreviewEstacion(null)} className="btn-secondary">
+              Cerrar
+            </button>
+          </div>
+        }
+      >
+        {previewEstacion && (() => {
+          const filas = filasDeEstacion(previewEstacion.sessionId, previewEstacion.boxNumber)
+          return (
+            <PreviewApp
+              estacion={previewEstacion.boxNumber}
+              filas={filas}
+              formato={filas[0] ? { rondas: filas[0].rondas } : null}
+            />
+          )
+        })()}
+      </Sidecart>
 
       {/* Routine Modal */}
       <Sidecart
@@ -1946,7 +1984,16 @@ export default function Routines() {
         size="md"
         zIndex={60}
         footer={
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <button
+              type="button"
+              onClick={() => setPreviewEstacion(estacionAbierta)}
+              className="btn-secondary flex items-center gap-1.5"
+              title="Ver cómo se ve esta estación en el teléfono del socio"
+            >
+              <DevicePhoneMobileIcon className="h-4 w-4" />
+              Ver en la app
+            </button>
             <button type="button" onClick={() => setEstacionAbierta(null)} className="btn-secondary">
               Cerrar
             </button>
