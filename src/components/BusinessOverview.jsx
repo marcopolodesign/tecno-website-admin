@@ -15,6 +15,7 @@ import { usersService } from '../services/usersService'
 import paymentsService from '../services/paymentsService'
 import membershipsService from '../services/membershipsService'
 import businessMetricsService from '../services/businessMetricsService'
+import cajaService from '../services/cajaService'
 import { BUSINESS_METRICS_REGISTRY } from '../config/businessMetricsCharts'
 import BenchmarksPanel from './business-metrics/BenchmarksPanel'
 import { PERIOD_PRESETS, CUSTOM_PERIOD_ID, resolvePeriod, etiquetaDePeriodo } from '../utils/metricPeriods'
@@ -139,6 +140,10 @@ export default function BusinessOverview() {
     totalRevenue: 0, newCustomersRevenue: 0, renewalsRevenue: 0,
     newCustomersCount: 0, renewalsCount: 0, byMembershipType: {}
   })
+  // Desglose de ingresos por concepto (mostrador + otros canales). Vive aparte de
+  // `revenueStats` porque ése sólo mira `payments`: la plata que entra por caja no pasa por
+  // ahí, así que el total de arriba se toma de esta RPC y no de la suma de pagos.
+  const [ingresosPorConcepto, setIngresosPorConcepto] = useState([])
   const [expiringMemberships, setExpiringMemberships] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -172,13 +177,15 @@ export default function BusinessOverview() {
       leadsService.getLeads(sedeId),
       paymentsService.getRevenueStats(start, end, sedeId),
       membershipsService.getExpiringMemberships(30, sedeId),
-    ]).then(([usersR, prospectsR, leadsR, revenueR, expiringR]) => {
+      cajaService.ingresosPorConcepto({ locationId: sedeId || null, desde: start, hasta: end }),
+    ]).then(([usersR, prospectsR, leadsR, revenueR, expiringR, conceptosR]) => {
       if (cancelled) return
       setUsers(usersR.status === 'fulfilled' ? (usersR.value.data || []) : [])
       setProspects(prospectsR.status === 'fulfilled' ? (prospectsR.value.data || []) : [])
       setLeads(leadsR.status === 'fulfilled' ? (leadsR.value.data || []) : [])
       setRevenueStats(revenueR.status === 'fulfilled' ? (revenueR.value.data || {}) : {})
       setExpiringMemberships(expiringR.status === 'fulfilled' ? (expiringR.value.data || []) : [])
+      setIngresosPorConcepto(conceptosR.status === 'fulfilled' ? (conceptosR.value || []) : [])
       setLoading(false)
     })
 
@@ -236,6 +243,18 @@ export default function BusinessOverview() {
   const selectedTypeConfig = selectedMembershipType ? MEMBERSHIP_TYPE_CONFIG[selectedMembershipType] : null
 
   const ctx = { sedeId, start, end, benchmarks }
+  // Total del período = lo que devuelve la RPC de conceptos, no la suma de `payments`:
+  // incluye lo cobrado por mostrador y descuenta lo que quedó fiado. Los conceptos en cero
+  // no se muestran — una fila "$0" sólo ocupa lugar.
+  const ingresos = useMemo(() => {
+    const filas = ingresosPorConcepto.filter((r) => r.total > 0 || r.cantidad > 0)
+    return {
+      filas,
+      total: ingresosPorConcepto.reduce((acc, r) => acc + r.total, 0),
+      cantidad: ingresosPorConcepto.reduce((acc, r) => acc + r.cantidad, 0),
+    }
+  }, [ingresosPorConcepto])
+
   const periodoLabel = etiquetaDePeriodo(periodId, rangoCustom)
 
   if (loading) {
@@ -385,10 +404,10 @@ export default function BusinessOverview() {
           <div className="bg-bg-secondary/50 rounded-lg p-4">
             <p className="text-xs font-medium text-text-tertiary mb-1">Ingresos Totales</p>
             <p className="text-2xl font-semibold text-brand">
-              ${revenueStats.totalRevenue?.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || '0'}
+              ${ingresos.total.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </p>
             <p className="text-xs text-text-tertiary mt-1">
-              {(revenueStats.newCustomersCount || 0) + (revenueStats.renewalsCount || 0)} pagos
+              {ingresos.cantidad} cobros · mostrador y otros canales
             </p>
           </div>
 
@@ -414,6 +433,27 @@ export default function BusinessOverview() {
             <p className="text-xs text-text-tertiary mt-1">{revenueStats.renewalsCount || 0} renovaciones</p>
           </div>
         </div>
+
+        {ingresos.filas.length > 0 && (
+          <div className="mt-4 bg-bg-secondary/50 rounded-lg p-4">
+            <p className="text-xs font-semibold text-text-secondary mb-3">De dónde vino la plata</p>
+            <div className="space-y-2">
+              {ingresos.filas.map((fila) => (
+                <div key={fila.concepto} className="flex items-center justify-between text-sm">
+                  <span className="text-text-secondary">
+                    {fila.concepto}
+                    <span className="text-text-tertiary text-xs ml-2">
+                      {fila.cantidad} {fila.cantidad === 1 ? 'cobro' : 'cobros'}
+                    </span>
+                  </span>
+                  <span className="font-medium text-text-primary">
+                    ${fila.total.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {Object.keys(revenueStats.byMembershipType || {}).length > 0 && (
           <div className="mt-4 bg-bg-secondary/50 rounded-lg p-4">

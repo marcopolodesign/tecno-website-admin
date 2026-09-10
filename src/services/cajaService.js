@@ -213,6 +213,25 @@ const cajaService = {
     return toCamelCase(data)
   },
 
+  // Ingresos del período desglosados por concepto — productos y membresías vendidos por
+  // mostrador, membresías cobradas por otros canales, y los ingresos de caja que no son
+  // una venta (ej. saldar una cuenta corriente vieja). Lo fiado NO cuenta: la RPC resta
+  // los pagos con medio `cuenta_corriente`, porque esa plata todavía no entró.
+  // (`20260909232000_ingresos_con_caja.sql`)
+  async ingresosPorConcepto({ locationId = null, desde = null, hasta = null } = {}) {
+    const { data, error } = await supabase.rpc('rpc_ingresos_periodo', {
+      p_location_id: locationId,
+      p_start: desde,
+      p_end: hasta,
+    })
+    if (error) throw new Error(error.message)
+    return (data || []).map((r) => ({
+      concepto: r.concepto,
+      total: Number(r.total) || 0,
+      cantidad: Number(r.cantidad) || 0,
+    }))
+  },
+
   // Buscador de socios para asignar una venta o cobrar cuenta corriente.
   async buscarSocios(query) {
     const q = (query || '').trim()

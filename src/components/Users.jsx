@@ -1143,7 +1143,7 @@ const Users = () => {
                 <div className="border-t border-border-default pt-4">
                   <label className="text-sm font-medium text-text-tertiary">Fecha de conversión</label>
                   <p className="text-text-primary">
-                    {new Date(selectedUser.convertedAt).toLocaleString('es-AR')}
+                    {new Date(selectedUser.convertedAt).toLocaleString('es-AR', { hour12: false })}
                   </p>
                 </div>
 

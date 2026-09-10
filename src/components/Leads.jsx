@@ -796,7 +796,7 @@ const Leads = ({ userRole }) => {
             <div className="border-t border-border-default pt-4">
               <label className="text-sm font-medium text-text-tertiary">Fecha de envío</label>
               <p className="text-text-primary">
-                {new Date(selectedLead.submittedAt).toLocaleString('es-AR')}
+                {new Date(selectedLead.submittedAt).toLocaleString('es-AR', { hour12: false })}
               </p>
             </div>
 
@@ -804,7 +804,7 @@ const Leads = ({ userRole }) => {
               <div>
                 <label className="text-sm font-medium text-text-tertiary">Último contacto</label>
                 <p className="text-text-primary">
-                  {new Date(selectedLead.lastContactedAt).toLocaleString('es-AR')}
+                  {new Date(selectedLead.lastContactedAt).toLocaleString('es-AR', { hour12: false })}
                 </p>
               </div>
             )}

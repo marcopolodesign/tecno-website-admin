@@ -513,7 +513,7 @@ const Prospects = () => {
                 <div className="border-t border-border-default pt-4">
                   <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Fecha de captura</label>
                   <p className="text-sm text-text-primary mt-1">
-                    {new Date(selectedProspect.capturedAt).toLocaleString('es-AR')}
+                    {new Date(selectedProspect.capturedAt).toLocaleString('es-AR', { hour12: false })}
                   </p>
                 </div>
 

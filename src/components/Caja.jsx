@@ -374,7 +374,7 @@ export default function Caja({ userRole }) {
                 Turno abierto por {turno.abiertoPorSeller ? `${turno.abiertoPorSeller.firstName} ${turno.abiertoPorSeller.lastName}` : '—'}
               </p>
               <p className="text-xs text-text-tertiary mt-0.5">
-                Desde {new Date(turno.abiertoAt).toLocaleString('es-AR')} · Apertura {formatARS(turno.montoInicial)}
+                Desde {new Date(turno.abiertoAt).toLocaleString('es-AR', { hour12: false })} · Apertura {formatARS(turno.montoInicial)}
               </p>
             </div>
             {puedeOperarCaja && (
@@ -460,7 +460,7 @@ export default function Caja({ userRole }) {
                   <tbody>
                     {ventas.map((v) => (
                       <tr key={v.id} className="table-row">
-                        <td className="table-cell">{new Date(v.createdAt).toLocaleTimeString('es-AR')}</td>
+                        <td className="table-cell">{new Date(v.createdAt).toLocaleTimeString('es-AR', { hour12: false })}</td>
                         <td className={`table-cell ${v.estado === 'anulada' ? 'line-through text-text-tertiary' : ''}`}>{descripcionVenta(v)}</td>
                         <td className="table-cell">{v.socio ? `${v.socio.firstName} ${v.socio.lastName}` : 'Consumidor final'}</td>
                         <td className="table-cell">{mediosVenta(v)}</td>
@@ -505,7 +505,7 @@ export default function Caja({ userRole }) {
                   const diff = Number(h.diferencia)
                   return (
                     <tr key={h.id} className="table-row">
-                      <td className="table-cell">{new Date(h.cerradoAt).toLocaleString('es-AR')}</td>
+                      <td className="table-cell">{new Date(h.cerradoAt).toLocaleString('es-AR', { hour12: false })}</td>
                       <td className="table-cell">{h.abiertoPorSeller ? `${h.abiertoPorSeller.firstName} ${h.abiertoPorSeller.lastName}` : '—'}</td>
                       <td className="table-cell">{h.cerradoPorSeller ? `${h.cerradoPorSeller.firstName} ${h.cerradoPorSeller.lastName}` : '—'}</td>
                       <td className={`table-cell font-medium ${Math.abs(diff) < 0.01 ? '' : diff > 0 ? 'text-success' : 'text-error'}`}>
