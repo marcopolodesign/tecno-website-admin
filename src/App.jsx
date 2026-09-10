@@ -6,6 +6,7 @@ import Hoy from './components/Hoy'
 import Funnel from './components/Funnel'
 import Caja from './components/Caja'
 import Productos from './components/Productos'
+import Configuracion from './components/Configuracion'
 import Deuda from './components/Deuda'
 import BusinessOverview from './components/BusinessOverview'
 import Prospects from './components/Prospects'
@@ -125,7 +126,7 @@ function App() {
     // Coach - has access to fitness features (but only if email is allowed)
     if (role === 'coach') {
       // Caja/Productos/Deuda son mostrador — de recepción y administración, no del piso.
-      if (['/negocio', '/hoy', '/leads', '/prospects', '/funnel', '/caja', '/productos', '/deuda'].includes(route)) return false
+      if (['/negocio', '/hoy', '/leads', '/prospects', '/funnel', '/caja', '/productos', '/deuda', '/configuracion'].includes(route)) return false
       return true // Access to users, content
     }
 
@@ -243,6 +244,9 @@ function AuthenticatedShell({
               )}
               {canAccess('/deuda') && (
                 <Route path="/deuda" element={<Deuda />} />
+              )}
+              {canAccess('/configuracion') && (
+                <Route path="/configuracion" element={<Configuracion />} />
               )}
               {canAccess('/negocio') && (
                 <Route path="/negocio" element={<BusinessOverview />} />

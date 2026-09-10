@@ -68,6 +68,29 @@ export const hoyService = {
     return data || []
   },
 
+  // Quién está en la sala AHORA: en la cola esperando o ya adentro de un box. Los tres
+  // estados van juntos a propósito — para recepción "está acá" es lo mismo si espera turno
+  // o si está entrenando; lo que importa es que la persona se puede cruzar en el mostrador.
+  // `queue_entries` tiene `location_id` propio, así que no hace falta pasar por la línea.
+  async getEnSalaAhora({ sedeId } = {}) {
+    let query = supabase
+      .from('queue_entries')
+      .select('id, user_id, status, users (id, first_name, last_name, phone)')
+      .in('status', ['waiting', 'confirming', 'in_box'])
+    if (sedeId) query = query.eq('location_id', sedeId)
+
+    const { data, error } = await query
+    if (error) throw error
+    return (data || [])
+      .filter((e) => e.user_id)
+      .map((e) => ({
+        userId: e.user_id,
+        status: e.status,
+        nombre: e.users ? `${e.users.first_name} ${e.users.last_name}` : 'Socio',
+        phone: e.users?.phone ?? null,
+      }))
+  },
+
   async getMembresiasPorVencer({ sedeId, days = 30 } = {}) {
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)

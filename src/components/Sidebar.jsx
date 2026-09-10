@@ -7,12 +7,8 @@ import {
   EnvelopeIcon,
   UserCircleIcon,
   FunnelIcon,
-  UsersIcon,
-  AcademicCapIcon,
   MapPinIcon,
-  CreditCardIcon,
   XMarkIcon,
-  QrCodeIcon,
   ClockIcon,
   CalendarDaysIcon,
   // Fitness icons
@@ -31,8 +27,6 @@ import {
   UserGroupIcon,
   ChartBarSquareIcon,
   BanknotesIcon,
-  CubeIcon,
-  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline'
 
 // Emails allowed to see fitness section (beta feature)
@@ -47,32 +41,40 @@ const hoyNav = [
   { name: 'Hoy', href: '/hoy', icon: HomeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
 ]
 
-// La caja se abre y se cierra todos los días: es operación, no configuración. Por eso tiene
-// grupo propio y no vive dentro de "Sede", que es lo que se toca de vez en cuando.
-const cajaNav = [
-  { name: 'Caja', href: '/caja', icon: BanknotesIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-  { name: 'Productos', href: '/productos', icon: CubeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-  { name: 'Deuda', href: '/deuda', icon: ReceiptPercentIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-]
-
-// El recorrido de una persona, en orden: primero es un lead, después un prospecto que dejó
-// sus datos, después un socio. El Funnel es esa misma historia mirada de arriba.
+// El orden es el del embudo (Mateo, 2026-09-10), no el histórico: primero el prospecto
+// —alguien que apareció pero todavía no dejó sus datos—, después el lead, después el socio.
+// El Embudo es esa misma historia mirada de arriba, así que cierra la lista. Es el mismo
+// orden que muestra /funnel, y que el menú lo contradijera obligaba a traducir dos veces.
 const usuariosNav = [
-  { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Prospects', href: '/prospects', icon: EnvelopeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Leads', href: '/leads', icon: FunnelIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Socios', href: '/users', icon: UserCircleIcon, roles: ['super_admin', 'admin', 'front_desk', 'coach'] },
   { name: 'Embudo', href: '/funnel', icon: ChartBarSquareIcon, roles: ['super_admin', 'admin', 'front_desk'] },
 ]
 
-// Lo que hace funcionar la sede todos los días: con qué se cobra, quién atiende, quién entra.
+// Sede queda en cuatro items (estructura de Mateo, 2026-09-10): las tres cosas que se
+// hacen todos los días —cobrar, ver quién entró, quién trabaja en cada turno— y una puerta
+// a los catálogos, que se cargan una vez. Antes eran ocho items donde Membresías pesaba lo
+// mismo que Caja; ahora cada uno es una decisión distinta.
+//
+// Deuda salió del menú a propósito: es la contracara del fiado, así que se entra desde
+// Caja, que es donde se fía y donde se cobra. Un item suelto llamado "Deuda" no le dice a
+// recepción cuándo lo tiene que abrir.
+//
+// `subrutas` son las pantallas que dejaron de tener item propio: mientras estás en una, el
+// menú marca de dónde colgás. Sin eso, entrar a Productos apaga todo el menú y no se
+// entiende por dónde volver.
 const sedeNav = [
-  { name: 'Membresías', href: '/membership-plans', icon: CreditCardIcon, roles: ['super_admin', 'admin'] },
-  { name: 'Vendedores', href: '/sellers', icon: UsersIcon, roles: ['super_admin', 'admin'] },
-  { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
-  // Va pegado a Coaches y Vendedores porque es sobre ellos: qué turno hace cada uno.
-  { name: 'Horas', href: '/horas', icon: CalendarDaysIcon, roles: ['super_admin', 'admin'] },
-  { name: 'Check-in', href: '/check-in', icon: QrCodeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Caja', href: '/caja', icon: BanknotesIcon, subrutas: ['/deuda'], roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Accesos', href: '/access-logs', icon: ClockIcon, roles: ['super_admin', 'admin'] },
+  { name: 'Horas', href: '/horas', icon: CalendarDaysIcon, roles: ['super_admin', 'admin'] },
+  {
+    name: 'Configuración',
+    href: '/configuracion',
+    icon: Cog6ToothIcon,
+    subrutas: ['/membership-plans', '/sellers', '/coaches', '/productos', '/check-in'],
+    roles: ['super_admin', 'admin'],
+  },
 ]
 
 // Cosas que se tocan una vez y afectan a todos: el sitio público y el alta de sedes nuevas.
@@ -113,7 +115,6 @@ const ESPACIOS = [
     icono: BuildingStorefrontIcon,
     grupos: [
       { items: hoyNav },
-      { titulo: 'Caja', items: cajaNav },
       { titulo: 'Usuarios', items: usuariosNav },
       { titulo: 'Sede', items: sedeNav },
       { titulo: 'Super Admin', items: superAdminNav },
@@ -162,9 +163,13 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLog
   // Which space you are in is read from the URL, not remembered separately. Land on
   // /catalogo from a link or a refresh and the sidebar is already showing Fitness — a
   // stored preference would sooner or later disagree with the page you are looking at.
+  const enItem = (item, pathname) =>
+    pathname === item.href || (item.subrutas || []).some((r) => pathname === r || pathname.startsWith(`${r}/`))
+
   const espacioActual =
-    espacios.find((e) => e.grupos.some((g) => g.items.some((i) => location.pathname.startsWith(i.href)))) ??
-    espacios[0]
+    espacios.find((e) =>
+      e.grupos.some((g) => g.items.some((i) => location.pathname.startsWith(i.href) || enItem(i, location.pathname)))
+    ) ?? espacios[0]
 
   useEffect(() => {
     if (!abierto) return
@@ -284,7 +289,7 @@ const Sidebar = ({ userRole, userEmail, mobileMenuOpen, onCloseMobileMenu, onLog
           <div key={grupo.titulo ?? `grupo-${i}`} className="space-y-0.5">
             {grupo.titulo && <div className="sidebar-section">{grupo.titulo}</div>}
             {grupo.items.map((item) => {
-              const isActive = location.pathname === item.href
+              const isActive = enItem(item, location.pathname)
               return (
                 <Link
                   key={item.name}

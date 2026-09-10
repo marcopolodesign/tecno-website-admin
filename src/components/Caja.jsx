@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   LockOpenIcon,
   LockClosedIcon,
@@ -10,6 +11,7 @@ import {
   MagnifyingGlassIcon,
   UserCircleIcon,
   XMarkIcon,
+  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
@@ -73,9 +75,37 @@ export default function Caja({ userRole }) {
   const [devolverEfectivo, setDevolverEfectivo] = useState(true)
   const [enviandoAnular, setEnviandoAnular] = useState(false)
 
+  const puedeOperarCaja = ['super_admin', 'admin', 'front_desk'].includes(userRole)
+
   useEffect(() => {
     authService.getCurrentUserProfile().then(setProfile).catch(() => setProfile(null))
   }, [])
+
+  // El módulo de caja de la pantalla Hoy manda acá con `?accion=` y el sidecart correcto ya
+  // abierto — un click, igual que si el botón viviera allá. La alternativa era duplicar el
+  // motor de venta en Hoy, que es exactamente lo que ya salió mal una vez (dos sesiones
+  // construyeron la caja entera en paralelo). Una sola implementación, dos puertas.
+  //
+  // Se espera a que termine de cargar: abrir "vender" antes de saber si hay turno mostraría
+  // un carrito que no se puede cobrar. Y el parámetro se consume una sola vez, para que un
+  // refresh o un "atrás" no lo vuelvan a disparar.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (loading) return
+    const accion = searchParams.get('accion')
+    if (!accion) return
+
+    if (accion === 'abrir' && !turno && puedeOperarCaja) setShowAbrir(true)
+    if (turno && puedeOperarCaja) {
+      if (accion === 'vender') setShowVender(true)
+      if (accion === 'movimiento') setShowMovimiento(true)
+      if (accion === 'cobrar') setShowCobrar(true)
+      if (accion === 'cerrar') setShowCerrar(true)
+    }
+
+    searchParams.delete('accion')
+    setSearchParams(searchParams, { replace: true })
+  }, [loading, turno, puedeOperarCaja, searchParams, setSearchParams])
 
   const cargarTurno = useCallback(async () => {
     if (!sedeId) return
@@ -282,8 +312,6 @@ export default function Caja({ userRole }) {
     }
   }
 
-  const puedeOperarCaja = ['super_admin', 'admin', 'front_desk'].includes(userRole)
-
   const descripcionVenta = (v) => (v.cajaVentaItems || []).map((i) => i.descripcion).join(', ') || '—'
   const mediosVenta = (v) =>
     (v.cajaVentaPagos || [])
@@ -307,8 +335,15 @@ export default function Caja({ userRole }) {
           <h1 className="text-xl font-semibold text-text-primary">Caja</h1>
           <p className="text-sm text-text-secondary mt-1">{sede?.name || 'Sede'}</p>
         </div>
-        {turno && puedeOperarCaja && (
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Deuda salió del menú: es la contracara del fiado, y se fía acá. Estaba suelto
+              arriba de todo sin decir cuándo abrirlo. */}
+          <Link to="/deuda" className="btn-secondary flex items-center gap-2">
+            <ReceiptPercentIcon className="h-4 w-4" />
+            Deuda
+          </Link>
+          {turno && puedeOperarCaja && (
+            <>
             <button onClick={() => setShowMovimiento(true)} className="btn-secondary">
               Ingreso / Egreso
             </button>
@@ -319,8 +354,9 @@ export default function Caja({ userRole }) {
               <ShoppingCartIcon className="h-4 w-4" />
               Vender
             </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {error && (

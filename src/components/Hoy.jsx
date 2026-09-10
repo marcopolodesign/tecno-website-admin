@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CalendarDaysIcon,
@@ -6,17 +6,31 @@ import {
   PhoneIcon,
   ChevronRightIcon,
   CheckCircleIcon,
+  BanknotesIcon,
+  LockOpenIcon,
+  LockClosedIcon,
+  ShoppingCartIcon,
 } from '@heroicons/react/24/outline'
 import { useSede } from '../contexts/SedeContext'
+import { formatARS } from '../lib/dinero'
 import hoyService from '../services/hoyService'
+import cajaService from '../services/cajaService'
 import QueueMonitor from './QueueMonitor'
 import Sidecart from './Sidecart'
 
-// La portada del día a día del gimnasio — lo primero que ve el dueño/staff al entrar. Orden
-// pedido: 1) estado de la sala ahora mismo (estaciones + lista de espera, reusando
-// QueueMonitor tal cual), 2) quién ya entró hoy, 3) clases de prueba de hoy, 4) alertas que
-// requieren una acción. Sin props — lee la sede del contexto global (useSede), igual que el
-// resto de las pantallas que filtran por sede.
+// La portada del día a día del gimnasio — lo primero que ve el dueño/staff al entrar.
+//
+// Orden definido por Mateo (2026-09-10), y cada salto tiene un porqué:
+//   1. Alertas — arriba de todo. Son lo único que pide una acción hoy; abajo del fold nadie
+//      las miraba, que es lo mismo que no tenerlas.
+//   2. Estaciones y lista de espera (QueueMonitor tal cual) — el estado de la sala ahora.
+//   3. Clases de prueba de hoy — arriba de asistidos: una clase de prueba es alguien que
+//      todavía se puede perder, un asistido ya entró. Lo que se puede cambiar va primero.
+//   4. Caja — el mostrador, que es donde vive recepción todo el día.
+//   5. Asistidos hoy — registro, no decisión. Cierra la pantalla.
+//
+// Sin props: lee la sede del contexto global (useSede), igual que el resto de las pantallas
+// que filtran por sede.
 const MEMBERSHIP_EXPIRING_DAYS = 30
 
 function waHref(phone) {
@@ -130,6 +144,149 @@ function AlertCard({ tone, icon: Icon, loading, error, count, title, description
   )
 }
 
+const RIESGO_LABEL = { high_risk: 'Alto riesgo', risk: 'Riesgo' }
+const EN_SALA_LABEL = { waiting: 'esperando turno', confirming: 'confirmando', in_box: 'entrenando' }
+
+// Módulo de caja de la portada (pedido de Mateo, 2026-09-10): recepción trabaja todo el día
+// en esta pantalla, y tener que irse a /caja para ver cuánto lleva el turno o cobrar algo es
+// un viaje de ida y vuelta cada vez.
+//
+// Los botones no reimplementan la caja: llevan a /caja con el sidecart correspondiente ya
+// abierto (`?accion=`). Es un click igual que si el botón viviera acá, y el motor de venta
+// —cinco tablas en una transacción— queda con una sola implementación. Duplicarlo es
+// exactamente lo que ya salió mal una vez.
+//
+// Nunca se muestra el efectivo esperado: el arqueo es a ciegas y `caja_resumen_turno` ni
+// siquiera lo trae. Lo que se ve acá es lo vendido, que es otra cosa.
+function CajaModulo({ turno, resumen, loading, error, enRiesgoEnSala }) {
+  const hayAlerta = enRiesgoEnSala.length > 0
+
+  return (
+    <div className="card border-0 shadow-none">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Caja</h2>
+          <p className="text-xs text-text-tertiary mt-0.5">
+            {turno
+              ? `Turno abierto por ${turno.abiertoPorSeller ? `${turno.abiertoPorSeller.firstName} ${turno.abiertoPorSeller.lastName}` : '—'} · desde ${formatTime(turno.abiertoAt)} · apertura ${formatARS(turno.montoInicial)}`
+              : 'El mostrador del día'}
+          </p>
+        </div>
+        <Link to="/caja" className="text-sm text-brand hover:underline shrink-0">
+          Ver caja
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="h-20 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : error ? (
+        <ErrorNotice error={error} />
+      ) : !turno ? (
+        <div className="text-center py-6">
+          <BanknotesIcon className="h-8 w-8 text-text-tertiary mx-auto mb-2" />
+          <p className="text-sm text-text-primary font-medium">No hay una caja abierta</p>
+          <p className="text-xs text-text-secondary mt-1 mb-4">Abrila para empezar a vender y cobrar</p>
+          <Link to="/caja?accion=abrir" className="btn-primary inline-flex items-center gap-2">
+            <LockOpenIcon className="h-4 w-4" />
+            Abrir caja
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="rounded-lg bg-bg-surface p-3">
+              <p className="text-xs text-text-tertiary">Total vendido</p>
+              <p className="text-2xl font-semibold text-text-primary mt-0.5">
+                {formatARS(resumen?.totalVendido ?? 0)}
+              </p>
+              <p className="text-xs text-text-tertiary mt-0.5">
+                {Number(resumen?.ventasCount ?? 0)} venta{Number(resumen?.ventasCount) === 1 ? '' : 's'}
+              </p>
+            </div>
+            <div className="rounded-lg bg-bg-surface p-3">
+              <p className="text-xs text-text-tertiary">Fiado del turno</p>
+              <p className={`text-xl font-semibold mt-0.5 ${Number(resumen?.fiado ?? 0) > 0 ? 'text-warning' : 'text-text-primary'}`}>
+                {formatARS(resumen?.fiado ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-bg-surface p-3">
+              <p className="text-xs text-text-tertiary">Ingresos / egresos</p>
+              <p className="text-xl font-semibold text-text-primary mt-0.5">
+                {formatARS(resumen?.ingresosExtra ?? 0)} / {formatARS(resumen?.egresos ?? 0)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap mt-4">
+            <Link to="/caja?accion=vender" className="btn-primary flex items-center gap-2">
+              <ShoppingCartIcon className="h-4 w-4" />
+              Vender
+            </Link>
+            <Link to="/caja?accion=movimiento" className="btn-secondary">
+              Ingreso / Egreso
+            </Link>
+            <Link to="/caja?accion=cobrar" className="btn-secondary">
+              Cobrar cuenta corriente
+            </Link>
+            <Link to="/caja?accion=cerrar" className="btn-secondary flex items-center gap-2">
+              <LockClosedIcon className="h-4 w-4" />
+              Cerrar caja
+            </Link>
+          </div>
+        </>
+      )}
+
+      {/* Sólo si se da la condición: alguien que está en la sala AHORA y además viene con
+          riesgo de no renovar. Es el único momento en que recepción lo tiene enfrente y
+          puede hacer algo — mañana es una llamada, hoy es una conversación en el mostrador.
+          Si no hay nadie así, el bloque no existe: una tarjeta vacía que dice "no hay nadie
+          en riesgo" entrena a la gente a ignorar el lugar donde después sí aparece uno. */}
+      {hayAlerta && (
+        <div className="mt-4 rounded-lg bg-error/5 p-4">
+          <div className="flex items-start gap-2">
+            <ExclamationTriangleIcon className="h-4 w-4 text-error shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error">
+                {enRiesgoEnSala.length === 1
+                  ? 'Hay alguien en la sala con riesgo de no renovar'
+                  : `Hay ${enRiesgoEnSala.length} personas en la sala con riesgo de no renovar`}
+              </p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Está acá ahora. Es el momento de hablarle.
+              </p>
+              <div className="space-y-1 mt-3">
+                {enRiesgoEnSala.map((r) => (
+                  <div key={r.userId} className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-md bg-bg-surface">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="text-text-primary truncate">{r.nombre}</span>
+                      <WhatsappLink phone={r.phone} />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-text-tertiary">
+                        {EN_SALA_LABEL[r.status] || 'en la sala'}
+                        {r.daysSinceLastVisit != null ? ` · ${r.daysSinceLastVisit} días sin venir` : ''}
+                      </span>
+                      <span
+                        className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          r.riskBucket === 'high_risk' ? 'bg-error/10 text-error' : 'bg-warning/10 text-warning'
+                        }`}
+                      >
+                        {RIESGO_LABEL[r.riskBucket] || 'Riesgo'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Cada sidecart de alerta pide sus datos recién al abrirse — el resumen ya trajo el
 // contador, no hace falta bajar las tres listas completas si nadie las mira.
 function useLazyList(fetcher) {
@@ -164,6 +321,16 @@ export default function Hoy() {
   const [clasesLoading, setClasesLoading] = useState(true)
   const [clasesError, setClasesError] = useState(null)
 
+  const [caja, setCaja] = useState({ turno: null, resumen: null })
+  const [cajaLoading, setCajaLoading] = useState(true)
+  const [cajaError, setCajaError] = useState(null)
+
+  // Estas dos se piden siempre, no de forma lazy como las listas de las alertas: el módulo
+  // de caja necesita cruzarlas para saber si tiene que mostrar el aviso, y no se puede
+  // decidir si mostrarlo sin tener las dos.
+  const [enSala, setEnSala] = useState([])
+  const [riesgo, setRiesgo] = useState([])
+
   const [activeSidecart, setActiveSidecart] = useState(null) // 'membresias' | 'leads' | 'riesgo' | null
 
   const membresiasList = useLazyList(useCallback(() => hoyService.getMembresiasPorVencer({ sedeId, days: MEMBERSHIP_EXPIRING_DAYS }), [sedeId]))
@@ -190,6 +357,32 @@ export default function Hoy() {
       .finally(() => setAsistidosLoading(false))
   }, [sedeId])
 
+  const fetchCaja = useCallback(() => {
+    if (!sedeId) {
+      setCaja({ turno: null, resumen: null })
+      setCajaLoading(false)
+      return
+    }
+    setCajaLoading(true)
+    setCajaError(null)
+    cajaService
+      .getTurnoAbierto(sedeId)
+      .then(async (turno) => {
+        const resumen = turno ? await cajaService.resumenTurno(turno.id) : null
+        setCaja({ turno, resumen })
+      })
+      .catch(setCajaError)
+      .finally(() => setCajaLoading(false))
+  }, [sedeId])
+
+  // El aviso de "está acá y se está por ir" sale del cruce de dos cosas que ya existían por
+  // separado y nunca se habían mirado juntas. Si cualquiera de las dos falla, el aviso
+  // simplemente no aparece: es información extra, no puede tirar abajo la portada.
+  const fetchRiesgoEnSala = useCallback(() => {
+    hoyService.getEnSalaAhora({ sedeId }).then(setEnSala).catch(() => setEnSala([]))
+    hoyService.getSociosEnRiesgo({ sedeId }).then(setRiesgo).catch(() => setRiesgo([]))
+  }, [sedeId])
+
   const fetchClases = useCallback(() => {
     setClasesLoading(true)
     setClasesError(null)
@@ -204,7 +397,28 @@ export default function Hoy() {
     fetchResumen()
     fetchAsistidos()
     fetchClases()
-  }, [fetchResumen, fetchAsistidos, fetchClases])
+    fetchCaja()
+    fetchRiesgoEnSala()
+  }, [fetchResumen, fetchAsistidos, fetchClases, fetchCaja, fetchRiesgoEnSala])
+
+  const enRiesgoEnSala = useMemo(() => {
+    if (enSala.length === 0 || riesgo.length === 0) return []
+    const porUsuario = new Map(riesgo.map((r) => [r.user_id, r]))
+    // Una misma persona no puede aparecer dos veces aunque tenga más de una entrada en la
+    // cola (pasa si se saltea un box y vuelve a entrar).
+    const porPersona = new Map()
+    enSala.forEach((p) => {
+      const r = porUsuario.get(p.userId)
+      if (!r || porPersona.has(p.userId)) return
+      porPersona.set(p.userId, {
+        ...p,
+        phone: p.phone ?? r.phone ?? null,
+        riskBucket: r.risk_bucket,
+        daysSinceLastVisit: r.days_since_last_visit,
+      })
+    })
+    return [...porPersona.values()]
+  }, [enSala, riesgo])
 
   const openSidecart = (key, list) => {
     setActiveSidecart(key)
@@ -221,42 +435,50 @@ export default function Hoy() {
         </p>
       </div>
 
-      {/* 1-2. Estado de la sala ahora mismo: estaciones y, dentro de cada línea, la lista de
+      {/* 1. Alertas — lo único que pide una acción hoy, así que va arriba de todo.
+          Cada una abre la lista filtrada correspondiente. */}
+      <div>
+        <h2 className="text-sm font-semibold text-text-primary mb-3">Alertas</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <AlertCard
+            tone="warning"
+            icon={CalendarDaysIcon}
+            loading={resumenLoading}
+            error={resumenError}
+            count={resumen?.membresias_por_vencer_count ?? 0}
+            title={(n) => `${n} membresía${n !== 1 ? 's' : ''} por vencer`}
+            description={`Vencen en los próximos ${resumen?.membership_expiring_window_days ?? MEMBERSHIP_EXPIRING_DAYS} días.`}
+            onClick={() => openSidecart('membresias', membresiasList)}
+          />
+          <AlertCard
+            tone="info"
+            icon={PhoneIcon}
+            loading={resumenLoading}
+            error={resumenError}
+            count={resumen?.leads_sin_contactar_count ?? 0}
+            title={(n) => `${n} lead${n !== 1 ? 's' : ''} esperando contacto`}
+            description="Leads nuevos que todavía no fueron contactados."
+            onClick={() => openSidecart('leads', leadsList)}
+          />
+          <AlertCard
+            tone="error"
+            icon={ExclamationTriangleIcon}
+            loading={resumenLoading}
+            error={resumenError}
+            count={resumen?.socios_en_riesgo_count ?? 0}
+            title={(n) => `${n} socio${n !== 1 ? 's' : ''} en riesgo de no renovar`}
+            description="Socios activos con baja frecuencia de asistencia (riesgo o alto riesgo de abandono)."
+            onClick={() => openSidecart('riesgo', riesgoList)}
+          />
+        </div>
+      </div>
+
+      {/* 2. Estado de la sala ahora mismo: estaciones y, dentro de cada línea, la lista de
           espera debajo — QueueMonitor ya trae ambas en ese orden con Realtime, no hace
           falta reimplementarlo. */}
       <QueueMonitor />
 
-      {/* 3. Asistidos hoy */}
-      <SectionCard
-        title="Asistidos hoy"
-        subtitle="Ingresos confirmados en el kiosko"
-        count={asistidosLoading || asistidosError ? undefined : asistidos.length}
-        loading={asistidosLoading}
-        error={asistidosError}
-        isEmpty={!asistidosLoading && !asistidosError && asistidos.length === 0}
-        emptyLabel="Todavía no hay ingresos registrados hoy."
-      >
-        {/* Los últimos que entraron, no todos: una caja con scroll propio en el medio de la
-            portada se come la rueda del mouse y deja al que scrollea trabado sobre una lista
-            que no estaba mirando. El resto vive en Accesos, que es la pantalla de eso. */}
-        <div className="space-y-1">
-          {asistidos.slice(0, 6).map((a) => (
-            <div key={a.id} className="flex items-center justify-between text-sm px-3 py-2 rounded-md bg-bg-surface">
-              <span className="text-text-primary">
-                {a.users ? `${a.users.first_name} ${a.users.last_name}` : 'Socio'}
-              </span>
-              <span className="text-text-tertiary text-xs">{formatTime(a.scanned_at)}</span>
-            </div>
-          ))}
-        </div>
-        {asistidos.length > 6 && (
-          <Link to="/access-logs" className="mt-3 inline-block text-sm text-brand hover:underline">
-            Ver los {asistidos.length} ingresos de hoy
-          </Link>
-        )}
-      </SectionCard>
-
-      {/* 4. Clases de prueba de hoy */}
+      {/* 3. Clases de prueba de hoy — arriba de asistidos: todavía se pueden perder. */}
       <SectionCard
         title="Clases de prueba hoy"
         subtitle="Leads con clase de prueba agendada para hoy"
@@ -294,42 +516,45 @@ export default function Hoy() {
         </div>
       </SectionCard>
 
-      {/* 5. Alertas — cada una abre la lista filtrada correspondiente */}
-      <div>
-        <h2 className="text-sm font-semibold text-text-primary mb-3">Alertas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <AlertCard
-            tone="warning"
-            icon={CalendarDaysIcon}
-            loading={resumenLoading}
-            error={resumenError}
-            count={resumen?.membresias_por_vencer_count ?? 0}
-            title={(n) => `${n} membresía${n !== 1 ? 's' : ''} por vencer`}
-            description={`Vencen en los próximos ${resumen?.membership_expiring_window_days ?? MEMBERSHIP_EXPIRING_DAYS} días.`}
-            onClick={() => openSidecart('membresias', membresiasList)}
-          />
-          <AlertCard
-            tone="info"
-            icon={PhoneIcon}
-            loading={resumenLoading}
-            error={resumenError}
-            count={resumen?.leads_sin_contactar_count ?? 0}
-            title={(n) => `${n} lead${n !== 1 ? 's' : ''} esperando contacto`}
-            description="Leads nuevos que todavía no fueron contactados."
-            onClick={() => openSidecart('leads', leadsList)}
-          />
-          <AlertCard
-            tone="error"
-            icon={ExclamationTriangleIcon}
-            loading={resumenLoading}
-            error={resumenError}
-            count={resumen?.socios_en_riesgo_count ?? 0}
-            title={(n) => `${n} socio${n !== 1 ? 's' : ''} en riesgo de no renovar`}
-            description="Socios activos con baja frecuencia de asistencia (riesgo o alto riesgo de abandono)."
-            onClick={() => openSidecart('riesgo', riesgoList)}
-          />
+      {/* 4. Caja — el mostrador. Recepción vive en esta pantalla; el módulo evita el viaje
+          de ida y vuelta a /caja para cada operación. */}
+      <CajaModulo
+        turno={caja.turno}
+        resumen={caja.resumen}
+        loading={cajaLoading}
+        error={cajaError}
+        enRiesgoEnSala={enRiesgoEnSala}
+      />
+
+      {/* 5. Asistidos hoy — registro del día, no decisión: cierra la pantalla. */}
+      <SectionCard
+        title="Asistidos hoy"
+        subtitle="Ingresos confirmados en el kiosko"
+        count={asistidosLoading || asistidosError ? undefined : asistidos.length}
+        loading={asistidosLoading}
+        error={asistidosError}
+        isEmpty={!asistidosLoading && !asistidosError && asistidos.length === 0}
+        emptyLabel="Todavía no hay ingresos registrados hoy."
+      >
+        {/* Los últimos que entraron, no todos: una caja con scroll propio en el medio de la
+            portada se come la rueda del mouse y deja al que scrollea trabado sobre una lista
+            que no estaba mirando. El resto vive en Accesos, que es la pantalla de eso. */}
+        <div className="space-y-1">
+          {asistidos.slice(0, 6).map((a) => (
+            <div key={a.id} className="flex items-center justify-between text-sm px-3 py-2 rounded-md bg-bg-surface">
+              <span className="text-text-primary">
+                {a.users ? `${a.users.first_name} ${a.users.last_name}` : 'Socio'}
+              </span>
+              <span className="text-text-tertiary text-xs">{formatTime(a.scanned_at)}</span>
+            </div>
+          ))}
         </div>
-      </div>
+        {asistidos.length > 6 && (
+          <Link to="/access-logs" className="mt-3 inline-block text-sm text-brand hover:underline">
+            Ver los {asistidos.length} ingresos de hoy
+          </Link>
+        )}
+      </SectionCard>
 
       {/* Sidecart: membresías por vencer */}
       <Sidecart
