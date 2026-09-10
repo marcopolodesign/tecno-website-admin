@@ -21,10 +21,20 @@ const NARANJA = '#E07C2C'
 const TRABAJO_DEFAULT = 25
 const DESCANSO_DEFAULT = 15
 
+// Primero los campos del formato por tiempo, después los del modelo viejo de series x reps.
+// No es un detalle de estilo: en una estación por tiempo `rest_time` queda con lo que haya
+// dejado el modelo anterior — un Tabata de 20/10 tiene `rest_time = '60s'`, que además es
+// texto y no un número. Leerlo primero mostraba 60 segundos de descanso donde hay 10.
+function aSegundos(v) {
+  if (typeof v === 'number') return v
+  const n = parseInt(String(v ?? '').replace(/[^0-9]/g, ''), 10)
+  return Number.isFinite(n) ? n : null
+}
+
 function segundosDe(fila) {
   return {
-    trabajo: fila?.repetitionTime ?? fila?.trabajoSeg ?? TRABAJO_DEFAULT,
-    descanso: fila?.restTime ?? fila?.descansoSeg ?? DESCANSO_DEFAULT,
+    trabajo: fila?.trabajoSeg ?? aSegundos(fila?.repetitionTime) ?? TRABAJO_DEFAULT,
+    descanso: fila?.descansoSeg ?? aSegundos(fila?.restTime) ?? DESCANSO_DEFAULT,
   }
 }
 
