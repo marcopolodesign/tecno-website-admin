@@ -20,6 +20,8 @@ import Modal from './Modal'
 import SelectorContraindicaciones from './SelectorContraindicaciones'
 import { useSede } from '../contexts/SedeContext'
 import { supabase } from '../lib/supabase'
+import cajaService from '../services/cajaService'
+import { formatARS } from '../lib/dinero'
 
 // Helper to format date without timezone issues
 // Parses YYYY-MM-DD string and formats as DD/MM/YYYY without timezone shift
@@ -42,6 +44,9 @@ const Users = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedUser, setSelectedUser] = useState(null)
   const [showSidePanel, setShowSidePanel] = useState(false)
+  // Saldo de caja del socio (ventas fiadas por mostrador que todavía no pagó) — sólo se
+  // pide cuando se abre su ficha, no en el listado entero.
+  const [saldoCaja, setSaldoCaja] = useState(null)
   const [editFormData, setEditFormData] = useState({})
   const [hasChanges, setHasChanges] = useState(false)
   const [sellers, setSellers] = useState([])
@@ -122,6 +127,19 @@ const Users = () => {
   useEffect(() => {
     filterUsers()
   }, [users, searchTerm, membershipFilter, statusFilter])
+
+  // Saldo de caja — sólo cuando se abre la ficha de un socio puntual.
+  useEffect(() => {
+    if (!selectedUser?.id) {
+      setSaldoCaja(null)
+      return
+    }
+    let cancelado = false
+    cajaService.saldoSocio(selectedUser.id)
+      .then((saldo) => { if (!cancelado) setSaldoCaja(saldo) })
+      .catch((error) => console.error('Error fetching saldo de caja:', error))
+    return () => { cancelado = true }
+  }, [selectedUser?.id])
 
   const fetchUsers = async () => {
     try {
@@ -1031,6 +1049,14 @@ const Users = () => {
                     Estado: {getStatusLabel(selectedUser.membershipStatus)}
                   </p>
                 </div>
+
+                {saldoCaja > 0 && (
+                  <div className="border-t border-border-default pt-4">
+                    <label className="text-sm font-medium text-text-tertiary">Deuda de caja</label>
+                    <p className="text-lg font-medium text-warning">{formatARS(saldoCaja)}</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">Ventas de mostrador fiadas, sin cobrar — se cobran desde Deuda</p>
+                  </div>
+                )}
 
                 <div className="border-t border-border-default pt-4">
                   <label className="text-sm font-medium text-text-tertiary">Período de membresía</label>

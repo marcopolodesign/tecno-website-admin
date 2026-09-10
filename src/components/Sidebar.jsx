@@ -29,6 +29,9 @@ import {
   ArrowRightOnRectangleIcon,
   UserGroupIcon,
   ChartBarSquareIcon,
+  BanknotesIcon,
+  CubeIcon,
+  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline'
 
 // Emails allowed to see fitness section (beta feature)
@@ -56,6 +59,9 @@ const usuariosNav = [
 
 // Lo que hace funcionar la sede todos los días: con qué se cobra, quién atiende, quién entra.
 const sedeNav = [
+  { name: 'Caja', href: '/caja', icon: BanknotesIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Productos', href: '/productos', icon: CubeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Deuda', href: '/deuda', icon: ReceiptPercentIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Membresías', href: '/membership-plans', icon: CreditCardIcon, roles: ['super_admin', 'admin'] },
   { name: 'Vendedores', href: '/sellers', icon: UsersIcon, roles: ['super_admin', 'admin'] },
   { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
