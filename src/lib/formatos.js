@@ -22,7 +22,10 @@ export const PRESETS = {
   // AMRAP is one round with a cap: as many rounds as possible inside the time.
   AMRAP: { rondas: 1, trabajoSeg: BLOQUE_SEG, descansoSeg: 0 },
   // EMOM has no stored rest — the rest is whatever is left of the minute after the reps.
-  EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0 },
+  // ejerciciosPorMinuto arranca en 1 (= EMOM_MIN_POR_MINUTO, definido más abajo junto con el
+  // resto del contrato "qué entra en un minuto") — un movimiento por minuto, que es lo que ya
+  // tenían las 1490 filas EMOM de antes de que esto fuera configurable.
+  EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0, ejerciciosPorMinuto: 1 },
   // 12 × (20+10) = 6:00 exacto. Antes eran 8 rondas (4:00) — el default dejaba 2:00 de la
   // estación sin usar hasta que el coach subiera "Rondas" a mano; ningún otro preset tiene
   // este problema (EMOM/AMRAP/A completar ya cierran justo en 6:00 desde el default).
@@ -40,8 +43,12 @@ export const PRESETS = {
 // cupo fijo — el coach carga los que quiera. Debe coincidir con CIRCUITO en
 // routineGenerationService.js (ejercicios/reps) — están duplicados a propósito, igual que los
 // PRESETS de arriba, no por descuido.
-export const CUPO_POR_FORMATO = { Tabata: 4, EMOM: 3, AMRAP: 4 }
-export const REPS_POR_FORMATO = { Tabata: 'máx por ronda', EMOM: '10 por minuto', AMRAP: '10 por vuelta' }
+//
+// EMOM quedó afuera de las dos: no tiene un cupo fijo (lo dicta ejerciciosPorMinuto × cuántos
+// minutos quiera rotar el coach) ni una sola prescripción para toda la estación (cada fila
+// tiene la suya, en reps o en segundos — ver la sección "qué entra en un minuto" más abajo).
+export const CUPO_POR_FORMATO = { Tabata: 4, AMRAP: 4 }
+export const REPS_POR_FORMATO = { Tabata: 'máx por ronda', AMRAP: '10 por vuelta' }
 
 export const esPorTiempo = (formato) => Boolean(formato) && formato !== 'Series'
 
@@ -99,4 +106,95 @@ export function faseDelFormato(transcurridoSeg, { rondas, trabajoSeg, descansoSe
     restanteSeg: trabajando ? trabajoSeg - dentro : ciclo - dentro,
     terminado: false,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMOM: qué entra en un minuto
+//
+// "Cada minuto, en el minuto" no dice cuántos ejercicios entran en ese minuto. Puede ser uno
+// solo repetido seis veces, o "10 push ups + 30s de plancha" juntos adentro del mismo minuto.
+// Las dos son EMOM y se arman igual de seguido, así que es el coach el que tiene que poder
+// decirlo — antes la estación guardaba tres ejercicios y seis rondas y las dos lecturas eran
+// igual de válidas mirando la fila.
+//
+// La estación guarda `ejerciciosPorMinuto`; cada fila guarda `segundosPorEjercicio` (null = va
+// por repeticiones). De esos dos sale todo lo demás, incluido el texto que ya leen la TV, la
+// app y las listas del admin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const EMOM_MIN_POR_MINUTO = 1
+export const EMOM_MAX_POR_MINUTO = 6
+export const MINUTO_SEG = 60
+
+/**
+ * El texto de una fila del circuito: "10 reps", "30s".
+ *
+ * Es lo que se guarda en `sets_reps`, que es donde ya miran la TV, la app y el admin. Derivarlo
+ * en vez de guardar una etiqueta suelta es lo que hace que una pantalla que no sabe nada de
+ * EMOM por minuto igual muestre algo correcto.
+ */
+export function prescripcionTexto({ segundos, reps } = {}) {
+  if (segundos) return `${segundos}s`
+  if (reps) return `${reps} reps`
+  return ''
+}
+
+/**
+ * Cómo se reparten los ejercicios de la estación entre los minutos.
+ *
+ * Con 4 ejercicios y 2 por minuto, el minuto 1 es A+B y el 2 es C+D — y como el EMOM dura seis
+ * minutos, en el 3 vuelve a empezar por A+B. Devuelve los grupos en orden; el que corre el
+ * reloj sólo tiene que ir tomando `grupos[minuto % grupos.length]`.
+ */
+export function gruposDelMinuto(filas, ejerciciosPorMinuto) {
+  const lista = filas || []
+  const porMinuto = Math.max(EMOM_MIN_POR_MINUTO, ejerciciosPorMinuto || 1)
+  const grupos = []
+  for (let i = 0; i < lista.length; i += porMinuto) {
+    grupos.push(lista.slice(i, i + porMinuto))
+  }
+  return grupos
+}
+
+/** Los ejercicios que le tocan a un minuto concreto (1 = el primero). */
+export function filasDelMinuto(filas, ejerciciosPorMinuto, minuto) {
+  const grupos = gruposDelMinuto(filas, ejerciciosPorMinuto)
+  if (!grupos.length) return []
+  return grupos[(Math.max(1, minuto) - 1) % grupos.length]
+}
+
+/**
+ * Los segundos que el coach dejó escritos dentro de un minuto.
+ *
+ * Sólo suma lo prescripto POR TIEMPO: las repeticiones no tienen duración fija — diez push ups
+ * son veinte segundos o cuarenta según quién los haga — así que el sistema nunca sabe de verdad
+ * cuánto dura el minuto. Por eso esto alcanza para avisar que se pasó, y no para prohibirlo.
+ */
+export function segundosCargados(filas) {
+  return (filas || []).reduce((acc, f) => acc + (Number(f.segundosPorEjercicio ?? f.segundos_por_ejercicio) || 0), 0)
+}
+
+/** Lo que queda del minuto después del trabajo cargado. Negativo = se pasó. */
+export function sobranteDelMinuto(filas) {
+  return MINUTO_SEG - segundosCargados(filas)
+}
+
+/**
+ * El minuto contado como lo diría un coach: "10 reps Push ups + 30s Plancha".
+ *
+ * `nombreDe` lo pasa quien llama porque el nombre del ejercicio vive en distintos lugares según
+ * la pantalla (el admin lo tiene embebido, la TV lo recibe en el payload de la línea).
+ */
+export function resumenDelMinuto(filas, nombreDe = (f) => f.nombre) {
+  return (filas || [])
+    .map((f) => {
+      const texto = prescripcionTexto({
+        segundos: f.segundosPorEjercicio ?? f.segundos_por_ejercicio,
+        reps: f.reps,
+      })
+      const nombre = nombreDe(f)
+      return [texto, nombre].filter(Boolean).join(' ')
+    })
+    .filter(Boolean)
+    .join(' + ')
 }

@@ -1,4 +1,13 @@
-import { FORMATOS, PRESETS, BLOQUE_SEG, esPorTiempo, duracionSeg, mmss } from '../lib/formatos'
+import {
+  FORMATOS,
+  PRESETS,
+  BLOQUE_SEG,
+  EMOM_MIN_POR_MINUTO,
+  EMOM_MAX_POR_MINUTO,
+  esPorTiempo,
+  duracionSeg,
+  mmss,
+} from '../lib/formatos'
 
 // How the work at THIS STATION is measured — once, not per exercise.
 //
@@ -16,7 +25,7 @@ import { FORMATOS, PRESETS, BLOQUE_SEG, esPorTiempo, duracionSeg, mmss } from '.
 // the queue moves the member along, and never less by accident either.
 
 export default function SelectorFormato({ valor, onChange, turnoSeg }) {
-  const { formato = 'Series', rondas, trabajoSeg, descansoSeg } = valor || {}
+  const { formato = 'Series', rondas, trabajoSeg, descansoSeg, ejerciciosPorMinuto } = valor || {}
   const porTiempo = esPorTiempo(formato)
   const estacion = porTiempo ? duracionSeg({ rondas, trabajoSeg, descansoSeg }) : 0
   const excede = estacion > BLOQUE_SEG
@@ -31,16 +40,32 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
 
   const elegir = (f) => {
     if (!esPorTiempo(f)) {
-      onChange({ formato: f, rondas: null, trabajoSeg: null, descansoSeg: null })
+      onChange({ formato: f, rondas: null, trabajoSeg: null, descansoSeg: null, ejerciciosPorMinuto: null })
       return
     }
     const p = PRESETS[f]
-    onChange({ formato: f, rondas: p.rondas, trabajoSeg: p.trabajoSeg, descansoSeg: p.descansoSeg })
+    onChange({
+      formato: f,
+      rondas: p.rondas,
+      trabajoSeg: p.trabajoSeg,
+      descansoSeg: p.descansoSeg,
+      // Sólo EMOM trae ejerciciosPorMinuto en su preset — el resto lo deja en null, igual que
+      // rondas/trabajoSeg quedan en null para Series: un campo que ese formato no usa.
+      ejerciciosPorMinuto: p.ejerciciosPorMinuto ?? null,
+    })
   }
 
   const set = (campo) => (ev) => {
     const n = ev.target.value === '' ? '' : Math.max(0, Number(ev.target.value))
-    onChange({ formato, rondas, trabajoSeg, descansoSeg, [campo]: n })
+    onChange({ formato, rondas, trabajoSeg, descansoSeg, ejerciciosPorMinuto, [campo]: n })
+  }
+
+  // Acotado a 1-6 (el mismo rango que el CHECK de la base) apenas se suelta el input, no en
+  // cada tecla — si no, escribir "1" antes de completar "16" lo clampeaba a mitad de camino.
+  const setPorMinuto = (ev) => {
+    const n = ev.target.value === '' ? EMOM_MIN_POR_MINUTO : Number(ev.target.value)
+    const acotado = Math.min(EMOM_MAX_POR_MINUTO, Math.max(EMOM_MIN_POR_MINUTO, n))
+    onChange({ formato, rondas, trabajoSeg, descansoSeg, ejerciciosPorMinuto: acotado })
   }
 
   const pct = Math.min(100, Math.round((estacion / BLOQUE_SEG) * 100))
@@ -71,23 +96,39 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
               <span style={s.etiqueta}>{formato === 'AMRAP' || formato === 'A completar' ? 'Tiempo total (seg)' : 'Trabajo (seg)'}</span>
               <input type="number" min="5" max={BLOQUE_SEG} value={trabajoSeg ?? ''} onChange={set('trabajoSeg')} style={s.input} />
             </label>
-            <label style={s.campo}>
-              <span style={s.etiqueta}>Descanso (seg)</span>
-              <input
-                type="number"
-                min="0"
-                max="600"
-                value={descansoSeg ?? 0}
-                onChange={set('descansoSeg')}
-                style={s.input}
-                disabled={formato === 'EMOM'}
-              />
-            </label>
+            {formato === 'EMOM' ? (
+              // El descanso de EMOM no se carga (es lo que sobra del minuto — ver la ayuda de
+              // abajo), así que este es el lugar natural para la otra decisión propia de EMOM:
+              // cuántos ejercicios entran juntos en cada minuto.
+              <label style={s.campo}>
+                <span style={s.etiqueta}>Ejercicios por minuto</span>
+                <input
+                  type="number"
+                  min={EMOM_MIN_POR_MINUTO}
+                  max={EMOM_MAX_POR_MINUTO}
+                  value={ejerciciosPorMinuto ?? EMOM_MIN_POR_MINUTO}
+                  onChange={setPorMinuto}
+                  style={s.input}
+                />
+              </label>
+            ) : (
+              <label style={s.campo}>
+                <span style={s.etiqueta}>Descanso (seg)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="600"
+                  value={descansoSeg ?? 0}
+                  onChange={set('descansoSeg')}
+                  style={s.input}
+                />
+              </label>
+            )}
           </div>
 
           <span style={s.ayuda}>
             {formato === 'EMOM'
-              ? 'En EMOM el descanso es lo que sobra del minuto después de las reps — por eso no se carga.'
+              ? 'Cuántos ejercicios comparten cada minuto. El descanso es lo que sobre del minuto después de hacerlos, por eso no se carga aparte.'
               : formato === 'AMRAP'
                 ? 'Las vueltas que entren en ese tiempo. Las reps por vuelta van en Series x Reps.'
                 : formato === 'A completar'
