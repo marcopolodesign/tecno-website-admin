@@ -55,6 +55,7 @@ export default function Caja({ userRole }) {
 
   const [anulando, setAnulando] = useState(null) // venta seleccionada para anular
   const [anularReason, setAnularReason] = useState('')
+  const [devolverEfectivo, setDevolverEfectivo] = useState(true)
   const [enviandoAnular, setEnviandoAnular] = useState(false)
 
   useEffect(() => {
@@ -187,6 +188,13 @@ export default function Caja({ userRole }) {
     )
   }
 
+  // Cuánto se cobró EN EFECTIVO en esa venta: es lo único que puede tener que salir
+  // físicamente del cajón al anular. Lo de tarjeta se devuelve por el posnet, no de acá.
+  const efectivoDeVenta = (venta) =>
+    (venta?.salePayments || venta?.sale_payments || [])
+      .filter((p) => p.method === 'efectivo')
+      .reduce((acc, p) => acc + Number(p.amount || 0), 0)
+
   const handleAnular = async (e) => {
     e.preventDefault()
     if (!anulando || !profile) return
@@ -197,9 +205,28 @@ export default function Caja({ userRole }) {
     setEnviandoAnular(true)
     try {
       await cajaService.anularVenta(anulando.id, profile.id, anularReason.trim())
-      toast.success(`Venta #${anulando.numero} anulada`, toastOptions)
+
+      // Anular no saca la plata del cajón por sí solo, y está bien que no lo haga: a veces
+      // se anula un error de carga y el billete nunca se movió. Pero cuando SÍ se devuelve,
+      // ese egreso hay que anotarlo o el cierre va a marcar un sobrante que no existe.
+      // Preguntarlo acá es lo que evita que alguien se entere recién al contar la caja.
+      const efectivo = efectivoDeVenta(anulando)
+      if (devolverEfectivo && efectivo > 0) {
+        await cajaService.registrarMovimiento(
+          cajaAbierta.id, 'egreso', efectivo,
+          `Devolución por anulación de venta #${anulando.numero}`, profile.id
+        )
+      }
+
+      toast.success(
+        devolverEfectivo && efectivo > 0
+          ? `Venta #${anulando.numero} anulada y ${formatARS(efectivo)} devueltos`
+          : `Venta #${anulando.numero} anulada`,
+        toastOptions
+      )
       setAnulando(null)
       setAnularReason('')
+      setDevolverEfectivo(true)
       cargarTurno()
     } catch (err) {
       toast.error(err.message, toastOptions)
@@ -593,6 +620,27 @@ export default function Caja({ userRole }) {
           <p className="text-sm text-text-secondary">
             Anular devuelve el stock de los productos de esta venta. No se puede deshacer.
           </p>
+
+          {efectivoDeVenta(anulando) > 0 && (
+            <label className="flex items-start gap-2.5 rounded-lg bg-bg-surface p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={devolverEfectivo}
+                onChange={(e) => setDevolverEfectivo(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                <span className="text-text-primary">
+                  Devolví {formatARS(efectivoDeVenta(anulando))} en efectivo
+                </span>
+                <span className="block text-xs text-text-tertiary mt-0.5">
+                  Se anota como egreso del turno. Destildalo si la plata no salió del cajón
+                  (por ejemplo, si fue un error de carga).
+                </span>
+              </span>
+            </label>
+          )}
+
           <div>
             <label className="form-label">Motivo *</label>
             <textarea
