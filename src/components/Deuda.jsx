@@ -4,41 +4,43 @@ import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
 import { formatARS } from '../lib/dinero'
 import { useSede } from '../contexts/SedeContext'
-import { authService } from '../services/authService'
 import cajaService, { METODOS_PAGO } from '../services/cajaService'
 import Sidecart from './Sidecart'
 
-// Socios con saldo pendiente (ventas fiadas por caja) y el cobro contra la caja de HOY. El
-// cobro necesita una caja abierta en la sede — es la misma regla que registrar_cobro impone
-// del lado de la base, así que si no hay turno abierto el botón directamente no aparece en
-// vez de dejar tocar algo que la RPC va a rechazar.
+// Socios con saldo pendiente y el cobro contra la caja de HOY.
+//
+// La deuda es un libro por socio, no una lista de ventas impagas: un socio puede fiar tres
+// veces y pagar una parte suelta que no corresponde a ninguna venta en particular. Por eso
+// se cobra contra el saldo y no contra un ticket — y por eso vale la pena poder abrir el
+// detalle y ver de dónde salió cada peso.
+//
+// Cobrar necesita una caja abierta, porque el cobro entra al turno como ingreso: si no
+// entrara, el arqueo de esa noche cerraría con un sobrante sin explicación. Es la misma
+// regla que impone `caja_cobrar_cuenta` del lado de la base, así que cuando no hay turno
+// abierto el botón no aparece en vez de dejar tocar algo que la base va a rechazar.
 export default function Deuda() {
   const { sedeId, sede } = useSede()
 
-  const [profile, setProfile] = useState(null)
-  const [cajaAbierta, setCajaAbierta] = useState(null)
+  const [turno, setTurno] = useState(null)
   const [deudores, setDeudores] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [cobrando, setCobrando] = useState(null) // { deudor, venta }
+  const [cobrando, setCobrando] = useState(null)
+  const [movimientos, setMovimientos] = useState([])
   const [metodo, setMetodo] = useState('efectivo')
   const [monto, setMonto] = useState('')
   const [enviando, setEnviando] = useState(false)
-
-  useEffect(() => {
-    authService.getCurrentUserProfile().then(setProfile).catch(() => setProfile(null))
-  }, [])
 
   const cargar = useCallback(async () => {
     if (!sedeId) return
     setLoading(true)
     try {
-      const [{ data: abierta }, { data: deuda }] = await Promise.all([
-        cajaService.getCajaAbierta(sedeId),
-        cajaService.deudoresSede(sedeId),
+      const [abierto, lista] = await Promise.all([
+        cajaService.getTurnoAbierto(sedeId),
+        cajaService.deudores(sedeId),
       ])
-      setCajaAbierta(abierta)
-      setDeudores(deuda)
+      setTurno(abierto)
+      setDeudores(lista)
     } catch (err) {
       toast.error(err.message, toastOptions)
     } finally {
@@ -48,18 +50,24 @@ export default function Deuda() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  const abrirCobro = (deudor, venta) => {
-    setCobrando({ deudor, venta })
+  const abrirCobro = async (deudor) => {
+    setCobrando(deudor)
     setMetodo('efectivo')
-    setMonto(String(venta.pendiente))
+    setMonto(String(deudor.saldo))
+    setMovimientos([])
+    try {
+      setMovimientos(await cajaService.movimientosCuenta(deudor.userId))
+    } catch (err) {
+      toast.error(err.message, toastOptions)
+    }
   }
 
   const handleCobrar = async (e) => {
     e.preventDefault()
-    if (!cobrando || !profile || !cajaAbierta) return
+    if (!cobrando || !turno) return
     setEnviando(true)
     try {
-      await cajaService.registrarCobro(cobrando.venta.id, sedeId, profile.id, metodo, Number(monto))
+      await cajaService.cobrarCuenta(turno.id, cobrando.userId, Number(monto), metodo)
       toast.success(`Cobro registrado — ${formatARS(monto)}`, toastOptions)
       setCobrando(null)
       cargar()
@@ -70,7 +78,7 @@ export default function Deuda() {
     }
   }
 
-  const totalDeuda = deudores.reduce((acc, d) => acc + d.saldo, 0)
+  const totalDeuda = deudores.reduce((acc, d) => acc + Number(d.saldo || 0), 0)
 
   if (loading && deudores.length === 0) {
     return (
@@ -86,10 +94,12 @@ export default function Deuda() {
 
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Deuda</h1>
-        <p className="text-sm text-text-secondary mt-1">{sede?.name || 'Sede'} — socios con ventas fiadas por caja</p>
+        <p className="text-sm text-text-secondary mt-1">
+          {sede?.name || 'Sede'} — socios con saldo pendiente en cuenta corriente
+        </p>
       </div>
 
-      {!cajaAbierta && deudores.length > 0 && (
+      {!turno && deudores.length > 0 && (
         <div className="rounded-lg bg-warning/5 p-4 flex items-start gap-2">
           <ExclamationTriangleIcon className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
           <p className="text-sm text-text-secondary">
@@ -100,7 +110,7 @@ export default function Deuda() {
 
       {deudores.length === 0 ? (
         <div className="card border-0 shadow-none text-center py-12">
-          <p className="text-text-secondary">No hay deuda pendiente en esta sede</p>
+          <p className="text-text-secondary">Nadie debe nada en esta sede</p>
         </div>
       ) : (
         <>
@@ -109,42 +119,26 @@ export default function Deuda() {
             <p className="text-lg font-semibold text-warning">{formatARS(totalDeuda)}</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="card border-0 shadow-none divide-y divide-border-default">
             {deudores.map((d) => (
-              <div key={d.userId} className="card border-0 shadow-none">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <UserCircleIcon className="h-8 w-8 text-text-tertiary shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">
-                        {d.user?.firstName} {d.user?.lastName}
-                      </p>
-                      <p className="text-xs text-text-tertiary truncate">{d.user?.email}</p>
-                    </div>
+              <div key={d.userId} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <UserCircleIcon className="h-8 w-8 text-text-tertiary shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{d.nombre || 'Socio'}</p>
+                    <p className="text-xs text-text-tertiary truncate">{d.email}</p>
                   </div>
-                  <span className="text-sm font-semibold text-warning shrink-0">{formatARS(d.saldo)}</span>
                 </div>
-
-                <div className="space-y-1.5">
-                  {d.ventas.map((v) => (
-                    <div key={v.id} className="flex items-center justify-between text-sm py-1.5 px-2.5 bg-bg-surface rounded-lg">
-                      <div>
-                        <span className="text-text-primary">Venta #{v.numero}</span>
-                        <span className="text-text-tertiary ml-2">{new Date(v.createdAt).toLocaleDateString('es-AR')}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-text-secondary">{formatARS(v.pendiente)} pendiente</span>
-                        {cajaAbierta && (
-                          <button
-                            onClick={() => abrirCobro(d, v)}
-                            className="text-xs text-brand font-medium hover:text-brand-hover"
-                          >
-                            Cobrar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="text-sm font-semibold text-warning">{formatARS(d.saldo)}</span>
+                  {turno && (
+                    <button
+                      onClick={() => abrirCobro(d)}
+                      className="text-xs text-brand font-medium hover:underline"
+                    >
+                      Cobrar
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -156,8 +150,8 @@ export default function Deuda() {
         isOpen={!!cobrando}
         onClose={() => setCobrando(null)}
         title="Cobrar deuda"
-        subtitle={cobrando ? `${cobrando.deudor.user?.firstName} ${cobrando.deudor.user?.lastName} — Venta #${cobrando.venta.numero}` : ''}
-        size="sm"
+        subtitle={cobrando ? `${cobrando.nombre} — debe ${formatARS(cobrando.saldo)}` : ''}
+        size="md"
         footer={
           <div className="flex justify-end gap-3">
             <button type="button" onClick={() => setCobrando(null)} className="btn-secondary">Cancelar</button>
@@ -182,17 +176,37 @@ export default function Deuda() {
               type="number"
               step="0.01"
               min="0.01"
-              max={cobrando?.venta.pendiente}
+              max={cobrando?.saldo}
               required
               value={monto}
               onChange={(e) => setMonto(e.target.value)}
               className="form-input"
               autoFocus
             />
+            {/* Se puede cobrar una parte: viene con el total puesto porque es lo normal,
+                pero un pago parcial es igual de válido y deja el resto como saldo. */}
             <p className="text-xs text-text-tertiary mt-1">
-              Pendiente: {formatARS(cobrando?.venta.pendiente)}
+              Debe {formatARS(cobrando?.saldo || 0)} — se puede cobrar una parte.
             </p>
           </div>
+
+          {movimientos.length > 0 && (
+            <div>
+              <p className="form-label">De dónde viene</p>
+              <div className="space-y-1">
+                {movimientos.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between text-xs px-2.5 py-1.5 rounded-md bg-bg-surface">
+                    <span className="text-text-secondary">
+                      {new Date(m.createdAt).toLocaleDateString('es-AR')} · {m.detalle || (m.tipo === 'cargo' ? 'Fiado' : 'Pago')}
+                    </span>
+                    <span className={m.tipo === 'cargo' ? 'text-warning' : 'text-green-600'}>
+                      {m.tipo === 'cargo' ? '+' : '−'}{formatARS(m.monto)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </form>
       </Sidecart>
     </div>

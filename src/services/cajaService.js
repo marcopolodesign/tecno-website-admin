@@ -151,6 +151,27 @@ const cajaService = {
     if (error) throw new Error(error.message)
   },
 
+  // Quiénes deben y cuánto. La suma la hace la base: traer todos los movimientos de todos
+  // los socios al navegador para sumarlos acá sería absurdo.
+  async deudores(locationId) {
+    const { data, error } = await supabase.rpc('caja_deudores', {
+      p_location_id: locationId || null,
+    })
+    if (error) throw new Error(error.message)
+    return toCamelCase(data || [])
+  },
+
+  // De dónde salió la deuda de un socio — es el sentido de llevarla como libro.
+  async movimientosCuenta(userId) {
+    const { data, error } = await supabase
+      .from('socio_cuenta_movimientos')
+      .select('id, tipo, monto, detalle, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(error.message)
+    return toCamelCase(data || [])
+  },
+
   async saldoSocio(userId) {
     if (!userId) return 0
     const { data, error } = await supabase.rpc('caja_saldo_socio', { p_user_id: userId })

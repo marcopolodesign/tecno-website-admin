@@ -50,8 +50,8 @@ const hoyNav = [
 // grupo propio y no vive dentro de "Sede", que es lo que se toca de vez en cuando.
 const cajaNav = [
   { name: 'Caja', href: '/caja', icon: BanknotesIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-  { name: 'Productos', href: '/productos', icon: ShoppingBagIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-  { name: 'Deuda', href: '/deuda', icon: ExclamationTriangleIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Productos', href: '/productos', icon: CubeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'Deuda', href: '/deuda', icon: ReceiptPercentIcon, roles: ['super_admin', 'admin', 'front_desk'] },
 ]
 
 // El recorrido de una persona, en orden: primero es un lead, después un prospecto que dejó
@@ -67,9 +67,6 @@ const usuariosNav = [
 
 // Lo que hace funcionar la sede todos los días: con qué se cobra, quién atiende, quién entra.
 const sedeNav = [
-  { name: 'Caja', href: '/caja', icon: BanknotesIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-  { name: 'Productos', href: '/productos', icon: CubeIcon, roles: ['super_admin', 'admin', 'front_desk'] },
-  { name: 'Deuda', href: '/deuda', icon: ReceiptPercentIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Membresías', href: '/membership-plans', icon: CreditCardIcon, roles: ['super_admin', 'admin'] },
   { name: 'Vendedores', href: '/sellers', icon: UsersIcon, roles: ['super_admin', 'admin'] },
   { name: 'Coaches', href: '/coaches', icon: AcademicCapIcon, roles: ['super_admin', 'admin'] },
