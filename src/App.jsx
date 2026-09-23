@@ -28,6 +28,8 @@ import Horas from './components/Horas'
 import QueueMonitor from './components/QueueMonitor'
 import QueueConfig from './components/QueueConfig'
 import QueueTv from './components/QueueTv'
+import QueueTvEstacion from './components/QueueTvEstacion'
+import QueueTvSede from './components/QueueTvSede'
 import Sidebar from './components/Sidebar'
 import ShellGlow from './components/ShellGlow'
 import { authService } from './services/authService'
@@ -141,6 +143,13 @@ function App() {
         <Route path="/checkin" element={<CheckIn />} />
         <Route path="/acceso" element={<MemberAccess />} />
         <Route path="/lista-espera/tv/:lineaId" element={<QueueTv />} />
+        <Route path="/lista-espera/tv/:lineaId/estacion/:posicion" element={<QueueTvEstacion />} />
+        {/* La de sede no es realmente pública en los datos (RLS cierra queue_entries/
+            line_box_status a anon) — ver el comentario grande en QueueTvSede.jsx. Vive acá,
+            fuera de AuthenticatedShell, para no traer el sidebar del CRM a una TV, pero el
+            componente pide sesión de staff por su cuenta. */}
+        <Route path="/lista-espera/tv/sede" element={<QueueTvSede />} />
+        <Route path="/lista-espera/tv/sede/:locationId" element={<QueueTvSede />} />
 
         {/* ─── All other routes — behind auth wall ─── */}
         <Route

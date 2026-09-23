@@ -2,245 +2,22 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
-import { exerciseMedia } from '../lib/exerciseMedia'
-import { esPorTiempo, faseDelFormato, comoTexto, filasDelMinuto, prescripcionTexto } from '../lib/formatos'
-import VideoEjercicio from './VideoEjercicio'
+import { useCountdown, useBoxPhase, explicacionSegDeLinea, formatMMSS } from '../lib/tvClock'
+import { ExercisePanel, ExplicacionPanel } from './tv/BoxPanels'
 
-// Drift-free countdown: derives remaining time from an absolute target
-// timestamp every animation frame instead of a setInterval tick, and only
-// setState's when the displayed integer second actually changes — immune to
-// background-tab throttling drift on an always-on TV. Pattern ported from
-// Lucas Barral's apps/box-display/src/lib/timer.ts + TimerCountdown.tsx.
-function useCountdown(targetIso) {
-  const [secondsLeft, setSecondsLeft] = useState(() =>
-    targetIso ? Math.max(0, Math.ceil((new Date(targetIso).getTime() - Date.now()) / 1000)) : null
-  )
-
-  useEffect(() => {
-    if (!targetIso) {
-      setSecondsLeft(null)
-      return
-    }
-    const targetMs = new Date(targetIso).getTime()
-    let rafId
-    const loop = () => {
-      const remaining = Math.max(0, Math.ceil((targetMs - Date.now()) / 1000))
-      setSecondsLeft((prev) => (prev !== remaining ? remaining : prev))
-      rafId = window.requestAnimationFrame(loop)
-    }
-    rafId = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(rafId)
-  }, [targetIso])
-
-  if (secondsLeft == null) return ''
-  const m = Math.floor(secondsLeft / 60)
-  const s = secondsLeft % 60
-  return `${m}:${String(s).padStart(2, '0')}`
-}
-
-// Work/rest inside the station, for a timed format.
-//
-// Derived from when the member entered the box, second by second, never counted: a screen on a
-// wall is a background tab to the browser, and a Tabata that drifts is a Tabata that tells the
-// member to stop at the wrong moment eight times.
-function useFase(entradaIso, formato) {
-  const [fase, setFase] = useState(null)
-
-  useEffect(() => {
-    if (!entradaIso || !esPorTiempo(formato?.formato)) {
-      setFase(null)
-      return
-    }
-    const inicioMs = new Date(entradaIso).getTime()
-    let rafId
-    const loop = () => {
-      const transcurrido = Math.floor((Date.now() - inicioMs) / 1000)
-      const f = faseDelFormato(Math.max(0, transcurrido), formato)
-      setFase((prev) =>
-        prev && f && prev.fase === f.fase && prev.ronda === f.ronda && prev.restanteSeg === f.restanteSeg
-          ? prev
-          : f
-      )
-      rafId = window.requestAnimationFrame(loop)
-    }
-    rafId = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(rafId)
-  }, [entradaIso, formato?.formato, formato?.rondas, formato?.trabajoSeg, formato?.descansoSeg])
-
-  return fase
-}
-
-function RelojFormato({ fase, formato }) {
-  if (!fase) return null
-  const trabajando = fase.fase === 'trabajo'
-  const color = fase.terminado ? 'rgba(255,255,255,0.45)' : trabajando ? '#4ADE80' : '#FBBF24'
-  return (
-    <div style={{ ...panelStyles.formato, borderColor: color }}>
-      <span style={{ ...panelStyles.formatoFase, color }}>
-        {fase.terminado ? 'Terminado' : trabajando ? 'TRABAJO' : 'DESCANSO'}
-      </span>
-      <span style={{ ...panelStyles.formatoSeg, color }}>{fase.restanteSeg}</span>
-      <span style={panelStyles.formatoRonda}>
-        {formato.formato === 'AMRAP' || formato.formato === 'A completar'
-          ? 'las vueltas que entren'
-          : `ronda ${fase.ronda} de ${formato.rondas}`}
-      </span>
-    </div>
-  )
-}
-
-function ExercisePanel({ exercise, exercises, entradaIso }) {
-  if (!exercise) {
-    return (
-      <div style={panelStyles.empty}>
-        <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>Entrenando</span>
-      </div>
-    )
-  }
-
-  const ex = exercise
-  const formato = {
-    formato: ex.formato,
-    rondas: ex.rondas,
-    trabajoSeg: ex.trabajo_seg,
-    descansoSeg: ex.descanso_seg,
-  }
-  const fase = useFase(entradaIso, formato)
-
-  // Qué ejercicio(s) le tocan a ESTE minuto. `ejercicio` (el singular que ya mandaba tv_linea)
-  // es siempre la primera fila de la estación — antes era lo único que existía, así que un
-  // EMOM de "3 ejercicios, uno por minuto rotando" se quedaba pegado al primero las seis
-  // rondas, y uno de "10 push ups + 30s de plancha en el mismo minuto" sólo mostraba los push
-  // ups. La ronda del reloj de arriba ES el minuto, y filasDelMinuto (formatos.js) ya sabe qué
-  // grupo de la estación completa (`ejercicios`, lo nuevo que manda tv_linea) le toca a esa
-  // ronda — rotando por grupos si hay más ejercicios que los que entran en uno solo.
-  //
-  // Con una sola fila en la estación esto da [ex] en todos los minutos: no cambia nada.
-  const estacion = exercises?.length ? exercises : [ex]
-  const porMinuto = ex.formato === 'EMOM' ? Math.max(1, ex.ejercicios_por_minuto || 1) : 1
-  const delMinuto =
-    ex.formato === 'EMOM' && fase && !fase.terminado
-      ? filasDelMinuto(estacion, porMinuto, fase.ronda)
-      : [ex]
-
-  // Con varios ejercicios en el mismo minuto no entra un video por cada uno en la columna del
-  // box: se listan como texto grande, para leerse de lejos. `sets_reps` de cada fila ya trae
-  // el texto hecho ("10 reps", "30s" — lo escribe el coach al guardar, con el mismo
-  // prescripcionTexto de acá), así que no hace falta recalcularlo, sólo mostrarlo.
-  if (delMinuto.length > 1) {
-    return (
-      <div style={panelStyles.wrapper}>
-        <RelojFormato fase={fase} formato={formato} />
-        <div style={panelStyles.minuto}>
-          {delMinuto.map((f) => (
-            <div key={f.exercise_order ?? f.name} style={panelStyles.minutoFila}>
-              <span style={panelStyles.minutoFilaPrescripcion}>
-                {f.sets_reps || prescripcionTexto({ segundos: f.segundos_por_ejercicio })}
-              </span>
-              <span style={panelStyles.minutoFilaNombre}>{f.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // Un solo ejercicio en el minuto en curso: se ve como siempre (con video), pero mostrando el
-  // que le toca a ESTA ronda — que en un EMOM rotando de a uno puede no ser el primero de la
-  // estación.
-  const actual = delMinuto[0] || ex
-  // The TV gets the TV rendition and the TV framing. Anything the gym has not filmed yet
-  // still falls back to whatever link the exercise was carrying.
-  const media = exerciseMedia(actual, 'tv')
-
-  return (
-    <div style={panelStyles.wrapper}>
-      <div style={panelStyles.media}>
-        {media.kind === 'hosted' ? (
-          // The poster covers the moment before the first frame decodes, so a box that
-          // just changed exercise never shows black.
-          <VideoEjercicio
-            src={media.src}
-            poster={media.poster}
-            recorte={media.recorte}
-            style={{ ...panelStyles.mediaEl, ...media.style }}
-          />
-        ) : media.kind === 'youtube' ? (
-          <iframe
-            src={`https://www.youtube.com/embed/${media.embedId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${media.embedId}`}
-            style={panelStyles.mediaEl}
-            allow="autoplay; encrypted-media"
-            title={actual?.name}
-          />
-        ) : media.kind === 'image' ? (
-          <img src={media.src} alt={actual?.name} style={panelStyles.mediaEl} />
-        ) : (
-          <div style={{ ...panelStyles.mediaEl, background: 'rgba(255,255,255,0.06)' }} />
-        )}
-      </div>
-      <span style={panelStyles.exerciseName}>{actual?.name ?? 'Ejercicio'}</span>
-      {fase ? (
-        <>
-          <RelojFormato fase={fase} formato={formato} />
-          <span style={panelStyles.exerciseMeta}>
-            {[comoTexto(ex.formato, formato), actual.sets_reps].filter(Boolean).join(' · ')}
-          </span>
-        </>
-      ) : (
-        <span style={panelStyles.exerciseMeta}>
-          {[actual.sets_reps, actual.rest_time ? `descanso ${actual.rest_time}s` : null]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-      )}
-    </div>
-  )
-}
-
-const panelStyles = {
-  wrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%' },
-  empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 90 },
-  media: {
-    width: '100%',
-    aspectRatio: '16 / 10',
-    borderRadius: 12,
-    overflow: 'hidden',
-    background: '#000',
-  },
-  mediaEl: { width: '100%', height: '100%', objectFit: 'cover', border: 0 },
-  exerciseName: { color: 'white', fontSize: 15, fontWeight: 700, textAlign: 'center' },
-  exerciseMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' },
-  formato: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
-    border: '2px solid', borderRadius: 14, padding: '6px 14px', minWidth: 110,
-  },
-  formatoFase: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5 },
-  // The seconds are the biggest thing on the box, because from the floor that is the only
-  // part anyone reads.
-  formatoSeg: { fontSize: 40, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1 },
-  formatoRonda: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
-  // Un EMOM con varios ejercicios por minuto no tiene lugar para un video por ejercicio en una
-  // columna de box — así que en vez de video, cada ejercicio del minuto es una tarjeta de
-  // texto grande: lo que tiene que hacer (prescripción) arriba, y con qué (nombre) abajo.
-  minuto: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%' },
-  minutoFila: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-    padding: '10px 8px', borderRadius: 10,
-    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-  },
-  minutoFilaPrescripcion: { color: '#F45F37', fontSize: 20, fontWeight: 800, fontFamily: 'monospace' },
-  minutoFilaNombre: { color: 'white', fontSize: 14, fontWeight: 700, textAlign: 'center' },
-}
-
-function BoxSlot({ box, lineNumber }) {
-  const countdown = useCountdown(box.status === 'occupied' ? box.advances_at : null)
+function BoxSlot({ box, line }) {
+  const countdown = formatMMSS(useCountdown(box.status === 'occupied' ? box.advances_at : null))
   const isOccupied = box.status === 'occupied'
-  // The exercise arrives with the box in a single payload — no per-box fetch, so five
+  // El exercise arrives with the box in a single payload — no per-box fetch, so five
   // boxes changing at once is one request, not six.
   const exercise = box.ejercicio
-  // Todos los ejercicios de la estación (para EMOM con más de uno por minuto). `ejercicio`
-  // arriba sigue siendo el primero solo, para lo que no lo necesita.
-  const exercises = box.ejercicios
+  const exercises = box.ejercicios?.length ? box.ejercicios : exercise ? [exercise] : []
+
+  // Explicación (los primeros explicacion_seg del box) vs. estación (el resto, hasta
+  // advances_at). `line?.explicacion_seg` todavía puede no venir en el payload de tv_linea —
+  // useBoxPhase cae al default de la migración (60s) mientras tanto, ver tvClock.js.
+  const phase = useBoxPhase(isOccupied ? box.entered_at : null, explicacionSegDeLinea(line))
+  const enExplicacion = isOccupied && phase.fase === 'explicacion'
 
   return (
     <div
@@ -259,7 +36,7 @@ function BoxSlot({ box, lineNumber }) {
       }}
     >
       <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: 600, letterSpacing: 1 }}>
-        BOX {boxLabel(lineNumber, box.line_position)}
+        BOX {boxLabel(line?.line_number, box.line_position)}
       </span>
       {isOccupied ? (
         <>
@@ -269,7 +46,11 @@ function BoxSlot({ box, lineNumber }) {
           <span style={{ color: '#F45F37', fontSize: 22, fontWeight: 800, fontFamily: 'monospace' }}>
             {countdown}
           </span>
-          <ExercisePanel exercise={exercise} exercises={exercises} entradaIso={box.entered_at} />
+          {enExplicacion ? (
+            <ExplicacionPanel exercises={exercises} restanteSeg={phase.restanteExplicacionSeg} />
+          ) : (
+            <ExercisePanel exercise={exercise} exercises={exercises} estacionInicioIso={phase.estacionInicioIso} />
+          )}
         </>
       ) : (
         <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>Libre</span>
@@ -289,6 +70,13 @@ export default function QueueTv() {
   // One call for the whole screen. It is also the only way this page can read anything:
   // the TV route is public and every underlying table is behind "authenticated", so the
   // payload comes from a function that anon may call and the tables stay closed.
+  //
+  // NOTA (2026-09-23): tv_linea() todavía no manda explicacion_seg/estacion_seg/
+  // demo_estacion_seg/modo_demo en `linea` — las columnas ya existen en production_lines
+  // pero la función no las expone al anon. Hasta que se actualice esa migración (en
+  // tecnofit-supabase, fuera de este worktree), esta pantalla usa los defaults de tvClock.js
+  // (60s / 420s), que son los mismos valores por default de la migración — así que hoy se
+  // comporta igual, y el día que el RPC los mande, arranca a leerlos solo.
   const refresh = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc('tv_linea', { p_line_id: Number(lineaId) })
@@ -360,7 +148,7 @@ export default function QueueTv() {
 
       <div style={{ display: 'flex', gap: 16, flex: 1 }}>
         {boxes.map((box) => (
-          <BoxSlot key={box.line_position} box={box} lineNumber={line?.line_number} />
+          <BoxSlot key={box.line_position} box={box} line={line} />
         ))}
         {boxes.length === 0 && (
           <p style={{ color: 'rgba(255,255,255,0.4)', margin: 'auto' }}>Sin boxes configurados</p>

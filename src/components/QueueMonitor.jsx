@@ -6,34 +6,14 @@ import hoyService from '../services/hoyService'
 import cajaService from '../services/cajaService'
 import { useSede } from '../contexts/SedeContext'
 import { formatARS } from '../lib/dinero'
+import { useCountdown as useCountdownSeg, useBoxPhase, explicacionSegDeLinea, formatMMSS } from '../lib/tvClock'
 import Sidecart from './Sidecart'
 
-// Drift-free countdown driven off requestAnimationFrame + an absolute target
-// timestamp, only setState-ing on integer-second change — same pattern as
-// QueueTv.jsx (ported from Lucas Barral's box-display timer).
+// Drift-free countdown driven off requestAnimationFrame + an absolute target timestamp — mismo
+// patrón que tvClock.js, acá sólo formateado mm:ss directo (varias filas de este monitor lo
+// usan sin pasar por formatMMSS explícito).
 function useCountdown(targetIso) {
-  const [secondsLeft, setSecondsLeft] = useState(() =>
-    targetIso ? Math.max(0, Math.ceil((new Date(targetIso).getTime() - Date.now()) / 1000)) : null
-  )
-
-  useEffect(() => {
-    if (!targetIso) {
-      setSecondsLeft(null)
-      return
-    }
-    const targetMs = new Date(targetIso).getTime()
-    let rafId
-    const loop = () => {
-      const remaining = Math.max(0, Math.ceil((targetMs - Date.now()) / 1000))
-      setSecondsLeft((prev) => (prev !== remaining ? remaining : prev))
-      rafId = window.requestAnimationFrame(loop)
-    }
-    rafId = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(rafId)
-  }, [targetIso])
-
-  if (secondsLeft == null) return ''
-  return `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
+  return formatMMSS(useCountdownSeg(targetIso))
 }
 
 function formatWait(createdAt) {
@@ -81,9 +61,10 @@ function RiesgoBadge({ riesgo, dias, compact = false }) {
   )
 }
 
-function BoxCard({ box, lineNumber, onFree, riesgo, onVerSocio }) {
+function BoxCard({ box, line, onFree, riesgo, onVerSocio }) {
   const countdown = useCountdown(box.status === 'occupied' ? box.advances_at : null)
   const isOccupied = box.status === 'occupied'
+  const phase = useBoxPhase(isOccupied ? box.entered_at : null, explicacionSegDeLinea(line))
 
   return (
     <div
@@ -92,7 +73,7 @@ function BoxCard({ box, lineNumber, onFree, riesgo, onVerSocio }) {
       }`}
     >
       <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wide">
-        Box {boxLabel(lineNumber, box.boxes?.line_position)}
+        Box {boxLabel(line?.line_number, box.boxes?.line_position)}
       </span>
       {isOccupied ? (
         <>
@@ -110,6 +91,11 @@ function BoxCard({ box, lineNumber, onFree, riesgo, onVerSocio }) {
             </span>
             {riesgo && <RiesgoBadge riesgo={riesgo.risk_bucket} dias={riesgo.days_since_last_visit} compact />}
           </button>
+          {/* Explicación vs. estación: quien atiende la sala ve si todavía está en el minuto
+              de explicación (mismo cálculo que usa la TV, no una aproximación aparte). */}
+          <span className={`text-[11px] font-mono ${phase.fase === 'explicacion' ? 'text-amber-600' : 'text-text-tertiary'}`}>
+            {phase.fase === 'explicacion' ? `Explicación ${formatMMSS(phase.restanteExplicacionSeg)}` : `Estación ${countdown}`}
+          </span>
           <div className="flex items-center gap-1 text-xs text-brand font-mono">
             <ClockIcon className="h-3.5 w-3.5" />
             {countdown}
@@ -164,9 +150,19 @@ function LinePipeline({ line, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSoc
     <div className="card space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-text-primary">{line.name}</h2>
-        <span className="text-xs text-text-tertiary">
-          {ocupados} de {boxes.length} en uso
-        </span>
+        <div className="flex items-center gap-3">
+          <a
+            href={`/lista-espera/tv/${line.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-text-tertiary hover:text-brand"
+          >
+            Ver TV
+          </a>
+          <span className="text-xs text-text-tertiary">
+            {ocupados} de {boxes.length} en uso
+          </span>
+        </div>
       </div>
 
       {/* Wrap, no scroll horizontal (Mateo, 2026-09-10): media línea escondida a la derecha
@@ -176,7 +172,7 @@ function LinePipeline({ line, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSoc
           <BoxCard
             key={box.id}
             box={box}
-            lineNumber={line.line_number}
+            line={line}
             onFree={onFreeBox}
             riesgo={box.users ? riesgoPorUsuario.get(box.users.id) : null}
             onVerSocio={onVerSocio}
@@ -451,10 +447,22 @@ export default function QueueMonitor() {
             Monitor en vivo — se actualiza solo
           </p>
         </div>
-        <button onClick={fetchLines} className="btn-secondary flex items-center gap-2 text-sm">
-          <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {sedeId && (
+            <a
+              href={`/lista-espera/tv/sede/${sedeId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary flex items-center gap-2 text-sm"
+            >
+              TV de sede
+            </a>
+          )}
+          <button onClick={fetchLines} className="btn-secondary flex items-center gap-2 text-sm">
+            <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {loading ? (

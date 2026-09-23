@@ -276,6 +276,29 @@ export const queueService = {
     }
   },
 
+  // Lo mismo que getWaitingForLocation pero sin dejar afuera a quien ya está confirmando su
+  // turno — la TV de sede (QueueTvSede.jsx) necesita mostrar a esa persona con su línea
+  // destino, no sólo a los que siguen esperando. Requiere sesión de staff (RLS): la TV se abre
+  // logueada en la máquina del gym, igual que el resto del admin.
+  async getQueueForLocation(locationId) {
+    try {
+      let query = supabase
+        .from('queue_entries')
+        .select('*, users (id, first_name, last_name), production_lines (id, name, line_number)')
+        .in('status', ['waiting', 'confirming'])
+        .order('posicion', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (locationId) query = query.eq('location_id', locationId)
+
+      const { data, error } = await query
+      if (error) throw error
+      return { data }
+    } catch (error) {
+      console.error('Error fetching location queue:', error)
+      throw error
+    }
+  },
+
   // Realtime de la cola de la sede. NO se puede reusar subscribeToLine: ése filtra por
   // `production_line_id`, y una fila en espera lo tiene en NULL — no llegaría nunca. Sin
   // esto recepción tendría que apretar Actualizar para ver quién entró, que es justo lo
