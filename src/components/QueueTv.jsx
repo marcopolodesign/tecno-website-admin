@@ -59,8 +59,11 @@ function BoxSlot({ box, line }) {
   )
 }
 
-export default function QueueTv() {
-  const { lineaId } = useParams()
+// overrideLineaId: cuando la pantalla se abre por slug (TvPorSlug.jsx), el id resuelto llega
+// por prop en vez de por la URL — la ruta ahí es /:sede/:linea, no /lista-espera/tv/:lineaId.
+export default function QueueTv({ overrideLineaId } = {}) {
+  const { lineaId: lineaIdDeUrl } = useParams()
+  const lineaId = overrideLineaId ?? lineaIdDeUrl
   const [line, setLine] = useState(null)
   const [boxes, setBoxes] = useState([])
   const [confirming, setConfirming] = useState(null)

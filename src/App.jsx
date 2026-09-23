@@ -30,6 +30,8 @@ import QueueConfig from './components/QueueConfig'
 import QueueTv from './components/QueueTv'
 import QueueTvEstacion from './components/QueueTvEstacion'
 import QueueTvSede from './components/QueueTvSede'
+import TvPorSlug from './components/TvPorSlug'
+import TvIndex from './components/TvIndex'
 import Sidebar from './components/Sidebar'
 import ShellGlow from './components/ShellGlow'
 import { authService } from './services/authService'
@@ -38,7 +40,37 @@ import { SedeProvider } from './contexts/SedeContext'
 // Emails allowed to see fitness section (beta feature)
 const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
 
+// tv.somostecnofit.com no es el CRM: es sólo las pantallas de TV, sin login ni sidebar. La
+// decisión se toma acá, antes de cualquier hook, para no meter el chequeo de hostname dentro
+// de un componente que ya llama useState/useEffect (rompería las reglas de hooks si alguna
+// vez dejara de ser constante durante la vida del componente).
+function esHostDeTv() {
+  return typeof window !== 'undefined' && window.location.hostname.startsWith('tv.')
+}
+
 function App() {
+  if (esHostDeTv()) {
+    return <TvHostApp />
+  }
+  return <MainApp />
+}
+
+// El router completo de tv.somostecnofit.com: nada de auth, nada de sidebar — sólo las tres
+// pantallas de TV resueltas por slug (/palermo, /palermo/A, /palermo/A/1).
+function TvHostApp() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<TvIndex />} />
+        <Route path="/:sede" element={<TvPorSlug modo="sede" />} />
+        <Route path="/:sede/:linea" element={<TvPorSlug modo="linea" />} />
+        <Route path="/:sede/:linea/:estacion" element={<TvPorSlug modo="estacion" />} />
+      </Routes>
+    </Router>
+  )
+}
+
+function MainApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState(null)
@@ -148,6 +180,14 @@ function App() {
             anon, así que no necesita sesión de staff ni el chrome del CRM alrededor. */}
         <Route path="/lista-espera/tv/sede" element={<QueueTvSede />} />
         <Route path="/lista-espera/tv/sede/:locationId" element={<QueueTvSede />} />
+
+        {/* Mismas pantallas por slug, bajo /tv/... en cualquier host — para probarlas en el
+            preview de Vercel, donde el hostname no empieza con "tv.". En producción esto vive
+            en tv.somostecnofit.com sin el prefijo (ver TvHostApp más arriba). */}
+        <Route path="/tv" element={<TvIndex />} />
+        <Route path="/tv/:sede" element={<TvPorSlug modo="sede" />} />
+        <Route path="/tv/:sede/:linea" element={<TvPorSlug modo="linea" />} />
+        <Route path="/tv/:sede/:linea/:estacion" element={<TvPorSlug modo="estacion" />} />
 
         {/* ─── All other routes — behind auth wall ─── */}
         <Route

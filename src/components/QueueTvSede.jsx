@@ -117,8 +117,11 @@ function Reloj() {
   return <span style={{ fontFamily: MONO, fontSize: 32, color: '#4b5563' }}>{ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
 }
 
-export default function QueueTvSede() {
-  const { locationId } = useParams()
+// overrideLocationId: llega por prop cuando la pantalla se abre por slug (TvPorSlug.jsx) en
+// vez de por /lista-espera/tv/sede/:locationId.
+export default function QueueTvSede({ overrideLocationId } = {}) {
+  const { locationId: locationIdDeUrl } = useParams()
+  const locationId = overrideLocationId ?? locationIdDeUrl
   const [data, setData] = useState(null)
   const [connected, setConnected] = useState(true)
   const pollRef = useRef(null)

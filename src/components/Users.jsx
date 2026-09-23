@@ -22,6 +22,7 @@ import { useSede } from '../contexts/SedeContext'
 import { supabase } from '../lib/supabase'
 import cajaService from '../services/cajaService'
 import { formatARS } from '../lib/dinero'
+import RiesgoBadge from './RiesgoBadge'
 
 // Helper to format date without timezone issues
 // Parses YYYY-MM-DD string and formats as DD/MM/YYYY without timezone shift
@@ -47,6 +48,9 @@ const Users = () => {
   // Saldo de caja del socio (ventas fiadas por mostrador que todavía no pagó) — sólo se
   // pide cuando se abre su ficha, no en el listado entero.
   const [saldoCaja, setSaldoCaja] = useState(null)
+  // Riesgo de abandono del socio abierto — siempre visible en la ficha, no sólo cuando está
+  // en riesgo/alto riesgo (pedido de Mateo, 2026-09-23).
+  const [riesgoSocio, setRiesgoSocio] = useState(null)
   const [editFormData, setEditFormData] = useState({})
   const [hasChanges, setHasChanges] = useState(false)
   const [sellers, setSellers] = useState([])
@@ -138,6 +142,19 @@ const Users = () => {
     cajaService.saldoSocio(selectedUser.id)
       .then((saldo) => { if (!cancelado) setSaldoCaja(saldo) })
       .catch((error) => console.error('Error fetching saldo de caja:', error))
+    return () => { cancelado = true }
+  }, [selectedUser?.id])
+
+  // Riesgo de abandono — mismo patrón que el saldo: se pide sólo cuando se abre una ficha.
+  useEffect(() => {
+    if (!selectedUser?.id) {
+      setRiesgoSocio(null)
+      return
+    }
+    let cancelado = false
+    usersService.getRiesgo(selectedUser.id)
+      .then((riesgo) => { if (!cancelado) setRiesgoSocio(riesgo) })
+      .catch((error) => console.error('Error fetching riesgo del socio:', error))
     return () => { cancelado = true }
   }, [selectedUser?.id])
 
@@ -949,6 +966,16 @@ const Users = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <p className="text-sm text-text-secondary truncate">
+                  {selectedUser.firstName} {selectedUser.lastName}
+                </p>
+                <RiesgoBadge
+                  riesgo={riesgoSocio?.risk_bucket}
+                  dias={riesgoSocio?.days_since_last_visit}
+                  mostrarSinDatos
+                />
               </div>
             </div>
 

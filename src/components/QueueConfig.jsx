@@ -4,6 +4,7 @@ import { queueService, boxLabel } from '../services/queueService'
 import { locationsService } from '../services/locationsService'
 import { explicacionSegDeLinea, estacionSegDeLinea, DEFAULT_DEMO_ESTACION_SEG } from '../lib/tvClock'
 import { mmss } from '../lib/formatos'
+import { tvUrlSede, tvUrlLinea, tvUrlEstacion } from '../lib/slug'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import Modal from './Modal'
@@ -97,6 +98,17 @@ function LineBoxes({ line, onChanged }) {
               #{box.line_position} — {box.name} (global box {box.box_number})
             </span>
             <div className="flex items-center gap-2">
+              {line.locations?.name && (
+                <a
+                  href={tvUrlEstacion(line.locations.name, line.line_number, box.line_position)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] font-mono text-text-tertiary hover:text-brand"
+                  title="URL de esta TV — se configura una vez y no cambia"
+                >
+                  {tvUrlEstacion(line.locations.name, line.line_number, box.line_position).replace('https://', '')}
+                </a>
+              )}
               <a
                 href={`/lista-espera/tv/${line.id}/estacion/${box.line_position}`}
                 target="_blank"
@@ -343,9 +355,14 @@ export default function QueueConfig() {
                         href={`/lista-espera/tv/sede/${locationId}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-1.5 text-xs text-text-tertiary hover:text-brand"
+                        className="flex flex-col items-end gap-0.5 text-xs text-text-tertiary hover:text-brand"
                       >
-                        <TvIcon className="h-4 w-4" /> TV de sede
+                        <span className="flex items-center gap-1.5">
+                          <TvIcon className="h-4 w-4" /> TV de sede
+                        </span>
+                        {nombreSede && (
+                          <span className="text-[11px] font-mono">{tvUrlSede(nombreSede).replace('https://', '')}</span>
+                        )}
                       </a>
                     )}
                     <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
@@ -398,9 +415,16 @@ export default function QueueConfig() {
                           href={`/lista-espera/tv/${line.id}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-text-tertiary hover:text-brand"
+                          className="flex flex-col items-end gap-0.5 text-xs text-text-tertiary hover:text-brand"
                         >
-                          <TvIcon className="h-4 w-4" /> TV de línea
+                          <span className="flex items-center gap-1.5">
+                            <TvIcon className="h-4 w-4" /> TV de línea
+                          </span>
+                          {line.locations?.name && (
+                            <span className="text-[11px] font-mono">
+                              {tvUrlLinea(line.locations.name, line.line_number).replace('https://', '')}
+                            </span>
+                          )}
                         </a>
                         <button onClick={() => openEditModal(line)} className="text-text-tertiary hover:text-brand">
                           <PencilIcon className="h-4 w-4" />

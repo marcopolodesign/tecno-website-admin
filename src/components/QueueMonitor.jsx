@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { ArrowPathIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, ClockIcon } from '@heroicons/react/24/outline'
 import { queueService, boxLabel } from '../services/queueService'
 import { usersService } from '../services/usersService'
 import hoyService from '../services/hoyService'
@@ -7,7 +7,9 @@ import cajaService from '../services/cajaService'
 import { useSede } from '../contexts/SedeContext'
 import { formatARS } from '../lib/dinero'
 import { useCountdown as useCountdownSeg, useBoxPhase, explicacionSegDeLinea, formatMMSS } from '../lib/tvClock'
+import { tvUrlSede, tvUrlLinea } from '../lib/slug'
 import Sidecart from './Sidecart'
+import RiesgoBadge from './RiesgoBadge'
 
 // Drift-free countdown driven off requestAnimationFrame + an absolute target timestamp — mismo
 // patrón que tvClock.js, acá sólo formateado mm:ss directo (varias filas de este monitor lo
@@ -42,28 +44,6 @@ function Avatar({ user, size = 'md', riesgo }) {
       ) : (
         iniciales(user)
       )}
-    </span>
-  )
-}
-
-const RIESGO_TEXTO = { high_risk: 'Alto riesgo', risk: 'Riesgo', good: 'Bien', very_good: 'Muy bien' }
-const RIESGO_TONO = {
-  high_risk: 'bg-error/10 text-error',
-  risk: 'bg-warning/10 text-warning',
-  good: 'bg-info/10 text-info',
-  very_good: 'bg-success/10 text-success',
-}
-
-// El riesgo va con el nombre, no escondido en una pantalla de métricas: quien atiende la
-// sala es quien puede hacer algo al respecto mientras la persona está adentro.
-function RiesgoBadge({ riesgo, dias, compact = false }) {
-  if (!riesgo || !RIESGO_TEXTO[riesgo]) return null
-  const alerta = riesgo === 'high_risk' || riesgo === 'risk'
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${RIESGO_TONO[riesgo]}`}>
-      {alerta && <ExclamationTriangleIcon className="h-3 w-3" />}
-      {RIESGO_TEXTO[riesgo]}
-      {dias != null && (compact ? ` · ${dias}d` : ` · ${dias}d sin venir`)}
     </span>
   )
 }
@@ -163,6 +143,7 @@ function LinePipeline({ line, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSoc
             target="_blank"
             rel="noreferrer"
             className="text-xs text-text-tertiary hover:text-brand"
+            title={line.locations?.name ? tvUrlLinea(line.locations.name, line.line_number) : undefined}
           >
             Ver TV
           </a>
@@ -272,9 +253,10 @@ function ListaDeEspera({ entries, riesgoPorUsuario, onVerSocio }) {
 // Ficha corta del socio, para el que atiende la sala. No es la de la pantalla de Socios —
 // ahí se edita, acá se decide en diez segundos si hay algo que hacer con esta persona
 // mientras la tenés adelante.
-function SocioSidecart({ userId, onClose, riesgo }) {
+function SocioSidecart({ userId, onClose, riesgo: riesgoDeSala }) {
   const [socio, setSocio] = useState(null)
   const [saldo, setSaldo] = useState(null)
+  const [riesgoPropio, setRiesgoPropio] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState(null)
 
@@ -284,6 +266,7 @@ function SocioSidecart({ userId, onClose, riesgo }) {
     setError(null)
     setSocio(null)
     setSaldo(null)
+    setRiesgoPropio(null)
     usersService
       .getUserDetalle(userId)
       .then(setSocio)
@@ -291,7 +274,15 @@ function SocioSidecart({ userId, onClose, riesgo }) {
       .finally(() => setCargando(false))
     // El saldo es un extra: si falla, la ficha se muestra igual sin esa línea.
     cajaService.saldoSocio(userId).then(setSaldo).catch(() => setSaldo(null))
+    // El riesgo va SIEMPRE en la ficha, esté o no la persona en la sala ahora mismo. Si ya
+    // viene resuelto desde el mapa de la sala (riesgoDeSala) no hace falta pedirlo de nuevo,
+    // pero si el sidecart se abre para alguien que no está entrenando (ej. desde otra
+    // pantalla) igual se busca acá.
+    usersService.getRiesgo(userId).then(setRiesgoPropio).catch(() => setRiesgoPropio(null))
   }, [userId])
+
+  const riesgo = riesgoDeSala || riesgoPropio
+  const enRiesgo = riesgo?.risk_bucket === 'high_risk' || riesgo?.risk_bucket === 'risk'
 
   const vence = socio?.membership_end_date
     ? Math.ceil((new Date(socio.membership_end_date) - new Date()) / 86400000)
@@ -315,14 +306,14 @@ function SocioSidecart({ userId, onClose, riesgo }) {
             </div>
           </div>
 
-          {riesgo && (
-            <div className="rounded-lg bg-error/5 p-3">
-              <RiesgoBadge riesgo={riesgo.risk_bucket} dias={riesgo.days_since_last_visit} />
+          <div className={`rounded-lg p-3 ${enRiesgo ? 'bg-error/5' : 'bg-bg-surface'}`}>
+            <RiesgoBadge riesgo={riesgo?.risk_bucket} dias={riesgo?.days_since_last_visit} mostrarSinDatos />
+            {riesgoDeSala && enRiesgo && (
               <p className="text-xs text-text-secondary mt-1.5">
                 Está entrenando ahora. Es el momento de hablarle.
               </p>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="space-y-2">
             <Dato label="Teléfono" valor={socio.phone} />
@@ -379,7 +370,7 @@ function Dato({ label, valor, tono }) {
 }
 
 export default function QueueMonitor() {
-  const { sedeId } = useSede()
+  const { sedeId, sede } = useSede()
   const [lines, setLines] = useState([])
   const [loading, setLoading] = useState(true)
   const [espera, setEspera] = useState([])
@@ -469,9 +460,15 @@ export default function QueueMonitor() {
               href={`/lista-espera/tv/sede/${sedeId}`}
               target="_blank"
               rel="noreferrer"
-              className="btn-secondary flex items-center gap-2 text-sm"
+              className="btn-secondary flex flex-col items-center gap-0.5 text-sm"
+              title={sede?.name ? tvUrlSede(sede.name) : undefined}
             >
-              TV de sede
+              <span>TV de sede</span>
+              {sede?.name && (
+                <span className="text-[10px] font-mono font-normal opacity-70">
+                  {tvUrlSede(sede.name).replace('https://', '')}
+                </span>
+              )}
             </a>
           )}
           <button onClick={fetchLines} className="btn-secondary flex items-center gap-2 text-sm">

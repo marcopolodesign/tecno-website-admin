@@ -317,8 +317,12 @@ function EstacionLibre({ box, line, posicion, confirming }) {
   )
 }
 
-export default function QueueTvEstacion() {
-  const { lineaId, posicion } = useParams()
+// overrideLineaId/overridePosicion: llegan por prop cuando la pantalla se abre por slug
+// (TvPorSlug.jsx) en vez de por /lista-espera/tv/:lineaId/estacion/:posicion.
+export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = {}) {
+  const { lineaId: lineaIdDeUrl, posicion: posicionDeUrl } = useParams()
+  const lineaId = overrideLineaId ?? lineaIdDeUrl
+  const posicion = overridePosicion ?? posicionDeUrl
   const pos = Number(posicion)
   const [line, setLine] = useState(null)
   const [boxes, setBoxes] = useState([])

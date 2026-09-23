@@ -20,6 +20,25 @@ export const usersService = {
     return data
   },
 
+  // Riesgo de abandono de un socio puntual — riesgo_socios() devuelve una fila por cada uno
+  // que SÍ tiene una visita previa; sin fila (nunca vino) esto devuelve null y quien llama
+  // muestra "Sin visitas previas" en vez de inventar un bucket.
+  async getRiesgo(userId) {
+    if (!userId) return null
+    const { data, error } = await supabase.rpc('riesgo_socios', { p_user_ids: [userId] })
+    if (error) throw error
+    return data?.[0] || null
+  },
+
+  // Mismo RPC en lote, para no pedir uno por fila en una lista (ej. la grilla de Socios).
+  async getRiesgoEnLote(userIds) {
+    const ids = [...new Set((userIds || []).filter(Boolean))]
+    if (ids.length === 0) return []
+    const { data, error } = await supabase.rpc('riesgo_socios', { p_user_ids: ids })
+    if (error) throw error
+    return data || []
+  },
+
   async getUsers(sedeId) {
     try {
       let query = supabase

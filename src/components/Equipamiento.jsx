@@ -40,6 +40,10 @@ export default function Equipamiento() {
   const [error, setError] = useState(null)
   const [abierto, setAbierto] = useState(null)
   const [sumando, setSumando] = useState(null)
+  // "Por equipamiento" es la pantalla nueva y el default: cargar un material y decidir en el
+  // mismo lugar dónde está disponible. "Por estación" es la vista de siempre — se mantiene
+  // porque sigue siendo la mejor forma de ver TODO lo que tiene un box puntual de una.
+  const [tab, setTab] = useState('material')
 
   // Una línea no tiene un largo fijo: es la lista de sus boxes. Sumar uno es sumar una fila, y
   // el gimnasio no debería necesitarnos para eso.
@@ -120,84 +124,106 @@ export default function Equipamiento() {
     <div style={e.pagina}>
       <div style={e.encabezado}>
         <div>
-          <h1 style={e.h1}>Equipamiento por box</h1>
+          <h1 style={e.h1}>Equipamiento</h1>
           <p style={e.sub}>
             {cargando ? 'Cargando…' : `${boxes.length} boxes · qué material tiene cada uno`}
           </p>
         </div>
-      </div>
-
-      {vacios > 0 && (
-        <div style={e.aviso}>
-          <strong>{vacios}</strong> {vacios === 1 ? 'box no tiene' : 'boxes no tienen'} material
-          cargado. Un box sin material sólo puede correr los ejercicios que no necesitan nada —
-          hoy son <strong>28</strong> de 309, y el motor de rutinas no le puede dar otra cosa.
+        <div style={e.tabs}>
+          <button
+            type="button"
+            onClick={() => setTab('material')}
+            style={{ ...e.tab, ...(tab === 'material' ? e.tabActivo : {}) }}
+          >
+            Por equipamiento
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('estacion')}
+            style={{ ...e.tab, ...(tab === 'estacion' ? e.tabActivo : {}) }}
+          >
+            Por estación
+          </button>
         </div>
-      )}
+      </div>
 
       {error && <div style={e.error}>{error}</div>}
 
-      {porLinea.map((g) => (
-        <div key={g.lineaId ?? 'sin'} style={e.grupo}>
-          <div style={e.grupoEncabezado}>
-            <span style={e.grupoTitulo}>{g.linea ?? 'Sin línea asignada'}</span>
-            <span style={e.grupoCuenta}>
-              {g.boxes.length} {g.boxes.length === 1 ? 'estación' : 'estaciones'}
-            </span>
-            {g.lineaId && (
-              <button
-                type="button"
-                onClick={() => sumarBox(g.lineaId)}
-                disabled={sumando === g.lineaId}
-                style={e.botonSumar}
-              >
-                {sumando === g.lineaId ? 'Agregando…' : '+ Estación'}
-              </button>
+      {tab === 'material' ? (
+        <EquipamientoPorMaterial boxes={boxes} cargando={cargando} onCambiado={cargar} />
+      ) : (
+        <>
+          {vacios > 0 && (
+            <div style={e.aviso}>
+              <strong>{vacios}</strong> {vacios === 1 ? 'box no tiene' : 'boxes no tienen'} material
+              cargado. Un box sin material sólo puede correr los ejercicios que no necesitan nada —
+              hoy son <strong>28</strong> de 309, y el motor de rutinas no le puede dar otra cosa.
+            </div>
+          )}
+
+          {porLinea.map((g) => (
+            <div key={g.lineaId ?? 'sin'} style={e.grupo}>
+              <div style={e.grupoEncabezado}>
+                <span style={e.grupoTitulo}>{g.linea ?? 'Sin línea asignada'}</span>
+                <span style={e.grupoCuenta}>
+                  {g.boxes.length} {g.boxes.length === 1 ? 'estación' : 'estaciones'}
+                </span>
+                {g.lineaId && (
+                  <button
+                    type="button"
+                    onClick={() => sumarBox(g.lineaId)}
+                    disabled={sumando === g.lineaId}
+                    style={e.botonSumar}
+                  >
+                    {sumando === g.lineaId ? 'Agregando…' : '+ Estación'}
+                  </button>
+                )}
+              </div>
+              <div style={e.grilla}>
+                {g.boxes.map((b) => (
+                  <Tarjeta key={b.id} box={b} onAbrir={() => setAbierto(b)} />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {sedeId && (
+            <button
+              type="button"
+              onClick={() => sumarLinea(sedeId)}
+              disabled={sumando === 'linea'}
+              style={e.botonSumarLinea}
+            >
+              {sumando === 'linea' ? 'Agregando…' : '+ Agregar una línea'}
+            </button>
+          )}
+
+          <Sidecart
+            isOpen={Boolean(abierto)}
+            onClose={() => setAbierto(null)}
+            title={abierto ? etiqueta(abierto) : ''}
+            subtitle={
+              abierto
+                ? `${abierto.linea ?? 'Sin línea'} · ${abierto.elementos.length} materiales · ${abierto.ejercicios_posibles} ejercicios posibles`
+                : undefined
+            }
+            size="lg"
+          >
+            {abierto && (
+              <EditorBox
+                box={abierto}
+                boxes={boxes}
+                onGuardado={(fila) => {
+                  alGuardar(fila)
+                  setAbierto((a) => (a && a.id === fila.id ? { ...a, ...fila } : a))
+                }}
+                onCopiado={cargar}
+                onCerrar={() => setAbierto(null)}
+              />
             )}
-          </div>
-          <div style={e.grilla}>
-            {g.boxes.map((b) => (
-              <Tarjeta key={b.id} box={b} onAbrir={() => setAbierto(b)} />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {sedeId && (
-        <button
-          type="button"
-          onClick={() => sumarLinea(sedeId)}
-          disabled={sumando === 'linea'}
-          style={e.botonSumarLinea}
-        >
-          {sumando === 'linea' ? 'Agregando…' : '+ Agregar una línea'}
-        </button>
+          </Sidecart>
+        </>
       )}
-
-      <Sidecart
-        isOpen={Boolean(abierto)}
-        onClose={() => setAbierto(null)}
-        title={abierto ? etiqueta(abierto) : ''}
-        subtitle={
-          abierto
-            ? `${abierto.linea ?? 'Sin línea'} · ${abierto.elementos.length} materiales · ${abierto.ejercicios_posibles} ejercicios posibles`
-            : undefined
-        }
-        size="lg"
-      >
-        {abierto && (
-          <EditorBox
-            box={abierto}
-            boxes={boxes}
-            onGuardado={(fila) => {
-              alGuardar(fila)
-              setAbierto((a) => (a && a.id === fila.id ? { ...a, ...fila } : a))
-            }}
-            onCopiado={cargar}
-            onCerrar={() => setAbierto(null)}
-          />
-        )}
-      </Sidecart>
     </div>
   )
 }
@@ -511,6 +537,267 @@ function Chip({ activo, onClick, children }) {
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Por equipamiento: cargar un material nuevo y decidir en la misma pantalla dónde está
+// disponible, en vez de entrar box por box a tildarlo. La vista "Por estación" de arriba
+// sigue existiendo para ver TODO lo que tiene un box puntual — ésta arranca del otro lado:
+// del material hacia las estaciones.
+function EquipamientoPorMaterial({ boxes, cargando, onCambiado }) {
+  const [catalogo, setCatalogo] = useState([])
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(true)
+  const [error, setError] = useState(null)
+  const [abierto, setAbierto] = useState(null) // { esNuevo: true } | fila del catálogo | null
+  const [busqueda, setBusqueda] = useState('')
+
+  const cargarCatalogo = useCallback(async () => {
+    setCargandoCatalogo(true)
+    setError(null)
+    try {
+      const { data, error: err } = await supabase
+        .from('elementos')
+        .select('id, nombre, is_active')
+        .eq('is_active', true)
+        .order('nombre')
+      if (err) throw err
+      setCatalogo(data || [])
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setCargandoCatalogo(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    cargarCatalogo()
+  }, [cargarCatalogo])
+
+  const filtrado = useMemo(() => {
+    const q = busqueda.trim().toLowerCase()
+    return q ? catalogo.filter((m) => m.nombre.toLowerCase().includes(q)) : catalogo
+  }, [catalogo, busqueda])
+
+  const resumenAsignacion = (nombre) => {
+    const conMaterial = boxes.filter((b) => b.elementos.includes(nombre))
+    if (conMaterial.length === 0) return 'Sin asignar a ninguna estación'
+    const posiciones = [...new Set(conMaterial.map((b) => b.line_position))].sort((a, b) => a - b)
+    return `Estación${posiciones.length > 1 ? 'es' : ''} ${posiciones.join(', ')} · ${conMaterial.length} ${conMaterial.length === 1 ? 'box' : 'boxes'}`
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={e.filtros}>
+        <input
+          value={busqueda}
+          onChange={(ev) => setBusqueda(ev.target.value)}
+          placeholder="Buscar material…"
+          style={e.input}
+        />
+        <button type="button" onClick={() => setAbierto({ esNuevo: true })} style={e.botonPrimarioChico}>
+          + Nuevo material
+        </button>
+      </div>
+
+      {cargando || cargandoCatalogo ? (
+        <p style={e.sub}>Cargando…</p>
+      ) : filtrado.length === 0 ? (
+        <p style={e.vacio}>
+          {busqueda ? 'Nada coincide con esa búsqueda.' : 'Todavía no hay materiales cargados — empezá por "+ Nuevo material".'}
+        </p>
+      ) : (
+        <div style={e.grilla}>
+          {filtrado.map((m) => (
+            <button key={m.id} onClick={() => setAbierto(m)} style={e.tarjeta}>
+              <span style={e.nombre}>{m.nombre}</span>
+              <span style={e.cantidad}>{resumenAsignacion(m.nombre)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Sidecart
+        isOpen={Boolean(abierto)}
+        onClose={() => setAbierto(null)}
+        title={abierto?.esNuevo ? 'Nuevo material' : abierto?.nombre || ''}
+        subtitle={abierto && !abierto.esNuevo ? resumenAsignacion(abierto.nombre) : undefined}
+        size="lg"
+      >
+        {abierto && (
+          <EditorMaterial
+            elemento={abierto.esNuevo ? null : abierto}
+            boxes={boxes}
+            onGuardado={() => {
+              cargarCatalogo()
+              onCambiado?.()
+              setAbierto(null)
+            }}
+            onCerrar={() => setAbierto(null)}
+          />
+        )}
+      </Sidecart>
+    </div>
+  )
+}
+
+// El editor de un material: nombre (sólo si es nuevo) + dónde está disponible. "Estación N"
+// mueve los dos boxes de esa posición juntos (el criterio de espejo por defecto); "avanzado"
+// destraba boxes individuales para el caso de un box con equipamiento propio que necesita algo
+// distinto a su par.
+function EditorMaterial({ elemento, boxes, onGuardado, onCerrar }) {
+  const esNuevo = !elemento
+  const [nombre, setNombre] = useState('')
+  const [avanzado, setAvanzado] = useState(false)
+  const [seleccion, setSeleccion] = useState(
+    () => new Set(elemento ? boxes.filter((b) => b.elementos.includes(elemento.nombre)).map((b) => b.id) : [])
+  )
+  const [guardando, setGuardando] = useState(false)
+  const [guardado, setGuardado] = useState(false)
+  const [error, setError] = useState(null)
+
+  const estaciones = useMemo(() => {
+    const posiciones = [...new Set(boxes.map((b) => b.line_position))].sort((a, b) => a - b)
+    return posiciones.map((pos) => ({ pos, boxes: boxes.filter((b) => b.line_position === pos) }))
+  }, [boxes])
+
+  const estadoEstacion = (est) => {
+    const marcados = est.boxes.filter((b) => seleccion.has(b.id)).length
+    if (marcados === 0) return 'ninguna'
+    if (marcados === est.boxes.length) return 'todas'
+    return 'parcial'
+  }
+
+  const alternarEstacion = (est) => {
+    setGuardado(false)
+    setSeleccion((s) => {
+      const copia = new Set(s)
+      const todas = est.boxes.every((b) => copia.has(b.id))
+      est.boxes.forEach((b) => (todas ? copia.delete(b.id) : copia.add(b.id)))
+      return copia
+    })
+  }
+
+  const alternarBox = (boxId) => {
+    setGuardado(false)
+    setSeleccion((s) => {
+      const copia = new Set(s)
+      copia.has(boxId) ? copia.delete(boxId) : copia.add(boxId)
+      return copia
+    })
+  }
+
+  const guardar = async () => {
+    setGuardando(true)
+    setError(null)
+    try {
+      let nombreFinal = elemento?.nombre
+      if (esNuevo) {
+        const limpio = nombre.trim()
+        if (!limpio) throw new Error('Ponele un nombre al material.')
+        // Mismo RPC que usa el editor de ejercicios: agrega al catálogo cerrado, idempotente
+        // (si ya existe lo reactiva y devuelve la ortografía que ya estaba guardada).
+        const { data, error: err } = await supabase.rpc('agregar_elemento', { p_nombre: limpio })
+        if (err) throw err
+        nombreFinal = data
+      }
+
+      // guardar_box_elementos pide el array completo del box, no un delta — y ya mirror-ea
+      // sola a la estación hermana salvo que el box sea independiente. Se llama una vez por
+      // cada box cuyo estado realmente cambió, así que un box independiente que quedó afuera
+      // de la selección no se toca.
+      const cambios = boxes.filter((b) => b.elementos.includes(nombreFinal) !== seleccion.has(b.id))
+      for (const box of cambios) {
+        const nuevaLista = seleccion.has(box.id)
+          ? [...box.elementos, nombreFinal]
+          : box.elementos.filter((n) => n !== nombreFinal)
+        const { error: err } = await supabase.rpc('guardar_box_elementos', {
+          p_box_id: box.id,
+          p_elementos: nuevaLista,
+        })
+        if (err) throw err
+      }
+
+      setGuardado(true)
+      onGuardado?.(nombreFinal)
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div style={e.contenedor}>
+      {esNuevo && (
+        <Campo etiqueta="Nombre" ayuda="Queda disponible para asignar a ejercicios y a estaciones, con esta misma ortografía.">
+          <input
+            value={nombre}
+            onChange={(ev) => {
+              setNombre(ev.target.value)
+              setGuardado(false)
+            }}
+            placeholder="Ej: Colchoneta"
+            style={e.input}
+            autoFocus
+          />
+        </Campo>
+      )}
+
+      <Campo
+        etiqueta="Dónde está disponible"
+        ayuda="Una estación son los dos boxes con esa posición, uno por línea — se marcan juntos salvo que alguno tenga equipamiento propio."
+      >
+        {estaciones.length === 0 ? (
+          <p style={e.vacio}>No hay boxes configurados todavía.</p>
+        ) : (
+          <div style={e.chips}>
+            {estaciones.map((est) => {
+              const estado = estadoEstacion(est)
+              return (
+                <Chip key={est.pos} activo={estado !== 'ninguna'} onClick={() => alternarEstacion(est)}>
+                  Estación {est.pos}
+                  {estado === 'parcial' && <span style={e.chipNota}>parcial</span>}
+                </Chip>
+              )
+            })}
+          </div>
+        )}
+      </Campo>
+
+      <label style={e.avanzadoToggle}>
+        <input type="checkbox" checked={avanzado} onChange={(ev) => setAvanzado(ev.target.checked)} />
+        Elegir boxes individuales (avanzado)
+      </label>
+
+      {avanzado && (
+        <Campo etiqueta="Boxes" ayuda="Por si un box con equipamiento propio necesita algo distinto a su par.">
+          <div style={e.chips}>
+            {boxes.map((b) => (
+              <Chip key={b.id} activo={seleccion.has(b.id)} onClick={() => alternarBox(b.id)}>
+                {etiqueta(b)}
+                {b.equipamiento_independiente && <span style={e.chipNota}>propio</span>}
+              </Chip>
+            ))}
+          </div>
+        </Campo>
+      )}
+
+      {error && <div style={e.error}>{error}</div>}
+
+      <div style={e.acciones}>
+        <button
+          onClick={guardar}
+          disabled={guardando || (esNuevo && !nombre.trim())}
+          style={e.botonPrimario}
+        >
+          {guardando ? 'Guardando…' : guardado ? 'Guardado ✓' : esNuevo ? 'Crear y asignar' : 'Guardar asignación'}
+        </button>
+        <button type="button" onClick={onCerrar} style={e.syncBoton} disabled={guardando}>
+          Cerrar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const e = {
   pagina: { padding: 24, display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 1280, margin: '0 auto' },
   encabezado: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
@@ -596,6 +883,24 @@ const e = {
     padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb', background: 'white',
     fontSize: 14, color: '#374151', cursor: 'pointer',
   },
+  input: {
+    padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb', background: 'white',
+    fontSize: 14, color: '#111827', width: '100%',
+  },
+  tabs: { display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: '#F3F4F6', width: 'fit-content' },
+  tab: {
+    padding: '7px 14px', borderRadius: 9, border: 'none', background: 'transparent',
+    fontSize: 13, fontWeight: 600, color: '#6B7280', cursor: 'pointer',
+  },
+  tabActivo: { background: 'white', color: '#111827', boxShadow: '0 1px 2px rgba(17,24,39,.08)' },
+  botonPrimarioChico: {
+    padding: '9px 14px', borderRadius: 10, border: 'none', background: '#F45F37',
+    color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+  },
+  avanzadoToggle: {
+    display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#6B7280', cursor: 'pointer',
+  },
+  filtros: { display: 'flex', alignItems: 'center', gap: 10 },
   acciones: {
     display: 'flex', gap: 10, position: 'sticky', bottom: -20, background: 'white',
     padding: '12px 0 20px', marginBottom: -20, borderTop: '1px solid #f3f4f6',
