@@ -281,7 +281,7 @@ export default function QueueConfig() {
   // otros esperando. Sólo existe en staging (función demo_cargar_escena) y exige el modo demo.
   const handleCargarEscena = async (locationId) => {
     try {
-      const { data, error } = await supabase.rpc('demo_cargar_escena', { p_location_id: locationId })
+      const { data, error } = await supabase.rpc('demo_cargar_escena', { p_location_id: locationId, p_en_espera: 8 })
       if (error) throw error
       toast.success(`Escena cargada — ${data?.en_estaciones ?? 0} entrenando, ${data?.esperando ?? 0} esperando`)
       await fetchAll()
