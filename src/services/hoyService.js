@@ -122,6 +122,24 @@ export const hoyService = {
     return data || []
   },
 
+  // El riesgo de los que están en la sala ahora (esperando, confirmando o entrenando), con los
+  // cuatro niveles — muy bien, bien, riesgo, alto riesgo — y contando la última visita ANTERIOR
+  // a hoy: si no, quien acaba de entrar figura "0 días" y el dato desaparece justo cuando sirve.
+  async getRiesgoEnSala({ sedeId } = {}) {
+    let query = supabase
+      .from('queue_entries')
+      .select('user_id')
+      .in('status', ['waiting', 'confirming', 'in_box'])
+    if (sedeId) query = query.eq('location_id', sedeId)
+    const { data, error } = await query
+    if (error) throw error
+    const ids = [...new Set((data || []).map((r) => r.user_id))]
+    if (ids.length === 0) return []
+    const { data: riesgo, error: riesgoError } = await supabase.rpc('riesgo_socios', { p_user_ids: ids })
+    if (riesgoError) throw riesgoError
+    return riesgo || []
+  },
+
   // Mismo risk_bucket que ChurnRiskChart (rpc_metric_churn_risk) — nunca un criterio propio
   // que después se desalinee del panel de métricas de negocio.
   async getSociosEnRiesgo({ sedeId } = {}) {

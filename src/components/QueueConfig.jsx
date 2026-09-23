@@ -5,6 +5,7 @@ import { locationsService } from '../services/locationsService'
 import { explicacionSegDeLinea, estacionSegDeLinea, DEFAULT_DEMO_ESTACION_SEG } from '../lib/tvClock'
 import { mmss } from '../lib/formatos'
 import toast from 'react-hot-toast'
+import { supabase } from '../lib/supabase'
 import Modal from './Modal'
 
 function LineBoxes({ line, onChanged }) {
@@ -276,6 +277,19 @@ export default function QueueConfig() {
     }
   }
 
+  // Deja la sede lista para mostrar: socios de demo entrenando en las estaciones 2 a 5 y
+  // otros esperando. Sólo existe en staging (función demo_cargar_escena) y exige el modo demo.
+  const handleCargarEscena = async (locationId) => {
+    try {
+      const { data, error } = await supabase.rpc('demo_cargar_escena', { p_location_id: locationId })
+      if (error) throw error
+      toast.success(`Escena cargada — ${data?.en_estaciones ?? 0} entrenando, ${data?.esperando ?? 0} esperando`)
+      await fetchAll()
+    } catch (err) {
+      toast.error(err?.message || 'No se pudo cargar la escena de demo')
+    }
+  }
+
   if (loading) {
     return <div className="p-6 text-text-secondary">Cargando...</div>
   }
@@ -352,6 +366,15 @@ export default function QueueConfig() {
                         />
                       </button>
                     </label>
+                    {modoDemo && (
+                      <button
+                        type="button"
+                        onClick={() => handleCargarEscena(locationId)}
+                        className="text-xs font-medium text-brand hover:underline"
+                      >
+                        Cargar escena de demo
+                      </button>
+                    )}
                   </div>
                 </div>
                 {/* Cambiar el toggle sólo afecta a los boxes que entren de acá en más — el

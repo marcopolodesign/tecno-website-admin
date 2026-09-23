@@ -46,17 +46,24 @@ function Avatar({ user, size = 'md', riesgo }) {
   )
 }
 
-const RIESGO_TEXTO = { high_risk: 'Alto riesgo', risk: 'Riesgo' }
+const RIESGO_TEXTO = { high_risk: 'Alto riesgo', risk: 'Riesgo', good: 'Bien', very_good: 'Muy bien' }
+const RIESGO_TONO = {
+  high_risk: 'bg-error/10 text-error',
+  risk: 'bg-warning/10 text-warning',
+  good: 'bg-info/10 text-info',
+  very_good: 'bg-success/10 text-success',
+}
 
 // El riesgo va con el nombre, no escondido en una pantalla de métricas: quien atiende la
 // sala es quien puede hacer algo al respecto mientras la persona está adentro.
 function RiesgoBadge({ riesgo, dias, compact = false }) {
-  if (!riesgo) return null
-  const tono = riesgo === 'high_risk' ? 'bg-error/10 text-error' : 'bg-warning/10 text-warning'
+  if (!riesgo || !RIESGO_TEXTO[riesgo]) return null
+  const alerta = riesgo === 'high_risk' || riesgo === 'risk'
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${tono}`}>
-      <ExclamationTriangleIcon className="h-3 w-3" />
-      {compact ? RIESGO_TEXTO[riesgo] : `${RIESGO_TEXTO[riesgo]}${dias != null ? ` · ${dias}d sin venir` : ''}`}
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${RIESGO_TONO[riesgo]}`}>
+      {alerta && <ExclamationTriangleIcon className="h-3 w-3" />}
+      {RIESGO_TEXTO[riesgo]}
+      {dias != null && (compact ? ` · ${dias}d` : ` · ${dias}d sin venir`)}
     </span>
   )
 }
@@ -412,10 +419,19 @@ export default function QueueMonitor() {
     return () => unsub?.()
   }, [sedeId, fetchEspera])
 
-  // El riesgo cambia por día, no por minuto: se pide una vez al entrar y no se re-suscribe.
+  // El riesgo de cada uno cambia por día, pero QUIÉN está en la sala cambia a cada rato: se
+  // vuelve a pedir cuando cambia la lista de espera y cada 30 s (los que rotan de box no
+  // tocan la lista).
   useEffect(() => {
-    hoyService.getSociosEnRiesgo({ sedeId }).then(setRiesgo).catch(() => setRiesgo([]))
-  }, [sedeId])
+    const cargar = () =>
+      hoyService.getRiesgoEnSala({ sedeId }).then(setRiesgo).catch((e) => {
+        console.error('Error cargando el riesgo de la sala:', e)
+        setRiesgo([])
+      })
+    cargar()
+    const id = setInterval(cargar, 30000)
+    return () => clearInterval(id)
+  }, [sedeId, espera.length])
 
   const riesgoPorUsuario = useMemo(
     () => new Map(riesgo.map((r) => [r.user_id, r])),
