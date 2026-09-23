@@ -71,12 +71,10 @@ export default function QueueTv() {
   // the TV route is public and every underlying table is behind "authenticated", so the
   // payload comes from a function that anon may call and the tables stay closed.
   //
-  // NOTA (2026-09-23): tv_linea() todavía no manda explicacion_seg/estacion_seg/
-  // demo_estacion_seg/modo_demo en `linea` — las columnas ya existen en production_lines
-  // pero la función no las expone al anon. Hasta que se actualice esa migración (en
-  // tecnofit-supabase, fuera de este worktree), esta pantalla usa los defaults de tvClock.js
-  // (60s / 420s), que son los mismos valores por default de la migración — así que hoy se
-  // comporta igual, y el día que el RPC los mande, arranca a leerlos solo.
+  // tv_linea() ya manda explicacion_seg/estacion_seg/demo_estacion_seg/modo_demo dentro de
+  // `linea` (actualizado 2026-09-23 en tecnofit-supabase). tvClock.js igual guarda los
+  // defaults de la migración (60s/420s) como respaldo por si algún día se llama a esta
+  // pantalla contra un ambiente con un tv_linea() más viejo.
   const refresh = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc('tv_linea', { p_line_id: Number(lineaId) })

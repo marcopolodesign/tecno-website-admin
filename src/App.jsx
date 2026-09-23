@@ -144,10 +144,8 @@ function App() {
         <Route path="/acceso" element={<MemberAccess />} />
         <Route path="/lista-espera/tv/:lineaId" element={<QueueTv />} />
         <Route path="/lista-espera/tv/:lineaId/estacion/:posicion" element={<QueueTvEstacion />} />
-        {/* La de sede no es realmente pública en los datos (RLS cierra queue_entries/
-            line_box_status a anon) — ver el comentario grande en QueueTvSede.jsx. Vive acá,
-            fuera de AuthenticatedShell, para no traer el sidebar del CRM a una TV, pero el
-            componente pide sesión de staff por su cuenta. */}
+        {/* Pública como las otras dos TVs — tv_sede() es SECURITY DEFINER y está granted a
+            anon, así que no necesita sesión de staff ni el chrome del CRM alrededor. */}
         <Route path="/lista-espera/tv/sede" element={<QueueTvSede />} />
         <Route path="/lista-espera/tv/sede/:locationId" element={<QueueTvSede />} />
 

@@ -1,30 +1,23 @@
-// TV de sede — la lista de espera única, para toda la línea de cajas de la ubicación (no una
-// por línea). A diferencia de QueueTv.jsx/QueueTvEstacion.jsx esta pantalla NO es pública:
-// queue_entries y line_box_status están cerradas a `anon` por RLS (mismo motivo que documenta
-// el comentario de arriba en QueueTv.jsx) y acá no hay un tv_linea() que las abra — no existe
-// un RPC equivalente para "toda la sede" y agregar uno es un cambio de schema en
-// tecnofit-supabase, fuera de este worktree (ver catchup/reporte de la tarea).
+// TV de sede — la lista de espera única, para toda la ubicación (no una por línea).
+// Pública, como QueueTv.jsx/QueueTvEstacion.jsx: lee todo por tv_sede(), un RPC
+// SECURITY DEFINER granted a anon (mismo patrón que tv_linea) — nada de esto pasa por RLS,
+// así que no hace falta sesión de staff ni chrome del CRM alrededor.
 //
-// La salida que no pide tocar Supabase: se abre logueada, como cualquier pantalla del admin —
-// exactamente lo que ya sugería la consigna ("las TVs se abren logueadas en las computadoras
-// del gym"). Reusa el cliente de Supabase ya autenticado y los mismos queueService que usa
-// QueueMonitor, sin sidebar ni chrome del CRM alrededor.
+// Sin Realtime: postgres_changes está sujeto a RLS igual que las tablas, así que anon no
+// recibiría nada — se refresca por polling cada 3s, que alcanza para una lista de espera.
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { isAuthenticated } from '../lib/supabase'
-import { queueService, boxLabel } from '../services/queueService'
-import { locationsService } from '../services/locationsService'
+import { supabase } from '../lib/supabase'
 import { useCountdown, formatMMSS, explicacionSegDeLinea, estacionSegDeLinea } from '../lib/tvClock'
 
 const GEIST = "'Geist', system-ui, -apple-system, sans-serif"
 const MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
 const NARANJA = '#F45F37'
 const ROTULO = '#E07C2C'
+const POLL_MS = 3000
 
 function nombreCorto(u) {
-  if (!u) return 'Socio'
-  const inicial = u.last_name ? `${u.last_name[0]}.` : ''
-  return `${u.first_name ?? ''} ${inicial}`.trim() || 'Socio'
+  return u || 'Socio'
 }
 
 function minutosEsperando(createdAt) {
@@ -51,9 +44,9 @@ function Fondo() {
   )
 }
 
-function FilaEspera({ entry, i }) {
+function FilaEspera({ entry, i, nombreLinea }) {
   const confirmando = entry.status === 'confirming'
-  const linea = entry.production_lines
+  const confirmCountdown = formatMMSS(useCountdown(confirmando ? entry.confirm_deadline : null))
   return (
     <div
       style={{
@@ -76,55 +69,38 @@ function FilaEspera({ entry, i }) {
       </span>
       {confirmando ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-          <span style={{ fontSize: 46, fontWeight: 600, color: '#111827', lineHeight: 1.1 }}>{nombreCorto(entry.users)}</span>
+          <span style={{ fontSize: 46, fontWeight: 600, color: '#111827', lineHeight: 1.1 }}>{nombreCorto(entry.socio)}</span>
           <span style={{ fontSize: 28, fontWeight: 500, color: NARANJA }}>
-            Confirmá tu turno en la app{linea ? ` · entrás a ${linea.name}` : ''}
+            Confirmá tu turno en la app{nombreLinea ? ` · entrás a ${nombreLinea}` : ''}
           </span>
         </div>
       ) : (
-        <span style={{ fontSize: 42, fontWeight: 500, color: '#111827' }}>{nombreCorto(entry.users)}</span>
+        <span style={{ fontSize: 42, fontWeight: 500, color: '#111827' }}>{nombreCorto(entry.socio)}</span>
       )}
-      <span style={{ marginLeft: 'auto', fontSize: 30, color: '#6b7280', flexShrink: 0 }}>
-        {confirmando ? '' : `${minutosEsperando(entry.created_at)} min esperando`}
+      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 8, flexShrink: 0 }}>
+        {confirmando ? (
+          <span style={{ fontFamily: MONO, fontSize: 44, color: NARANJA, fontWeight: 700 }}>{confirmCountdown}</span>
+        ) : (
+          <span style={{ fontSize: 30, color: '#6b7280' }}>{minutosEsperando(entry.created_at)} min esperando</span>
+        )}
       </span>
     </div>
   )
 }
 
-function TarjetaLinea({ line, boxes }) {
-  const box1 = boxes.find((b) => b.boxes?.line_position === 1)
-  const box1Countdown = formatMMSS(useCountdown(box1?.status === 'occupied' ? box1.advances_at : null))
-  const ocupados = boxes.filter((b) => b.status === 'occupied').length
-  const proximoLugar = box1?.status === 'occupied' ? box1Countdown : 'Ahora'
+function TarjetaLinea({ linea }) {
+  const box1Countdown = formatMMSS(useCountdown(linea.box1?.status === 'occupied' ? linea.box1.advances_at : null))
+  const proximoLugar = linea.box1?.status === 'occupied' ? box1Countdown : 'Ahora'
 
   return (
     <div style={{ background: '#ffffff', border: '2px solid #e5e7eb', borderRadius: 36, padding: '30px 34px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 36, fontWeight: 600, color: '#111827' }}>{line.name}</span>
-        <span style={{ fontSize: 28, color: '#6b7280' }}>{ocupados} de {boxes.length} en uso</span>
-      </div>
-      <div style={{ display: 'flex', gap: 12 }}>
-        {boxes
-          .slice()
-          .sort((a, b) => (a.boxes?.line_position ?? 0) - (b.boxes?.line_position ?? 0))
-          .map((b) => (
-            <span
-              key={b.id}
-              style={{
-                flex: 1, height: 78, borderRadius: 20,
-                background: b.status === 'occupied' ? NARANJA : '#f3f4f6',
-                color: b.status === 'occupied' ? '#ffffff' : '#6b7280',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: MONO, fontSize: 28,
-              }}
-            >
-              {boxLabel(line.line_number, b.boxes?.line_position)}
-            </span>
-          ))}
+        <span style={{ fontSize: 36, fontWeight: 600, color: '#111827' }}>{linea.name}</span>
+        <span style={{ fontSize: 28, color: '#6b7280' }}>{linea.ocupados} en uso</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', paddingTop: 4 }}>
-        <span style={{ fontSize: 24, color: '#6b7280' }}>Próximo lugar en</span>
-        <span style={{ fontFamily: MONO, fontSize: 34, color: proximoLugar === 'Ahora' ? '#16a34a' : NARANJA, fontWeight: 700 }}>
+        <span style={{ fontSize: 26, color: '#6b7280' }}>Próximo lugar en</span>
+        <span style={{ fontFamily: MONO, fontSize: 40, color: proximoLugar === 'Ahora' ? '#16a34a' : NARANJA, fontWeight: 700 }}>
           {proximoLugar}
         </span>
       </div>
@@ -141,71 +117,52 @@ function Reloj() {
   return <span style={{ fontFamily: MONO, fontSize: 32, color: '#4b5563' }}>{ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
 }
 
-function PantallaSede({ locationId }) {
-  const [location, setLocation] = useState(null)
-  const [lines, setLines] = useState([])
-  const [boxesPorLinea, setBoxesPorLinea] = useState({})
-  const [entries, setEntries] = useState([])
-  const unsubsRef = useRef([])
+export default function QueueTvSede() {
+  const { locationId } = useParams()
+  const [data, setData] = useState(null)
+  const [connected, setConnected] = useState(true)
+  const pollRef = useRef(null)
 
-  const refreshEntries = useCallback(async () => {
+  const refresh = useCallback(async () => {
     try {
-      const { data } = await queueService.getQueueForLocation(locationId)
-      setEntries(data || [])
+      const { data: payload, error } = await supabase.rpc('tv_sede', { p_location_id: locationId || null })
+      if (error) throw error
+      setData(payload)
+      setConnected(true)
     } catch (err) {
-      console.error('Error fetching sede queue:', err)
-    }
-  }, [locationId])
-
-  const refreshBoxes = useCallback(async (lineId) => {
-    try {
-      const { data } = await queueService.getLineBoxStatus(lineId)
-      setBoxesPorLinea((prev) => ({ ...prev, [lineId]: data || [] }))
-    } catch (err) {
-      console.error('Error fetching line box status:', err)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (locationId) {
-      locationsService.getLocation(locationId).then(({ data }) => setLocation(data)).catch(() => setLocation(null))
+      console.error('Error refreshing sede TV:', err)
+      setConnected(false)
     }
   }, [locationId])
 
   useEffect(() => {
-    queueService.getLines(locationId).then(({ data }) => setLines(data || []))
-  }, [locationId])
+    refresh()
+    pollRef.current = setInterval(refresh, POLL_MS)
+    return () => clearInterval(pollRef.current)
+  }, [refresh])
 
-  useEffect(() => {
-    refreshEntries()
-    const unsub = queueService.subscribeToLocationQueue(locationId, refreshEntries)
-    return () => unsub?.()
-  }, [locationId, refreshEntries])
+  const sede = data?.sede
+  const lineas = data?.lineas || []
+  const fila = data?.fila || []
+  // `fila` sólo trae line_number para quien está confirmando — el nombre de la línea sale de
+  // buscarlo en `lineas`, que ya vino en el mismo payload.
+  const nombreDeLinea = (lineNumber) => lineas.find((l) => l.line_number === lineNumber)?.name
 
-  useEffect(() => {
-    unsubsRef.current.forEach((fn) => fn?.())
-    unsubsRef.current = lines.map((line) => {
-      refreshBoxes(line.id)
-      return queueService.subscribeToLine(line.id, () => refreshBoxes(line.id))
-    })
-    return () => unsubsRef.current.forEach((fn) => fn?.())
-  }, [lines, refreshBoxes])
-
-  // Duración estimada de una estación (explicación + estación real/demo), tomando la primera
-  // línea como referencia — en la práctica todas las líneas de una sede corren la misma
-  // configuración.
-  const minutosEstacion = lines[0]
-    ? Math.round((explicacionSegDeLinea(lines[0]) + estacionSegDeLinea(lines[0])) / 60)
+  const minutosEstacion = lineas[0]
+    ? Math.round((explicacionSegDeLinea(lineas[0]) + estacionSegDeLinea(lineas[0])) / 60)
     : null
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#F7F7FA', color: '#111827', fontFamily: GEIST }}>
       <Fondo />
       <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', padding: '56px 56px 0' }}>
+        {!connected && (
+          <div style={{ position: 'absolute', top: 16, right: 56, color: '#f59e0b', fontSize: 18, fontWeight: 600 }}>Reconectando…</div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 20, borderBottom: '2px solid #e5e7eb' }}>
           <span style={{ fontSize: 56, fontWeight: 700, letterSpacing: 1, color: ROTULO }}>LISTA DE ESPERA</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-            <span style={{ fontSize: 32, fontWeight: 500, color: '#4b5563' }}>{(location?.name || '').toUpperCase()}</span>
+            <span style={{ fontSize: 32, fontWeight: 500, color: '#4b5563' }}>{(sede?.name || '').toUpperCase()}</span>
             <Reloj />
           </div>
         </div>
@@ -217,18 +174,20 @@ function PantallaSede({ locationId }) {
         <div style={{ flex: 1, minHeight: 0, padding: '36px 0 246px' }}>
           <div style={{ display: 'flex', gap: 36, height: '100%' }}>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
-              {entries.length === 0 ? (
+              {fila.length === 0 ? (
                 <span style={{ margin: 'auto', color: '#9ca3af', fontSize: 36 }}>No hay nadie esperando.</span>
               ) : (
-                entries.slice(0, 6).map((entry, i) => <FilaEspera key={entry.id} entry={entry} i={i} />)
+                fila.slice(0, 6).map((entry, i) => (
+                  <FilaEspera key={entry.id} entry={entry} i={i} nombreLinea={nombreDeLinea(entry.line_number)} />
+                ))
               )}
-              {entries.length > 6 && (
-                <span style={{ fontSize: 30, color: '#6b7280', paddingLeft: 36 }}>y {entries.length - 6} personas más</span>
+              {fila.length > 6 && (
+                <span style={{ fontSize: 30, color: '#6b7280', paddingLeft: 36 }}>y {fila.length - 6} personas más</span>
               )}
             </div>
-            <div style={{ width: 660, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {lines.map((line) => (
-                <TarjetaLinea key={line.id} line={line} boxes={boxesPorLinea[line.id] || []} />
+            <div style={{ width: 560, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {lineas.map((linea) => (
+                <TarjetaLinea key={linea.id} linea={linea} />
               ))}
             </div>
           </div>
@@ -267,55 +226,4 @@ function PantallaSede({ locationId }) {
       </div>
     </div>
   )
-}
-
-function PideLogin() {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: '#111111', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: GEIST, textAlign: 'center', padding: 40 }}>
-      <div>
-        <p style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}>Esta pantalla necesita una sesión de staff</p>
-        <p style={{ fontSize: 20, color: 'rgba(255,255,255,0.6)' }}>
-          Iniciá sesión en el admin en esta misma computadora y volvé a abrir esta URL.
-        </p>
-        <a href="/" style={{ display: 'inline-block', marginTop: 24, color: NARANJA, fontSize: 20 }}>Ir a iniciar sesión</a>
-      </div>
-    </div>
-  )
-}
-
-export default function QueueTvSede() {
-  const { locationId: locationIdParam } = useParams()
-  const [checking, setChecking] = useState(true)
-  const [authed, setAuthed] = useState(false)
-  const [defaultLocationId, setDefaultLocationId] = useState(null)
-
-  useEffect(() => {
-    isAuthenticated().then((ok) => {
-      setAuthed(ok)
-      setChecking(false)
-    })
-  }, [])
-
-  useEffect(() => {
-    if (locationIdParam || !authed) return
-    // Sin :locationId en la URL, cae a la primera sede activa — hoy hay una sola.
-    locationsService.getLocations().then(({ data }) => {
-      const activa = (data || []).find((l) => l.is_active) || data?.[0]
-      setDefaultLocationId(activa?.id || null)
-    })
-  }, [locationIdParam, authed])
-
-  if (checking) return null
-  if (!authed) return <PideLogin />
-
-  const locationId = locationIdParam || defaultLocationId
-  if (!locationId) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, background: '#F7F7FA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: GEIST }}>
-        <span style={{ color: '#6b7280', fontSize: 24 }}>Cargando sede…</span>
-      </div>
-    )
-  }
-
-  return <PantallaSede locationId={locationId} />
 }
