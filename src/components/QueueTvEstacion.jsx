@@ -292,7 +292,7 @@ function EstacionLibre({ box, line, posicion, confirming }) {
     <>
       <EncabezadoEstacion
         posicion={posicion}
-        rotuloDerecha={['ESPERANDO A QUIEN CONFIRME']}
+        rotuloDerecha={[posicion === 1 ? 'ESPERANDO A QUIEN CONFIRME' : 'LIBRE']}
         nombre={null}
         boxCodigo={boxLabel(line?.line_number, posicion)}
       />
@@ -305,7 +305,7 @@ function EstacionLibre({ box, line, posicion, confirming }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
               <span style={{ fontSize: 28, fontWeight: 500, letterSpacing: 1.5, textTransform: 'uppercase', color: NARANJA }}>Te toca</span>
               <span style={{ fontSize: 82, fontWeight: 600, color: '#111827', lineHeight: 1 }}>{teToca.socio}</span>
-              <span style={{ fontSize: 36, color: '#4b5563' }}>Confirmá tu turno en la app y entrá al box {posicion}.</span>
+              <span style={{ fontSize: 36, color: '#4b5563' }}>Apoyá el teléfono en el sticker del box {posicion} o confirmá en la app.</span>
             </div>
           </div>
         ) : (
@@ -357,7 +357,8 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
   const box = boxes.find((b) => Number(b.line_position) === pos)
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#F7F7FA', color: '#111827', fontFamily: GEIST }}>
+    <LienzoTv>
+    <div style={{ position: 'relative', width: 1920, height: 1080, overflow: 'hidden', background: '#F7F7FA', color: '#111827', fontFamily: GEIST }}>
       <Fondo />
       <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', padding: '56px 56px 0' }}>
         {!connected && (
@@ -374,5 +375,33 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
         )}
       </div>
     </div>
+    </LienzoTv>
   )
+}
+
+// La pantalla está diseñada en 1920×1080 (el artboard aprobado) con tamaños fijos. En una TV
+// 16:9 se ve igual; en un iPad o una tablet —que en la weekly quedaron como opción válida— se
+// rompía: textos partidos, reloj cortado (prueba de la sala, 2026-09-24). Se escala el lienzo
+// entero para que entre en cualquier pantalla, con bandas si la proporción no es 16:9.
+function LienzoTv({ children }) {
+  const [escala, setEscala] = useState(() => calcularEscala())
+  useEffect(() => {
+    const onResize = () => setEscala(calcularEscala())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#F7F7FA', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 1920 * escala, height: 1080 * escala, position: 'relative' }}>
+        <div style={{ width: 1920, height: 1080, transform: `scale(${escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function calcularEscala() {
+  if (typeof window === 'undefined') return 1
+  return Math.min(window.innerWidth / 1920, window.innerHeight / 1080)
 }

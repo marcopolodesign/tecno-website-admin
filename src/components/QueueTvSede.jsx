@@ -71,7 +71,7 @@ function FilaEspera({ entry, i, nombreLinea }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
           <span style={{ fontSize: 46, fontWeight: 600, color: '#111827', lineHeight: 1.1 }}>{nombreCorto(entry.socio)}</span>
           <span style={{ fontSize: 28, fontWeight: 500, color: NARANJA }}>
-            Confirmá tu turno en la app{nombreLinea ? ` · entrás a ${nombreLinea}` : ''}
+            Apoyá el teléfono en el box 1{nombreLinea ? ` de ${nombreLinea}` : ''} o confirmá en la app
           </span>
         </div>
       ) : (
