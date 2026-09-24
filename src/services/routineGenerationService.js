@@ -15,6 +15,29 @@ import { BLOQUE_SEG } from '../lib/formatos'
  * líneas heredadas de un diseño de motor anterior (grupos de ejercicio, box_groups, overrides
  * de coach, log de generación...) que nada en la plataforma llama: verificado con grep sobre
  * todo el admin antes de borrarlas, no a ojo.
+ *
+ * Rendimiento (2026-09-24): generar una rutina hacía ~55 ida-y-vuelta a la base POR SESIÓN
+ * (1-2 sustitutos_para_ejercicio por ejercicio, 1 peso_sugerido por ejercicio, 1 insert por
+ * ejercicio) — con la conexión de un socio real (Lucas, ~1s de latencia) un mes de 30 sesiones
+ * quedaba "colgado" ~30 minutos, aunque el trabajo de la base son milisegundos: era la latencia
+ * de red multiplicada por ~1.550 viajes. Se reordenó en tres frentes, sin tocar qué ejercicio
+ * elige el motor (mismos seeds, mismo orden de concesiones — ver seededIndex y los comentarios
+ * de generarSesion):
+ *
+ *   1. El universo de sustitutos de cada (ejercicio, box) se pide UNA vez por rutina, no una
+ *      vez por slot por sesión — ver poolDeSustitutos. sustitutos_para_ejercicio ordena por
+ *      patrón/familia/rol/hash, nunca por qué se excluye, así que pedirlo completo y filtrar en
+ *      JS da exactamente el mismo resultado que pedirlo de a un excluir distinto por llamada.
+ *   2. El peso de todos los ejercicios de una sesión se pide en un solo viaje (RPC
+ *      `pesos_sugeridos`, plural) en vez de uno por ejercicio — ver pesosSugeridos.
+ *   3. Todas las filas de session_exercises de una sesión se insertan en un solo INSERT, no uno
+ *      por ejercicio — ver el final de generarSesion.
+ *
+ * Lo que sí sigue siendo secuencial, a propósito: qué ejercicio evitar por estación (`usados`,
+ * que se acumula estación tras estación dentro de la sesión) y qué evitó la sesión anterior
+ * (`evitar`/`anterior`, sesión tras sesión). Paralelizar esas dos cosas cambiaría qué ejercicio
+ * termina eligiéndose — es la dependencia real, no una ida-y-vuelta de más — así que se dejaron
+ * como estaban y sólo se sacó del medio lo que no cambiaba el resultado.
  */
 
 // Deterministic string hash (FNV-1a) — same inputs always produce the same pick, so
@@ -31,20 +54,23 @@ function seededIndex(seed, length) {
 }
 
 /**
- * What to put in the weight field of a generated exercise.
+ * El peso sugerido de varios ejercicios de un mismo socio, en un solo viaje.
  *
- * Uses peso_sugerido, which falls back to the exercise's family when the member has no history
- * on this one — which is most of the time here, since the whole point of generating is that the
- * exercise is new to them. The old helper only matched the exact exercise, so a generated month
- * came out with every weight blank.
+ * Antes esto era `getProposedWeight` llamada una vez por ejercicio (una RPC `peso_sugerido` por
+ * fila de session_exercises) — 25-30 ida-y-vuelta por sesión sólo para el peso. peso_sugerido
+ * es una función STABLE de (socio, ejercicio): no depende de la sesión ni del orden en que se
+ * pida, así que juntar todos los ejercicios de la sesión y pedirlos de una (RPC
+ * `pesos_sugeridos`, ver migración 20260924130000) da el mismo número por ejercicio que pedirlo
+ * uno por uno.
  */
-async function getProposedWeight(userId, exerciseId) {
-  if (!userId || !exerciseId) return null
-  const { data } = await supabase.rpc('peso_sugerido', {
+async function pesosSugeridos(userId, exerciseIds) {
+  if (!userId || !exerciseIds.length) return new Map()
+  const { data, error } = await supabase.rpc('pesos_sugeridos', {
     p_user_id: userId,
-    p_exercise_id: exerciseId,
+    p_exercise_ids: exerciseIds,
   })
-  return data?.[0]?.kg ?? null
+  if (error) throw error
+  return new Map((data || []).map((row) => [row.exercise_id, row.kg ?? null]))
 }
 
 /**
@@ -94,6 +120,39 @@ async function perfilesDeEsfuerzo() {
   }
 
   return new Map((data || []).map((e) => [e.id, { ...e, necesitaCarga: idsNecesitanCarga.has(e.id) }]))
+}
+
+/**
+ * El universo completo de sustitutos de cada (ejercicio, box) que la rutina va a necesitar,
+ * pedido UNA vez por toda la rutina y en paralelo — no una vez por slot por sesión.
+ *
+ * sustitutos_para_ejercicio ordena por patrón/familia/rol/hash(socio+box+candidato) — nada de
+ * eso depende de p_excluir, sólo que las filas excluidas no aparezcan en el resultado. Pedirlo
+ * sin exclusión y con un límite que cubre el catálogo activo entero (~312 ejercicios, ver
+ * perfilesDeEsfuerzo) da EL MISMO ORDEN que cualquier llamada puntual con un excluir más chico:
+ * sacar ids de esta lista en JS y cortar a 12 reproduce exactamente lo que hoy hace cada llamada
+ * a la RPC con su propio excluir (`usados`+`evitar`+`candidatos`, distinto en cada slot). Eso es
+ * lo que permite generar las 30 sesiones del mes sin volver a tocar esta RPC.
+ *
+ * Un (ejercicio, box) es el mismo para todas las sesiones que rotan sobre la misma plantilla
+ * escrita a mano, así que el número de llamadas acá es del orden de "cuántas líneas escribió el
+ * coach" (5-25), no de "cuántas sesiones genera el mes" (hasta 30).
+ */
+async function poolDeSustitutos(clientId, pares) {
+  const entradas = await Promise.all(
+    pares.map(async ([exerciseId, boxId]) => {
+      const { data, error } = await supabase.rpc('sustitutos_para_ejercicio', {
+        p_exercise_id: exerciseId,
+        p_box_id: boxId,
+        p_user_id: clientId,
+        p_excluir: [],
+        p_limite: 500,
+      })
+      if (error) throw error
+      return [`${exerciseId}::${boxId}`, data || []]
+    })
+  )
+  return new Map(entradas)
 }
 
 /**
@@ -305,10 +364,35 @@ export const generateRoutineSessions = async (routineId) => {
     )
   }
 
-  await supabase
+  // Candado: sólo se toma la generación si nadie más la tiene, o si la tiene hace más de 10
+  // minutos sin avanzar — eso es "quedó colgada", no "está en curso". La condición vive en el
+  // propio UPDATE (no en el SELECT de `routine`, más arriba) porque es la única forma atómica:
+  // si dos coaches aprietan "Generar" a la vez, Postgres serializa las dos UPDATE contra la
+  // misma fila y sólo la primera encuentra la fila todavía elegible — la segunda vuelve con
+  // `tomado` vacío y no sigue. Sin este candado, las dos corridas generaban session_number
+  // repetidos y chocaban con routine_sessions_routine_id_session_number_key.
+  const DIEZ_MIN_MS = 10 * 60 * 1000
+  const staleDesde = new Date(Date.now() - DIEZ_MIN_MS).toISOString()
+  const { data: tomado, error: lockError } = await supabase
     .from('training_routines')
-    .update({ generation_status: 'generating' })
+    .update({ generation_status: 'generating', generation_progress: 0 })
     .eq('id', routineId)
+    .or(`generation_status.neq.generating,updated_at.lt.${staleDesde}`)
+    .select('id')
+  if (lockError) throw lockError
+  if (!tomado?.length) {
+    if (routine.generation_status === 'generating') {
+      const minutos = routine.updated_at
+        ? Math.max(1, Math.round((Date.now() - new Date(routine.updated_at).getTime()) / 60000))
+        : null
+      throw new Error(
+        minutos != null
+          ? `Se está generando desde hace ${minutos} min. Esperá a que termine.`
+          : 'Se está generando ahora mismo. Esperá a que termine.'
+      )
+    }
+    throw new Error('Otra persona la generó justo ahora. Volvé a intentar en un momento.')
+  }
 
   try {
     // Anything previously generated is replaced. Regenerating after fixing a station should not
@@ -322,8 +406,22 @@ export const generateRoutineSessions = async (routineId) => {
       await supabase.from('routine_sessions').delete().in('id', viejas.map((s) => s.id))
     }
 
-    const perfiles = await perfilesDeEsfuerzo()
-    const techos = await techosDelSocio(routine.client_id)
+    // Independientes entre sí: uno lee exercises/elementos, el otro el arquetipo del socio.
+    const [perfiles, techos] = await Promise.all([perfilesDeEsfuerzo(), techosDelSocio(routine.client_id)])
+
+    // Todos los pares (ejercicio, box) que alguna sesión generada va a necesitar sustitutos —
+    // salen de las sesiones a mano, que son las que rotan de base para todo el mes. Pedirlos
+    // todos de una, en paralelo, es lo que saca sustitutos_para_ejercicio del loop por sesión
+    // (ver poolDeSustitutos).
+    const pares = new Map()
+    for (const s of conEjercicios) {
+      for (const te of s.session_exercises || []) {
+        if (!te.is_cooldown && te.box_number && te.box_id) {
+          pares.set(`${te.exercise_id}::${te.box_id}`, [te.exercise_id, te.box_id])
+        }
+      }
+    }
+    const pool = await poolDeSustitutos(routine.client_id, [...pares.values()])
 
     // What the last hand-written session used. Without this the first generated session is the
     // only one in the month that does not know what came the day before, and it can repeat it —
@@ -334,7 +432,12 @@ export const generateRoutineSessions = async (routineId) => {
       // Rotate through the hand-made sessions so the month keeps their variety instead of
       // orbiting one of them.
       const base = conEjercicios[(n - aMano - 1) % conEjercicios.length]
-      anterior = await generarSesion(routineId, routine.client_id, base, n, anterior, perfiles, techos)
+      anterior = await generarSesion(routineId, routine.client_id, base, n, anterior, perfiles, techos, pool)
+      // Progreso visible para cualquier pestaña/coach que esté mirando esta rutina (Routines.jsx
+      // la sondea mientras generation_status = 'generating'). De paso, cada UPDATE re-toca
+      // updated_at (trigger ya existente en training_routines) — es el latido que el candado de
+      // arriba usa para distinguir una generación en curso de una que quedó colgada.
+      await supabase.from('training_routines').update({ generation_progress: n }).eq('id', routineId)
     }
 
     await supabase
@@ -353,7 +456,7 @@ export const generateRoutineSessions = async (routineId) => {
 }
 
 /** One generated session. Returns the exercise ids it used, for the next one to avoid. */
-async function generarSesion(routineId, clientId, base, sessionNumber, evitar, perfiles, techos) {
+async function generarSesion(routineId, clientId, base, sessionNumber, evitar, perfiles, techos, pool) {
   // Yesterday's movements, as families rather than ids.
   const familiasAyer = new Set(
     evitar.map((id) => perfiles?.get(id)?.family_code).filter(Boolean)
@@ -376,6 +479,11 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
   // station — the same constraint that used to make the admin's own form collide.
   let orden = 0
 
+  // Filas a insertar, armadas en memoria estación por estación. El peso y el INSERT van al
+  // final, todos juntos (ver debajo) — no fila por fila, que es lo que hacía 25-30 ida-y-vuelta
+  // de más por sesión.
+  const pendientes = []
+
   // Group the template by station. The station is what gets generated: its format, how long the
   // circuit is and which movements are in it are one decision, not one per row.
   const estaciones = new Map()
@@ -393,14 +501,22 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
     // A cooldown has no station, so there is nothing to rotate it against — it carries over.
     if (cabeza.is_cooldown || !cabeza.box_number) {
       orden += 1
-      await insertarEjercicio(session.id, cabeza, cabeza.exercise_id, orden, 'template', {
-        formato: cabeza.formato || 'Series',
-        rondas: cabeza.rondas,
-        trabajo_seg: cabeza.trabajo_seg,
-        descanso_seg: cabeza.descanso_seg,
-        sets_reps: cabeza.sets_reps,
-      }, await getProposedWeight(clientId, cabeza.exercise_id), perfiles?.get(cabeza.exercise_id)?.necesitaCarga || false, cabeza.is_pinned || false)
       usados.push(cabeza.exercise_id)
+      pendientes.push({
+        te: cabeza,
+        exerciseId: cabeza.exercise_id,
+        orden,
+        fuente: 'template',
+        trabajo: {
+          formato: cabeza.formato || 'Series',
+          rondas: cabeza.rondas,
+          trabajo_seg: cabeza.trabajo_seg,
+          descanso_seg: cabeza.descanso_seg,
+          sets_reps: cabeza.sets_reps,
+        },
+        necesitaCarga: perfiles?.get(cabeza.exercise_id)?.necesitaCarga || false,
+        isPinned: cabeza.is_pinned || false,
+      })
       continue
     }
 
@@ -437,17 +553,12 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
         continue
       }
 
-      const pedir = async (excluir) => {
-        const { data } = await supabase.rpc('sustitutos_para_ejercicio', {
-          p_exercise_id: te.exercise_id,
-          // El box, no la posición: la posición 3 existe en cada línea de cada sede, y preguntar
-          // por número devolvía lo que tenían en común todas ellas.
-          p_box_id: te.box_id,
-          p_user_id: clientId,
-          p_excluir: [...new Set(excluir)],
-          p_limite: 12,
-        })
-        return data || []
+      // El universo completo para este (ejercicio, box) ya está pedido — ver poolDeSustitutos.
+      // `pedir` ahora sólo filtra en memoria: nada de esto es una ida-y-vuelta a la base.
+      const universo = pool?.get(`${te.exercise_id}::${te.box_id}`) || []
+      const pedir = (excluir) => {
+        const fuera = new Set(excluir)
+        return universo.filter((o) => !fuera.has(o.id)).slice(0, 12)
       }
 
       // Las concesiones tienen orden, y el orden es por lo que le cuesta al socio.
@@ -484,12 +595,12 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
           return !mov || !movimientosEnEstacion.has(mov)
         })
 
-      const conAyerFuera = await pedir([...usados, ...evitar, ...candidatos])
+      const conAyerFuera = pedir([...usados, ...evitar, ...candidatos])
       let opciones = sinRepetirMovimientoHoy(bajoTecho(otraFamiliaQueAyer(conAyerFuera)))
 
       if (!opciones.length) {
         // Se afloja lo de ayer, manteniendo el techo y no repetir movimiento hoy.
-        const conAyerAdentro = await pedir([...usados, ...candidatos])
+        const conAyerAdentro = pedir([...usados, ...candidatos])
         opciones = sinRepetirMovimientoHoy(bajoTecho(conAyerAdentro))
         if (!opciones.length) {
           // Se afloja también el techo, pero seguimos sin repetir movimiento hoy.
@@ -545,30 +656,51 @@ async function generarSesion(routineId, clientId, base, sessionNumber, evitar, p
       usados.push(exerciseId)
       const te = plantillas[i % plantillas.length]
       const fuente = exerciseId === te.exercise_id ? 'template' : 'similar'
-      await insertarEjercicio(
-        session.id, te, exerciseId, orden, fuente,
-        trabajo ?? {
+      pendientes.push({
+        te,
+        exerciseId,
+        orden,
+        fuente,
+        trabajo: trabajo ?? {
           formato: 'Series',
           rondas: null,
           trabajo_seg: null,
           descanso_seg: null,
           sets_reps: te.sets_reps,
         },
-        await getProposedWeight(clientId, exerciseId),
-        perfiles?.get(exerciseId)?.necesitaCarga || false,
+        necesitaCarga: perfiles?.get(exerciseId)?.necesitaCarga || false,
         // Mismo criterio que arriba: sólo la ocurrencia literal que escribió el coach queda
         // marcada como fija — un clon de wrap-around que se sustituyó normalmente no es "el
         // ejercicio fijado", aunque comparta plantilla con el que sí lo es.
-        (i < plantillas.length && te.is_pinned) || false
-      )
+        isPinned: (i < plantillas.length && te.is_pinned) || false,
+      })
     }
+  }
+
+  // Un solo viaje para el peso de TODOS los ejercicios de la sesión — antes eran uno por
+  // ejercicio (getProposedWeight). El peso depende sólo de (socio, ejercicio), nunca de en qué
+  // fila de la sesión termina, así que pedir los ids únicos de una da el mismo número que
+  // pedirlos uno por uno.
+  const idsUnicos = [...new Set(pendientes.map((p) => p.exerciseId))]
+  const pesos = await pesosSugeridos(clientId, idsUnicos)
+
+  // Y un solo INSERT para todas las filas — antes era uno por ejercicio (insertarEjercicio).
+  const filas = pendientes.map((p) =>
+    filaDeSessionExercise(
+      session.id, p.te, p.exerciseId, p.orden, p.fuente, p.trabajo,
+      pesos.get(p.exerciseId) ?? null, p.necesitaCarga, p.isPinned
+    )
+  )
+  const { error: seError } = await supabase.from('session_exercises').insert(filas)
+  if (seError) {
+    throw new Error(`No se pudieron insertar los ejercicios de la sesión ${sessionNumber}: ${seError.message}`)
   }
 
   return usados
 }
 
-/** Una fila de session_exercises. La forma sale de la plantilla; el trabajo, del bloque. */
-async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, trabajo, peso, necesitaCarga, isPinned) {
+/** Una fila de session_exercises, lista para el insert en lote. La forma sale de la plantilla; el trabajo, del bloque. */
+function filaDeSessionExercise(sessionId, te, exerciseId, orden, fuente, trabajo, peso, necesitaCarga, isPinned) {
   // te.weight_kg es el peso de la plantilla — pero es el peso del ejercicio QUE HABÍA en esa
   // posición del circuito, no necesariamente el que termina eligiéndose acá. Un sustituto de
   // peso corporal (una "Gluteos elevación cadera colchoneta", por ejemplo) heredaba el peso del
@@ -586,29 +718,29 @@ async function insertarEjercicio(sessionId, te, exerciseId, orden, fuente, traba
   if (fuente === 'template' && te.notes) notas.push(te.notes)
   if (necesitaCarga && pesoFinal == null) notas.push('Sin peso de referencia — revisar antes de la sesión')
 
-  await supabase.from('session_exercises').insert([{
-      session_id: sessionId,
-      exercise_id: exerciseId,
-      box_id: te.box_id,
-      box_number: te.box_number,
-      exercise_order: orden,
-      sets_reps: trabajo.sets_reps,
-      rest_time: te.rest_time,
-      repetition_time: te.repetition_time,
-      micro_pause: te.micro_pause,
-      weight_kg: pesoFinal,
-      // Same minutes at the station, a different way of spending them.
-      formato: trabajo.formato,
-      rondas: trabajo.rondas,
-      trabajo_seg: trabajo.trabajo_seg,
-      descanso_seg: trabajo.descanso_seg,
-      // Sólo EMOM lo trae (ver trabajoDelBloque) — el resto de los formatos generados no usa
-      // el campo, igual que el armador manual lo deja en null fuera de EMOM.
-      ejercicios_por_minuto: trabajo.ejercicios_por_minuto ?? null,
-      notes: notas.length ? notas.join(' · ') : null,
-      is_auto_generated: true,
-      is_cooldown: te.is_cooldown || false,
-      generation_source: fuente,
-      is_pinned: isPinned || false,
-  }])
+  return {
+    session_id: sessionId,
+    exercise_id: exerciseId,
+    box_id: te.box_id,
+    box_number: te.box_number,
+    exercise_order: orden,
+    sets_reps: trabajo.sets_reps,
+    rest_time: te.rest_time,
+    repetition_time: te.repetition_time,
+    micro_pause: te.micro_pause,
+    weight_kg: pesoFinal,
+    // Same minutes at the station, a different way of spending them.
+    formato: trabajo.formato,
+    rondas: trabajo.rondas,
+    trabajo_seg: trabajo.trabajo_seg,
+    descanso_seg: trabajo.descanso_seg,
+    // Sólo EMOM lo trae (ver trabajoDelBloque) — el resto de los formatos generados no usa
+    // el campo, igual que el armador manual lo deja en null fuera de EMOM.
+    ejercicios_por_minuto: trabajo.ejercicios_por_minuto ?? null,
+    notes: notas.length ? notas.join(' · ') : null,
+    is_auto_generated: true,
+    is_cooldown: te.is_cooldown || false,
+    generation_source: fuente,
+    is_pinned: isPinned || false,
+  }
 }

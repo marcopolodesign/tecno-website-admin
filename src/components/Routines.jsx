@@ -850,6 +850,48 @@ export default function Routines() {
     }
   }
 
+  // Una generación en 'generating' hace más de 10 minutos sin que updated_at avance está
+  // colgada, no en curso — mismo umbral que usa el candado del lado del servidor
+  // (routineGenerationService.js). Sin esto, cerrar la pestaña a mitad de una generación dejaba
+  // el botón escondido para siempre, para cualquier coach que abriera la rutina después.
+  const DIEZ_MIN_MS = 10 * 60 * 1000
+  const minutosGenerando = (routine) => {
+    if (!routine?.updatedAt) return null
+    return Math.max(0, Math.round((Date.now() - new Date(routine.updatedAt).getTime()) / 60000))
+  }
+  const generacionColgada = (routine) => {
+    if (routine?.generationStatus !== 'generating' || !routine?.updatedAt) return false
+    return Date.now() - new Date(routine.updatedAt).getTime() > DIEZ_MIN_MS
+  }
+
+  // Mientras se está generando, sondea cada pocos segundos — no fetchRoutineDetail entero (eso
+  // pone loadingDetail y tapa el panel con el spinner grande), sólo los tres campos que cambian
+  // sesión a sesión. Sirve para ver "Generando sesión 12 de 30" en vivo y para que una
+  // generación que termina (o se cuelga) se refleje sin que el coach tenga que recargar — y para
+  // cualquier OTRA pestaña/coach que tenga la misma rutina abierta, no sólo la que la disparó.
+  useEffect(() => {
+    if (selectedRoutine?.generationStatus !== 'generating') return
+    const routineId = selectedRoutine.id
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('training_routines')
+        .select('generation_status, generation_progress, updated_at')
+        .eq('id', routineId)
+        .single()
+      if (!data) return
+      if (data.generation_status !== 'generating') {
+        // Terminó (o falló) — traer el detalle entero para que las sesiones nuevas aparezcan.
+        fetchRoutineDetail(routineId)
+        return
+      }
+      setSelectedRoutine((prev) => (prev && prev.id === routineId
+        ? { ...prev, generationStatus: data.generation_status, generationProgress: data.generation_progress, updatedAt: data.updated_at }
+        : prev))
+    }, 4000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoutine?.id, selectedRoutine?.generationStatus])
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '-'
     return new Date(dateStr).toLocaleDateString('es-AR', {
@@ -1057,10 +1099,17 @@ export default function Routines() {
                       {selectedRoutine.generationStatus === 'completed' && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Auto-generada</span>
                       )}
-                      {selectedRoutine.generationStatus === 'generating' && (
+                      {selectedRoutine.generationStatus === 'generating' && !generacionColgada(selectedRoutine) && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
                           <span className="w-2 h-2 border border-blue-500 border-t-transparent rounded-full animate-spin inline-block" />
-                          Generando...
+                          {selectedRoutine.generationProgress
+                            ? `Generando sesión ${selectedRoutine.generationProgress} de ${selectedRoutine.totalSessions}`
+                            : 'Generando...'}
+                        </span>
+                      )}
+                      {selectedRoutine.generationStatus === 'generating' && generacionColgada(selectedRoutine) && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                          Se quedó colgada hace {minutosGenerando(selectedRoutine)} min — se puede reintentar
                         </span>
                       )}
                       {selectedRoutine.generationStatus === 'failed' && (
@@ -1068,26 +1117,44 @@ export default function Routines() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {selectedRoutine.generationStatus !== 'generating' && (
-                        <button
-                          onClick={handleGenerateSessions}
-                          disabled={generating}
-                          className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50 disabled:opacity-50"
-                          title="Completa el resto del mes a partir de las sesiones que cargaste a mano"
-                        >
-                          {generating ? (
-                            <>
-                              <span className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin" />
-                              Generando...
-                            </>
-                          ) : (
-                            <>
-                              <PlayIcon className="h-3.5 w-3.5" />
-                              {selectedRoutine.generationStatus === 'completed' ? 'Regenerar' : 'Generar Sesiones'}
-                            </>
-                          )}
-                        </button>
-                      )}
+                      {/*
+                        El botón queda SIEMPRE visible — antes desaparecía apenas
+                        generation_status pasaba a 'generating', y si el coach cerraba la
+                        pestaña a mitad de una generación quedaba escondido para siempre, para
+                        cualquiera que abriera la rutina después. Ahora sólo se deshabilita
+                        mientras hay una generación realmente en curso (menos de 10 min sin
+                        avanzar); pasado ese umbral el propio candado del servicio la trata como
+                        colgada y deja re-generar.
+                      */}
+                      <button
+                        onClick={handleGenerateSessions}
+                        disabled={generating || (selectedRoutine.generationStatus === 'generating' && !generacionColgada(selectedRoutine))}
+                        className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+                        title={
+                          selectedRoutine.generationStatus === 'generating' && !generacionColgada(selectedRoutine)
+                            ? 'Ya se está generando — esperá a que termine'
+                            : 'Completa el resto del mes a partir de las sesiones que cargaste a mano'
+                        }
+                      >
+                        {generating ? (
+                          <>
+                            <span className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin" />
+                            Generando...
+                          </>
+                        ) : selectedRoutine.generationStatus === 'generating' && !generacionColgada(selectedRoutine) ? (
+                          <>
+                            <span className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin" />
+                            Generando...
+                          </>
+                        ) : (
+                          <>
+                            <PlayIcon className="h-3.5 w-3.5" />
+                            {selectedRoutine.generationStatus === 'generating'
+                              ? 'Reintentar (colgada)'
+                              : selectedRoutine.generationStatus === 'completed' ? 'Regenerar' : 'Generar Sesiones'}
+                          </>
+                        )}
+                      </button>
                       <button
                         onClick={() => openSessionModal(selectedRoutine.id)}
                         className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1"
