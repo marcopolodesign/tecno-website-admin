@@ -50,6 +50,10 @@ export default function Caja({ userRole }) {
   const [notasCierre, setNotasCierre] = useState('')
   const [cerrando, setCerrando] = useState(false)
   const [resultadoCierre, setResultadoCierre] = useState(null)
+  // Previsualización del arqueo: se llena sólo cuando lo contado da un faltante, y recién ahí
+  // se pide justificación — antes de eso el cierre sigue siendo a ciegas.
+  const [previaCierre, setPreviaCierre] = useState(null)
+  const [justificacionFaltante, setJustificacionFaltante] = useState('')
 
   const [showMovimiento, setShowMovimiento] = useState(false)
   const [movTipo, setMovTipo] = useState('egreso')
@@ -160,12 +164,18 @@ export default function Caja({ userRole }) {
     }
   }
 
-  const handleCerrar = async (e) => {
-    e.preventDefault()
-    if (!turno) return
+  const resetCierre = () => {
+    setShowCerrar(false)
+    setEfectivoContado('')
+    setNotasCierre('')
+    setPreviaCierre(null)
+    setJustificacionFaltante('')
+  }
+
+  const confirmarCierre = async (justificacion) => {
     setCerrando(true)
     try {
-      const cerrado = await cajaService.cerrarTurno(turno.id, efectivoContado, notasCierre.trim() || null)
+      const cerrado = await cajaService.cerrarTurno(turno.id, efectivoContado, notasCierre.trim() || null, justificacion)
       const diff = Number(cerrado.diferencia)
       setResultadoCierre(cerrado)
       toast.success(
@@ -176,15 +186,42 @@ export default function Caja({ userRole }) {
           : `Caja cerrada — faltan ${formatARS(Math.abs(diff))}`,
         toastOptions
       )
-      setShowCerrar(false)
-      setEfectivoContado('')
-      setNotasCierre('')
+      resetCierre()
       cargarTurno()
     } catch (err) {
       toast.error(err.message, toastOptions)
     } finally {
       setCerrando(false)
     }
+  }
+
+  // Primer paso: contar a ciegas y previsualizar. Si hay faltante, se corta acá y se pide la
+  // justificación — todavía no se cerró nada. Si no hay faltante, cierra directo.
+  const handleContinuarCierre = async (e) => {
+    e.preventDefault()
+    if (!turno || efectivoContado === '') return
+    setCerrando(true)
+    try {
+      const previa = await cajaService.previsualizarCierre(turno.id, efectivoContado)
+      if (Number(previa.diferencia) < -0.004) {
+        setPreviaCierre(previa)
+        setCerrando(false)
+        return
+      }
+      await confirmarCierre(null)
+    } catch (err) {
+      toast.error(err.message, toastOptions)
+      setCerrando(false)
+    }
+  }
+
+  // Segundo paso, sólo cuando hubo faltante: exige el motivo antes de cerrar de verdad.
+  const handleConfirmarConFaltante = async () => {
+    if (justificacionFaltante.trim().length < 10) {
+      toast.error('La justificación necesita al menos 10 caracteres.', toastOptions)
+      return
+    }
+    await confirmarCierre(justificacionFaltante.trim())
   }
 
   const handleMovimiento = async (e) => {
@@ -592,47 +629,90 @@ export default function Caja({ userRole }) {
         </form>
       </Sidecart>
 
-      {/* Cerrar caja — arqueo a ciegas: NO se muestra el esperado hasta confirmar. */}
+      {/* Cerrar caja — arqueo a ciegas: NO se muestra el esperado hasta confirmar. Si lo
+          contado da un faltante, previaCierre se llena y el formulario pasa a pedir la
+          justificación en vez de cerrar directo. */}
       <Sidecart
         isOpen={showCerrar}
-        onClose={() => setShowCerrar(false)}
+        onClose={resetCierre}
         title="Cerrar caja"
         subtitle="Arqueo de efectivo"
         size="sm"
         footer={
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setShowCerrar(false)} className="btn-secondary">
+            <button type="button" onClick={resetCierre} className="btn-secondary">
               Cancelar
             </button>
-            <button onClick={handleCerrar} disabled={cerrando || efectivoContado === ''} className="btn-primary disabled:opacity-50">
-              {cerrando ? 'Cerrando...' : 'Confirmar cierre'}
-            </button>
+            {previaCierre ? (
+              <button
+                onClick={handleConfirmarConFaltante}
+                disabled={cerrando || justificacionFaltante.trim().length < 10}
+                className="btn-primary disabled:opacity-50"
+              >
+                {cerrando ? 'Cerrando...' : 'Confirmar cierre con faltante'}
+              </button>
+            ) : (
+              <button onClick={handleContinuarCierre} disabled={cerrando || efectivoContado === ''} className="btn-primary disabled:opacity-50">
+                {cerrando ? 'Verificando...' : 'Confirmar cierre'}
+              </button>
+            )}
           </div>
         }
       >
-        <form onSubmit={handleCerrar} className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            Contá el efectivo del cajón y cargá el número. El sistema recién te va a mostrar si coincide después de confirmar.
-          </p>
-          <div>
-            <label className="form-label">Efectivo contado *</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              value={efectivoContado}
-              onChange={(e) => setEfectivoContado(e.target.value)}
-              className="form-input"
-              placeholder="0"
-              autoFocus
-            />
+        {previaCierre ? (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-error/5 p-3">
+              <p className="text-sm font-medium text-error">
+                Faltan {formatARS(Math.abs(Number(previaCierre.diferencia)))}
+              </p>
+              <p className="text-xs text-text-secondary mt-1">
+                Contaste {formatARS(efectivoContado)} y el sistema esperaba {formatARS(previaCierre.efectivoEsperado)}.
+              </p>
+            </div>
+            <div>
+              <label className="form-label">Justificación del faltante *</label>
+              <textarea
+                value={justificacionFaltante}
+                onChange={(e) => setJustificacionFaltante(e.target.value)}
+                className="form-textarea"
+                rows={3}
+                placeholder="¿Qué pasó con esa plata? (mínimo 10 caracteres)"
+                autoFocus
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setPreviaCierre(null)}
+              className="text-xs text-text-tertiary hover:text-brand"
+            >
+              ← Volver a cargar el efectivo contado
+            </button>
           </div>
-          <div>
-            <label className="form-label">Notas (opcional)</label>
-            <textarea value={notasCierre} onChange={(e) => setNotasCierre(e.target.value)} className="form-textarea" rows={2} />
-          </div>
-        </form>
+        ) : (
+          <form onSubmit={handleContinuarCierre} className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              Contá el efectivo del cajón y cargá el número. El sistema recién te va a mostrar si coincide después de confirmar.
+            </p>
+            <div>
+              <label className="form-label">Efectivo contado *</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={efectivoContado}
+                onChange={(e) => setEfectivoContado(e.target.value)}
+                className="form-input"
+                placeholder="0"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="form-label">Notas (opcional)</label>
+              <textarea value={notasCierre} onChange={(e) => setNotasCierre(e.target.value)} className="form-textarea" rows={2} />
+            </div>
+          </form>
+        )}
       </Sidecart>
 
       {/* Ingreso / egreso */}

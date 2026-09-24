@@ -276,7 +276,7 @@ function AuthenticatedShell({
                 <Route path="/funnel" element={<Funnel />} />
               )}
               {canAccess('/hoy') && (
-                <Route path="/hoy" element={<Hoy />} />
+                <Route path="/hoy" element={<Hoy userRole={userRole} />} />
               )}
               {/* La portada vieja y el panel viejo siguen respondiendo, redirigidos: hay
                   links y pestañas guardadas apuntando ahí. */}

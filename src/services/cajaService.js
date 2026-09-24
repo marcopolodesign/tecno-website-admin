@@ -179,16 +179,42 @@ const cajaService = {
     return Number(data) || 0
   },
 
+  // Previsualizar el cierre sin cerrar nada — misma cuenta que hace caja_cerrar_turno. Sirve
+  // para revelar el faltante y pedir la justificación ANTES de confirmar: cerrar la caja es
+  // la única acción que no se puede repetir "para ver qué da".
+  async previsualizarCierre(turnoId, efectivoContado) {
+    const { data, error } = await supabase.rpc('caja_previsualizar_cierre', {
+      p_turno_id: turnoId,
+      p_efectivo_contado: Number(efectivoContado),
+    })
+    if (error) throw new Error(error.message)
+    const fila = Array.isArray(data) ? data[0] : data
+    return fila ? toCamelCase(fila) : null
+  },
+
   // Arqueo a ciegas: sólo acá se conoce efectivo_esperado y la diferencia, en la
-  // respuesta — nunca antes.
-  async cerrarTurno(turnoId, efectivoContado, notas) {
+  // respuesta — nunca antes. Si diferencia < 0 (faltante), la base exige
+  // justificacionFaltante de al menos 10 caracteres — ver 20260924100100_caja_faltante_justificacion.sql.
+  async cerrarTurno(turnoId, efectivoContado, notas, justificacionFaltante = null) {
     const { data, error } = await supabase.rpc('caja_cerrar_turno', {
       p_turno_id: turnoId,
       p_efectivo_contado: Number(efectivoContado),
       p_notas: notas || null,
+      p_justificacion_faltante: justificacionFaltante || null,
     })
     if (error) throw new Error(error.message)
     return toCamelCase(data)
+  },
+
+  // Turnos cerrados con faltante en los últimos N días, para el aviso de Hoy → Alertas.
+  async faltantesRecientes(locationId, dias = 7) {
+    if (!locationId) return []
+    const { data, error } = await supabase.rpc('caja_faltantes_recientes', {
+      p_location_id: locationId,
+      p_dias: dias,
+    })
+    if (error) throw new Error(error.message)
+    return toCamelCase(data || [])
   },
 
   // Ingreso/egreso — insert directo, sin RPC: no arrastra otra validación además del

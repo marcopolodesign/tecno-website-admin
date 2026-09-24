@@ -92,7 +92,7 @@ const VACIO = {
   name: '', tipo: 'Ejercicio', patron: '', rol: '', musculo: '', lateralidad: '',
   posicion: '', vector: '', impacto: '', intensidad_relativa: '', complejidad_tecnica: '',
   contraindicaciones: [], elementos: [], video_estado: 'Sin filmar', family_code: '',
-  movimiento_madre: '', nota_interna: '', is_active: true,
+  movimiento_madre: '', nota_interna: '', is_active: true, requiere_experiencia: false,
 }
 
 function desdeFila(ej) {
@@ -116,6 +116,7 @@ function desdeFila(ej) {
     movimiento_madre: ej.movimiento_madre ?? '',
     nota_interna: ej.nota_interna ?? '',
     is_active: ej.is_active ?? true,
+    requiere_experiencia: ej.requiere_experiencia ?? false,
   }
 }
 
@@ -204,6 +205,7 @@ export default function EjercicioEditor({ ejercicio, opcionesElemento, onElement
         p_nota_interna: nulo(f.nota_interna.trim()),
         p_is_active: f.is_active,
         p_movimiento_madre: nulo(f.movimiento_madre.trim()),
+        p_requiere_experiencia: f.requiere_experiencia,
       })
       if (err) throw err
       setGuardado(true)
@@ -318,6 +320,26 @@ export default function EjercicioEditor({ ejercicio, opcionesElemento, onElement
               </div>
             </Campo>
           </div>
+
+          {/* Al lado de Complejidad técnica a propósito (Mateo, weekly 2026-09-24): no es lo
+              mismo — complejidad_tecnica es una escala continua que carga el catalogador,
+              esto es una decisión editorial del coach ("¿se lo daría a alguien que recién
+              arranca?"). Nunca se completa sola a partir de la complejidad: la tilda un
+              coach, ejercicio por ejercicio. */}
+          <label style={s.checkbox}>
+            <input
+              type="checkbox"
+              checked={f.requiere_experiencia}
+              onChange={(ev) => set('requiere_experiencia')(ev.target.checked)}
+            />
+            <span>
+              Requiere experiencia
+              <span style={s.checkboxNota}>
+                {' '}— no se le asigna a socios nuevos (menos de 28 días desde su primera
+                membresía). El motor de rutinas lo excluye solo.
+              </span>
+            </span>
+          </label>
 
           <Campo etiqueta="Contraindicaciones" ayuda="Qué lesión o condición desaconseja este movimiento.">
             <div style={s.chips}>

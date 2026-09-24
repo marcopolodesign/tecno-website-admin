@@ -39,6 +39,7 @@ export default function Catalogo() {
   const [estadoVideo, setEstadoVideo] = useState('')
   const [soloConVideo, setSoloConVideo] = useState(false)
   const [sinClasificar, setSinClasificar] = useState(false)
+  const [requiereExperiencia, setRequiereExperiencia] = useState(false)
 
   const [opcionesMusculo, setOpcionesMusculo] = useState([])
   const [opcionesElemento, setOpcionesElemento] = useState([])
@@ -82,16 +83,18 @@ export default function Catalogo() {
         limite: LIMITE,
       })
       if (err) throw err
-      // video_estado is a production state, not a search axis, so it filters the result
-      // rather than being another argument the database has to know about.
-      const filtrados = estadoVideo ? (data || []).filter((r) => r.video_estado === estadoVideo) : data || []
+      // video_estado y requiere_experiencia no son ejes de búsqueda de buscar_ejercicios, así
+      // que filtran el resultado en vez de ser otro argumento que la base tiene que conocer —
+      // mismo criterio que ya usa estadoVideo acá abajo.
+      let filtrados = estadoVideo ? (data || []).filter((r) => r.video_estado === estadoVideo) : data || []
+      if (requiereExperiencia) filtrados = filtrados.filter((r) => r.requiere_experiencia)
       setResultados(filtrados)
     } catch (err) {
       setError(err.message || String(err))
     } finally {
       setCargando(false)
     }
-  }, [q, musculos, elementos, soloConVideo, estadoVideo, sinClasificar])
+  }, [q, musculos, elementos, soloConVideo, estadoVideo, sinClasificar, requiereExperiencia])
 
   // Typing should feel like filtering, not like submitting a form.
   useEffect(() => {
@@ -122,7 +125,8 @@ export default function Catalogo() {
   const alternar = (lista, setLista, valor) =>
     setLista(lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor])
 
-  const hayFiltros = q || musculos.length || elementos.length || estadoVideo || soloConVideo || sinClasificar
+  const hayFiltros =
+    q || musculos.length || elementos.length || estadoVideo || soloConVideo || sinClasificar || requiereExperiencia
 
   const resumen = useMemo(() => {
     const listos = resultados.filter((r) => r.processing_status === 'ready').length
@@ -222,6 +226,12 @@ export default function Catalogo() {
                 Sin clasificar{pendientes > 0 ? ` (${pendientes})` : ''}
               </Chip>
             </Grupo>
+
+            <Grupo titulo="Experiencia">
+              <Chip activo={requiereExperiencia} onClick={() => setRequiereExperiencia((v) => !v)}>
+                Requieren experiencia
+              </Chip>
+            </Grupo>
           </div>
 
           {hayFiltros && (
@@ -233,6 +243,7 @@ export default function Catalogo() {
                 setEstadoVideo('')
                 setSoloConVideo(false)
                 setSinClasificar(false)
+                setRequiereExperiencia(false)
               }}
               style={e.limpiar}
             >
@@ -262,6 +273,7 @@ export default function Catalogo() {
                   // broken card, and what it actually is is work nobody has done yet.
                   <span style={e.faltaClasificar}>Sin clasificar</span>
                 )}
+                {ex.requiere_experiencia && <span style={e.requiereExperiencia}>Requiere experiencia</span>}
                 {ex.elementos?.length > 0 && (
                   <span style={e.elementos}>{ex.elementos.join(', ')}</span>
                 )}
@@ -436,6 +448,10 @@ const e = {
   nombre: { fontSize: 14, fontWeight: 600, color: '#111827', lineHeight: 1.3 },
   meta: { fontSize: 12, color: '#6b7280' },
   faltaClasificar: { fontSize: 12, color: '#92400E', fontWeight: 600 },
+  requiereExperiencia: {
+    fontSize: 11, color: '#B33204', background: '#FFF1ED', fontWeight: 600,
+    padding: '2px 8px', borderRadius: 999, alignSelf: 'flex-start',
+  },
   elementos: { fontSize: 11, color: '#9ca3af' },
   vacio: { gridColumn: '1 / -1', textAlign: 'center', color: '#9ca3af', padding: 32 },
   error: { padding: '10px 12px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: 13 },

@@ -1,15 +1,22 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { ArrowPathIcon, ClockIcon } from '@heroicons/react/24/outline'
+import toast, { Toaster } from 'react-hot-toast'
 import { queueService, boxLabel } from '../services/queueService'
 import { usersService } from '../services/usersService'
 import hoyService from '../services/hoyService'
 import cajaService from '../services/cajaService'
+import { supabase } from '../lib/supabase'
 import { useSede } from '../contexts/SedeContext'
 import { formatARS } from '../lib/dinero'
+import { toastOptions } from '../lib/themeStyles'
 import { useCountdown as useCountdownSeg, useBoxPhase, explicacionSegDeLinea, formatMMSS } from '../lib/tvClock'
 import { tvUrlSede, tvUrlLinea } from '../lib/slug'
 import Sidecart from './Sidecart'
 import RiesgoBadge from './RiesgoBadge'
+
+// Estado de una entrada ya en la cola, para el aviso de "ya está anotado" — mismo vocabulario
+// que usa EN_SALA_LABEL en Hoy.jsx.
+const ESTADO_COLA_LABEL = { waiting: 'esperando turno', confirming: 'confirmando su turno', in_box: 'entrenando' }
 
 // Drift-free countdown driven off requestAnimationFrame + an absolute target timestamp — mismo
 // patrón que tvClock.js, acá sólo formateado mm:ss directo (varias filas de este monitor lo
@@ -203,10 +210,205 @@ function LinePipeline({ line, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSoc
   )
 }
 
+// Anotar a un socio en la lista de espera desde el admin (weekly 2026-09-24): backup para
+// cuando no tiene el teléfono a mano o no tiene la app. Busca entre los socios de la sede
+// actual y hace el mismo insert que la app (`joinQueue` en tecnofit-app/lib/queue.ts: sólo
+// user_id + location_id, sin línea — se estampa recién al promover, ver
+// 20260910180000_lista_espera_unica_por_sede.sql) más el mismo registro de acceso que deja el
+// kiosco, con method 'manual_admin' para poder distinguirlo en Accesos.
+function AnotarSocioSidecart({ isOpen, onClose, sedeId, onAnotado }) {
+  const [q, setQ] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [resultados, setResultados] = useState([])
+  const [seleccionado, setSeleccionado] = useState(null)
+  const [entradaExistente, setEntradaExistente] = useState(null)
+  const [verificando, setVerificando] = useState(false)
+  const [anotando, setAnotando] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (isOpen) return
+    // Se limpia recién al cerrar, no al abrir — así si lo cierran por error y lo reabren en
+    // seguida no perdieron la búsqueda.
+    const t = setTimeout(() => {
+      setQ('')
+      setResultados([])
+      setSeleccionado(null)
+      setEntradaExistente(null)
+      setError(null)
+    }, 200)
+    return () => clearTimeout(t)
+  }, [isOpen])
+
+  useEffect(() => {
+    const termino = q.trim()
+    if (termino.length < 2 || !sedeId) {
+      setResultados([])
+      return
+    }
+    setBuscando(true)
+    const t = setTimeout(async () => {
+      const { data, error: err } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, email, dni, membership_status, membership_end_date')
+        .eq('location_id', sedeId)
+        .or(`first_name.ilike.%${termino}%,last_name.ilike.%${termino}%,dni.ilike.%${termino}%,email.ilike.%${termino}%`)
+        .limit(8)
+      if (!err) setResultados(data || [])
+      setBuscando(false)
+    }, 250)
+    return () => clearTimeout(t)
+  }, [q, sedeId])
+
+  // Bloquear duplicados: si el socio ya tiene una entrada activa se muestra en vez de dejar
+  // anotarlo de nuevo — insertar otra fila lo pondría dos veces en la misma cola.
+  const elegir = async (socio) => {
+    setSeleccionado(socio)
+    setEntradaExistente(null)
+    setError(null)
+    setVerificando(true)
+    try {
+      const { data, error: err } = await supabase
+        .from('queue_entries')
+        .select('id, status, created_at')
+        .eq('user_id', socio.id)
+        .in('status', ['waiting', 'confirming', 'in_box'])
+        .maybeSingle()
+      if (err) throw err
+      setEntradaExistente(data || null)
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setVerificando(false)
+    }
+  }
+
+  const anotar = async () => {
+    if (!seleccionado || !sedeId) return
+    setAnotando(true)
+    setError(null)
+    try {
+      const { error: errCola } = await supabase
+        .from('queue_entries')
+        .insert({ user_id: seleccionado.id, location_id: sedeId })
+      if (errCola) throw errCola
+
+      // El mismo registro que deja el kiosco al dar un ingreso (ver MemberAccess.jsx →
+      // logAccess). No bloquea el anotado si falla: es historial, no el hecho en sí.
+      const { error: errAcceso } = await supabase.from('access_logs').insert({
+        user_id: seleccionado.id,
+        location_id: sedeId,
+        method: 'manual_admin',
+        granted: true,
+      })
+      if (errAcceso) console.error('access_logs insert error:', errAcceso)
+
+      toast.success(`${nombreDe(seleccionado)} — anotado en la lista de espera`, toastOptions)
+      onAnotado?.()
+      onClose()
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setAnotando(false)
+    }
+  }
+
+  const vencida = seleccionado && seleccionado.membership_status !== 'active'
+
+  return (
+    <Sidecart
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Anotar socio"
+      subtitle="Backup para cuando no tiene el teléfono o la app a mano"
+      size="sm"
+    >
+      <div className="space-y-4">
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setSeleccionado(null)
+            setEntradaExistente(null)
+          }}
+          placeholder="Nombre, DNI o email"
+          className="form-input"
+        />
+
+        {buscando && <p className="text-sm text-text-tertiary">Buscando…</p>}
+
+        {!seleccionado && !buscando && resultados.length > 0 && (
+          <div className="space-y-1">
+            {resultados.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => elegir(u)}
+                className="w-full flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-md bg-bg-surface text-left transition-colors hover:brightness-[0.97]"
+              >
+                <span className="min-w-0 truncate text-text-primary">{nombreDe(u)}</span>
+                <span className="text-xs text-text-tertiary shrink-0">{u.dni || u.email}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!buscando && q.trim().length >= 2 && resultados.length === 0 && !seleccionado && (
+          <p className="text-sm text-text-tertiary text-center py-4">
+            Ningún socio de esta sede coincide con esa búsqueda.
+          </p>
+        )}
+
+        {seleccionado && (
+          <div className="card border-0 shadow-none space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-text-primary">{nombreDe(seleccionado)}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSeleccionado(null)
+                  setEntradaExistente(null)
+                }}
+                className="text-xs text-text-tertiary hover:text-brand shrink-0"
+              >
+                Cambiar
+              </button>
+            </div>
+
+            {vencida && (
+              <p className="text-xs text-warning bg-warning/10 rounded-md px-2.5 py-1.5">
+                Membresía {seleccionado.membership_status === 'cancelled' ? 'cancelada' : 'vencida'} — se
+                puede anotar igual, pero avisale en el mostrador.
+              </p>
+            )}
+
+            {verificando ? (
+              <p className="text-sm text-text-tertiary">Verificando si ya está en la cola…</p>
+            ) : entradaExistente ? (
+              <p className="text-sm text-text-secondary bg-bg-surface rounded-md px-2.5 py-2">
+                Ya está en la lista de espera —{' '}
+                {ESTADO_COLA_LABEL[entradaExistente.status] || entradaExistente.status}, desde hace{' '}
+                {formatWait(entradaExistente.created_at)}.
+              </p>
+            ) : (
+              <button type="button" onClick={anotar} disabled={anotando} className="btn-primary w-full">
+                {anotando ? 'Anotando…' : 'Anotar en la lista de espera'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {error && <p className="text-sm text-error">{error}</p>}
+      </div>
+    </Sidecart>
+  )
+}
+
 // La lista de espera de la sede: una sola para todas las líneas (2026-09-10). Nadie elige
 // línea — se entra a la que se libere primero, así que el orden de llegada es lo único que
 // importa y mostrarlo partido en dos columnas mentía sobre quién va antes.
-function ListaDeEspera({ entries, riesgoPorUsuario, onVerSocio }) {
+function ListaDeEspera({ entries, riesgoPorUsuario, onVerSocio, onAnotarSocio }) {
   return (
     <div className="card space-y-3">
       <div className="flex items-center justify-between">
@@ -216,9 +418,14 @@ function ListaDeEspera({ entries, riesgoPorUsuario, onVerSocio }) {
             Una sola para toda la sede — entra a la línea que se libere primero
           </p>
         </div>
-        <span className="text-xs text-text-tertiary">
-          {entries.length} {entries.length === 1 ? 'persona' : 'personas'}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-tertiary">
+            {entries.length} {entries.length === 1 ? 'persona' : 'personas'}
+          </span>
+          <button type="button" onClick={onAnotarSocio} className="btn-secondary text-xs py-1.5 px-2.5">
+            Anotar socio
+          </button>
+        </div>
       </div>
 
       {entries.length === 0 ? (
@@ -376,6 +583,7 @@ export default function QueueMonitor() {
   const [espera, setEspera] = useState([])
   const [riesgo, setRiesgo] = useState([])
   const [socioAbierto, setSocioAbierto] = useState(null)
+  const [anotarAbierto, setAnotarAbierto] = useState(false)
 
   const fetchLines = useCallback(async () => {
     setLoading(true)
@@ -512,6 +720,7 @@ export default function QueueMonitor() {
             entries={espera}
             riesgoPorUsuario={riesgoPorUsuario}
             onVerSocio={setSocioAbierto}
+            onAnotarSocio={() => setAnotarAbierto(true)}
           />
         </>
       )}
@@ -521,6 +730,15 @@ export default function QueueMonitor() {
         onClose={() => setSocioAbierto(null)}
         riesgo={socioAbierto ? riesgoPorUsuario.get(socioAbierto) : null}
       />
+
+      <AnotarSocioSidecart
+        isOpen={anotarAbierto}
+        onClose={() => setAnotarAbierto(false)}
+        sedeId={sedeId}
+        onAnotado={fetchEspera}
+      />
+
+      <Toaster position="top-right" />
     </div>
   )
 }

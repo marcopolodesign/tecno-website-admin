@@ -10,6 +10,7 @@ import {
   LockOpenIcon,
   LockClosedIcon,
   ShoppingCartIcon,
+  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline'
 import { useSede } from '../contexts/SedeContext'
 import { formatARS } from '../lib/dinero'
@@ -308,8 +309,11 @@ function useLazyList(fetcher) {
   return { data, loading, error, load }
 }
 
-export default function Hoy() {
+export default function Hoy({ userRole }) {
   const { sedeId, sede } = useSede()
+  // Mismo patrón de roles que el Sidebar (Accesos/Horas/Sedes): faltantes de caja es
+  // información sensible del mostrador, no algo que un front_desk necesita ver de otro turno.
+  const puedeVerFaltantes = userRole === 'admin' || userRole === 'super_admin'
 
   const [resumen, setResumen] = useState(null)
   const [resumenLoading, setResumenLoading] = useState(true)
@@ -333,7 +337,11 @@ export default function Hoy() {
   const [enSala, setEnSala] = useState([])
   const [riesgo, setRiesgo] = useState([])
 
-  const [activeSidecart, setActiveSidecart] = useState(null) // 'membresias' | 'leads' | 'riesgo' | null
+  const [faltantes, setFaltantes] = useState([])
+  const [faltantesLoading, setFaltantesLoading] = useState(true)
+  const [faltantesError, setFaltantesError] = useState(null)
+
+  const [activeSidecart, setActiveSidecart] = useState(null) // 'membresias' | 'leads' | 'riesgo' | 'faltantes' | null
 
   const membresiasList = useLazyList(useCallback(() => hoyService.getMembresiasPorVencer({ sedeId, days: MEMBERSHIP_EXPIRING_DAYS }), [sedeId]))
   const leadsList = useLazyList(useCallback(() => hoyService.getLeadsSinContactar({ sedeId }), [sedeId]))
@@ -395,13 +403,32 @@ export default function Hoy() {
       .finally(() => setClasesLoading(false))
   }, [sedeId])
 
+  // Se pide entera (no lazy como las otras tres alertas) porque el mismo array sirve para el
+  // contador de la tarjeta y para la lista del sidecart — separarlo en dos pedidos abriría la
+  // puerta a que muestren números distintos. Sólo se pide si el rol la puede ver.
+  const fetchFaltantes = useCallback(() => {
+    if (!puedeVerFaltantes || !sedeId) {
+      setFaltantes([])
+      setFaltantesLoading(false)
+      return
+    }
+    setFaltantesLoading(true)
+    setFaltantesError(null)
+    cajaService
+      .faltantesRecientes(sedeId, 7)
+      .then(setFaltantes)
+      .catch(setFaltantesError)
+      .finally(() => setFaltantesLoading(false))
+  }, [sedeId, puedeVerFaltantes])
+
   useEffect(() => {
     fetchResumen()
     fetchAsistidos()
     fetchClases()
     fetchCaja()
     fetchRiesgoEnSala()
-  }, [fetchResumen, fetchAsistidos, fetchClases, fetchCaja, fetchRiesgoEnSala])
+    fetchFaltantes()
+  }, [fetchResumen, fetchAsistidos, fetchClases, fetchCaja, fetchRiesgoEnSala, fetchFaltantes])
 
   const enRiesgoEnSala = useMemo(() => {
     if (enSala.length === 0 || riesgo.length === 0) return []
@@ -472,6 +499,18 @@ export default function Hoy() {
             description="Socios activos con baja frecuencia de asistencia (riesgo o alto riesgo de abandono)."
             onClick={() => openSidecart('riesgo', riesgoList)}
           />
+          {puedeVerFaltantes && (
+            <AlertCard
+              tone="error"
+              icon={ReceiptPercentIcon}
+              loading={faltantesLoading}
+              error={faltantesError}
+              count={faltantes.length}
+              title={(n) => `${n} faltante${n !== 1 ? 's' : ''} de caja`}
+              description="Turnos cerrados con menos efectivo del esperado en los últimos 7 días."
+              onClick={() => setActiveSidecart('faltantes')}
+            />
+          )}
         </div>
       </div>
 
@@ -682,6 +721,47 @@ export default function Hoy() {
           </div>
         )}
       </Sidecart>
+
+      {/* Sidecart: faltantes de caja — sólo admin/super_admin (ver puedeVerFaltantes) */}
+      {puedeVerFaltantes && (
+        <Sidecart
+          isOpen={activeSidecart === 'faltantes'}
+          onClose={() => setActiveSidecart(null)}
+          title="Faltantes de caja"
+          subtitle="Turnos cerrados con faltante en los últimos 7 días"
+        >
+          {faltantesLoading ? (
+            <div className="h-40 flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : faltantesError ? (
+            <ErrorNotice error={faltantesError} />
+          ) : (
+            <div className="space-y-2">
+              {faltantes.map((f) => (
+                <div key={f.turnoId} className="card border-0 shadow-none">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-text-primary">
+                        {formatDate(f.cerradoAt)} {formatTime(f.cerradoAt)} · {f.cerradoPorNombre}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1 whitespace-pre-line">
+                        {f.justificacionFaltante || 'Sin justificación registrada.'}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-error shrink-0">
+                      {formatARS(Math.abs(Number(f.diferencia)))}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {faltantes.length === 0 && (
+                <p className="text-sm text-text-tertiary text-center py-8">No hay faltantes en los últimos 7 días.</p>
+              )}
+            </div>
+          )}
+        </Sidecart>
+      )}
     </div>
   )
 }
