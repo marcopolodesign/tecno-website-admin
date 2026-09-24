@@ -481,9 +481,20 @@ export const routinesService = {
 
   async updateSessionExercise(id, exerciseData) {
     try {
+      // El formulario guarda los campos numéricos vacíos como '' (inputs controlados), y la base
+      // los rechaza: "invalid input syntax for type integer". Pasaba al editar cualquier ejercicio
+      // de una sesión generada (Lucas, 2026-09-24). Vacío = sin valor; micro_pause usa 0, que es
+      // su default al crear (ver addExerciseToSession).
+      const limpio = { ...exerciseData }
+      for (const k of ['repetitionTime', 'weightKg', 'rondas', 'trabajoSeg', 'descansoSeg', 'ejerciciosPorMinuto', 'segundosPorEjercicio']) {
+        if (limpio[k] === '') limpio[k] = null
+      }
+      if (limpio.microPause === '' || limpio.microPause == null) {
+        if ('microPause' in limpio) limpio.microPause = 0
+      }
       const { data, error } = await supabase
         .from('session_exercises')
-        .update(toSnakeCase(exerciseData))
+        .update(toSnakeCase(limpio))
         .eq('id', id)
         .select()
         .single()
