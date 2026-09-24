@@ -596,7 +596,9 @@ export default function Routines() {
         boxId: isCooldown ? '' : (selectedBox?.id || ''),
         boxNumber: isCooldown ? null : (boxNumber || ''),
         exerciseOrder: siguienteOrden,
-        setsReps: '3x12',
+        // AMRAP precarga el default del formato (editable, ver el input de más abajo); el
+        // resto arranca en el "3x12" de siempre.
+        setsReps: !isCooldown && formatoDeLaEstacion.formato === 'AMRAP' ? REPS_POR_FORMATO.AMRAP : '3x12',
         restTime: '60s',
         repetitionTime: '',
         weightKg: '',
@@ -632,11 +634,17 @@ export default function Routines() {
       return
     }
 
-    // Para Tabata/AMRAP, "series x reps" no lo escribe el coach por ejercicio — lo define el
-    // formato entero (ver el input deshabilitado de arriba). Se fuerza acá también por si el
-    // estado quedó de un ejercicio anterior con otro formato. EMOM quedó afuera de esto: cada
-    // fila tiene su propia prescripción (ver más abajo).
-    const repsDelFormato = estacionFormato.formato === 'EMOM' ? null : REPS_POR_FORMATO[estacionFormato.formato]
+    // Sólo Tabata corre con una prescripción fija por todo el circuito ("series x reps" no lo
+    // escribe el coach por ejercicio ahí — ver el input deshabilitado de arriba). Se fuerza acá
+    // también por si el estado quedó de un ejercicio anterior con otro formato.
+    //
+    // AMRAP salió de acá (Lucas, 2026-09-24): "10 por vuelta" era el mismo texto fijo para las
+    // tres estaciones AMRAP del mes y no había forma de decir "esta vez son 15" sin editar la
+    // rutina entera a mano en la base. Ahora es sólo el DEFAULT que precarga el formulario (ver
+    // openExerciseModal) — cada ejercicio guarda lo que el coach haya dejado en setsReps, igual
+    // que Series/A completar. EMOM también queda afuera de esto: cada fila tiene su propia
+    // prescripción (ver más abajo).
+    const repsDelFormato = estacionFormato.formato === 'Tabata' ? REPS_POR_FORMATO.Tabata : null
 
     // La prescripción de la fila para EMOM: en reps o en segundos, nunca las dos. setsReps se
     // deriva con prescripcionTexto — el mismo contrato que ya leen la TV, la app y las listas
@@ -864,11 +872,39 @@ export default function Routines() {
     return Date.now() - new Date(routine.updatedAt).getTime() > DIEZ_MIN_MS
   }
 
-  // Mientras se está generando, sondea cada pocos segundos — no fetchRoutineDetail entero (eso
-  // pone loadingDetail y tapa el panel con el spinner grande), sólo los tres campos que cambian
-  // sesión a sesión. Sirve para ver "Generando sesión 12 de 30" en vivo y para que una
-  // generación que termina (o se cuelga) se refleje sin que el coach tenga que recargar — y para
-  // cualquier OTRA pestaña/coach que tenga la misma rutina abierta, no sólo la que la disparó.
+  // Sólo las sesiones (con sus ejercicios), sin tocar loadingDetail — reemplaza
+  // selectedRoutine.routineSessions in place para que la lista se vaya llenando sola mientras se
+  // genera, sin taparle la pantalla al coach con el spinner grande de fetchRoutineDetail.
+  const refreshLiveSessions = async (routineId) => {
+    try {
+      const { data } = await routinesService.getRoutineSessionsLive(routineId)
+      setSelectedRoutine((prev) => (prev && prev.id === routineId ? { ...prev, routineSessions: data } : prev))
+    } catch (error) {
+      // No corta la generación por esto — es sólo el refresco en vivo, el próximo tick reintenta.
+      console.error('Error refreshing live sessions:', error)
+    }
+  }
+
+  // Realtime de las sesiones de esta rutina mientras se está generando: cada sesión que
+  // generar_sesion termina de insertar (rutina + sus ejercicios, misma transacción — ver
+  // subscribeToRoutineSessions) llega acá al toque, para cualquier pestaña/coach que tenga la
+  // rutina abierta, no sólo la que apretó "Generar".
+  useEffect(() => {
+    if (selectedRoutine?.generationStatus !== 'generating') return
+    const routineId = selectedRoutine.id
+    const unsubscribe = routinesService.subscribeToRoutineSessions(routineId, () => {
+      refreshLiveSessions(routineId)
+    })
+    return unsubscribe
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoutine?.id, selectedRoutine?.generationStatus])
+
+  // Sondeo cada 2s como red de si Realtime no llegó (conexión caída, pestaña que se abrió
+  // después de que arrancó la generación, etc.) — no fetchRoutineDetail entero, sólo los tres
+  // campos que cambian sesión a sesión más las sesiones mismas. Sirve para ver "Generando sesión
+  // 12 de 30" en vivo y para que una generación que termina (o se cuelga) se refleje sin que el
+  // coach tenga que recargar — y para cualquier OTRA pestaña/coach que tenga la misma rutina
+  // abierta, no sólo la que la disparó.
   useEffect(() => {
     if (selectedRoutine?.generationStatus !== 'generating') return
     const routineId = selectedRoutine.id
@@ -887,7 +923,10 @@ export default function Routines() {
       setSelectedRoutine((prev) => (prev && prev.id === routineId
         ? { ...prev, generationStatus: data.generation_status, generationProgress: data.generation_progress, updatedAt: data.updated_at }
         : prev))
-    }, 4000)
+      // Red por si Realtime no avisó esta vuelta — barata: son a lo sumo 30 sesiones con sus
+      // ejercicios, no toda la rutina.
+      refreshLiveSessions(routineId)
+    }, 2000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoutine?.id, selectedRoutine?.generationStatus])
@@ -1435,6 +1474,42 @@ export default function Routines() {
                       </div>
                     ))}
 
+                    {/* Mientras se genera, las sesiones que todavía no llegaron (ni por
+                        Realtime ni por el sondeo de refreshLiveSessions) se muestran como
+                        placeholder — así la lista se ve "llenándose" en vez de quedar corta
+                        hasta que termine todo el mes. La que está en vuelo ahora mismo
+                        (generationProgress + 1, la última que YA se confirmó terminada) se
+                        marca aparte. */}
+                    {selectedRoutine.generationStatus === 'generating' && !generacionColgada(selectedRoutine) && (() => {
+                      const presentes = new Set((selectedRoutine.routineSessions ?? []).map((s) => s.sessionNumber))
+                      const total = selectedRoutine.totalSessions || 30
+                      const enVuelo = (selectedRoutine.generationProgress || 0) + 1
+                      const faltantes = []
+                      for (let n = 1; n <= total; n++) {
+                        if (!presentes.has(n)) faltantes.push(n)
+                      }
+                      return faltantes.map((n) => (
+                        <div
+                          key={`skeleton-${n}`}
+                          className="border border-dashed border-border-default rounded-lg p-3 flex items-center gap-3"
+                        >
+                          <div className="w-8 h-8 bg-bg-surface rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-text-tertiary font-bold text-sm">{n}</span>
+                          </div>
+                          <div className="flex-1 space-y-1.5 animate-pulse">
+                            <div className="h-3 w-28 bg-bg-surface rounded" />
+                            <div className="h-2 w-40 bg-bg-surface rounded" />
+                          </div>
+                          {n === enVuelo && (
+                            <span className="text-xs text-blue-500 flex items-center gap-1 flex-shrink-0">
+                              <span className="w-2 h-2 border border-blue-500 border-t-transparent rounded-full animate-spin inline-block" />
+                              generando…
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    })()}
+
                     {(!selectedRoutine.routineSessions || selectedRoutine.routineSessions.length === 0) && (
                       <div className="text-center py-8 border border-dashed border-border-default rounded-lg">
                         <p className="text-sm text-text-tertiary mb-3">No hay sesiones</p>
@@ -1913,23 +1988,27 @@ export default function Routines() {
                       required
                     />
                   </div>
-                ) : REPS_POR_FORMATO[estacionFormato.formato] ? (
-                  // Un circuito por tiempo corre con un solo reloj compartido por toda la
-                  // estación (ver SelectorFormato) — "series x reps" por ejercicio no
-                  // significa nada acá. Se muestra lo que realmente hace cada vuelta, fijo.
+                ) : estacionFormato.formato === 'Tabata' ? (
+                  // Tabata corre con un solo reloj compartido por toda la estación (ver
+                  // SelectorFormato) — "series x reps" por ejercicio no significa nada acá. Se
+                  // muestra lo que realmente hace cada vuelta, fijo para todo el circuito.
                   <input
                     type="text"
-                    value={REPS_POR_FORMATO[estacionFormato.formato]}
+                    value={REPS_POR_FORMATO.Tabata}
                     className="form-input"
                     disabled
                   />
                 ) : (
+                  // AMRAP, Series y A completar: reps editables por ejercicio. AMRAP arranca
+                  // precargado en "10 por vuelta" (ver openExerciseModal) pero, a diferencia de
+                  // Tabata, el coach lo puede cambiar por ejercicio — Lucas pidió una estación
+                  // de 15 y no había forma de escribirlo (2026-09-24).
                   <input
                     type="text"
                     value={exerciseForm.setsReps}
                     onChange={(e) => setExerciseForm({ ...exerciseForm, setsReps: e.target.value })}
                     className="form-input"
-                    placeholder="3x12"
+                    placeholder={estacionFormato.formato === 'AMRAP' ? REPS_POR_FORMATO.AMRAP : '3x12'}
                     required
                   />
                 )}

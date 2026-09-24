@@ -48,6 +48,11 @@ export const PRESETS = {
 // minutos quiera rotar el coach) ni una sola prescripción para toda la estación (cada fila
 // tiene la suya, en reps o en segundos — ver la sección "qué entra en un minuto" más abajo).
 export const CUPO_POR_FORMATO = { Tabata: 4, AMRAP: 4 }
+// Tabata: fijo para todo el circuito, el coach no lo edita por ejercicio (una sola prescripción
+// para las 4 filas). AMRAP: sólo el DEFAULT que precarga el formulario al agregar un ejercicio —
+// el coach lo puede cambiar por ejercicio (Lucas, 2026-09-24: pidió una estación de "15 por
+// vuelta" y con esto fijo no había forma de escribirlo). Ver saveExerciseToSession en
+// Routines.jsx — ahí es donde se decide cuál de las dos se fuerza y cuál sólo sugiere.
 export const REPS_POR_FORMATO = { Tabata: 'máx por ronda', AMRAP: '10 por vuelta' }
 
 export const esPorTiempo = (formato) => Boolean(formato) && formato !== 'Series'

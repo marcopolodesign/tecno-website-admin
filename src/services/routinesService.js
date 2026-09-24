@@ -263,6 +263,97 @@ export const routinesService = {
     }
   },
 
+  // Igual forma que las routine_sessions anidadas de getRoutine (mismos campos de
+  // session_exercises: formato/rondas/trabajo_seg/... que la lista de Rutinas necesita para
+  // pintar la modalidad de cada estación), pero sin traer toda la fila de training_routines ni
+  // users/arquetipos. La usa el refresco en vivo mientras se está generando una rutina
+  // (Routines.jsx): un fetchRoutineDetail entero pone loadingDetail y tapa el panel con el
+  // spinner grande — esto sólo trae lo que cambia sesión a sesión, para reemplazar
+  // selectedRoutine.routineSessions in place sin taparle la pantalla al coach que está mirando.
+  async getRoutineSessionsLive(routineId) {
+    try {
+      const { data, error } = await supabase
+        .from('routine_sessions')
+        .select(`
+          id,
+          session_number,
+          title,
+          description,
+          status,
+          completed_at,
+          session_exercises (
+            id,
+            exercise_order,
+            box_id,
+            box_number,
+            is_cooldown,
+            sets_reps,
+            rest_time,
+            repetition_time,
+            weight_kg,
+            micro_pause,
+            notes,
+            formato,
+            rondas,
+            trabajo_seg,
+            descanso_seg,
+            ejercicios_por_minuto,
+            segundos_por_ejercicio,
+            is_pinned,
+            boxes (
+              id,
+              name,
+              box_number
+            ),
+            exercises!session_exercises_exercise_id_fkey (
+              id,
+              name,
+              description,
+              instructions,
+              difficulty_level,
+              exercise_categories (
+                id,
+                name,
+                body_zones (
+                  id,
+                  name
+                )
+              )
+            )
+          )
+        `)
+        .eq('routine_id', routineId)
+        .order('session_number', { ascending: true })
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error fetching live routine sessions:', error)
+      throw error
+    }
+  },
+
+  // Realtime de las sesiones de una rutina mientras se está generando — para que la lista se
+  // vaya llenando sola (en la pestaña que la disparó Y en cualquier otra que tenga la misma
+  // rutina abierta) en vez de esperar a que el coach recargue. routine_sessions sí tiene
+  // routine_id para filtrar; session_exercises no (sólo session_id), así que esa tabla no se
+  // puede filtrar por rutina directo — pero como generar_sesion inserta la sesión Y sus
+  // ejercicios en la misma transacción, el INSERT de routine_sessions llega por este canal
+  // recién cuando ambos ya están commiteados: alcanza con reaccionar a esta tabla y volver a
+  // pedir getRoutineSessionsLive.
+  subscribeToRoutineSessions(routineId, onChange) {
+    const channel = supabase
+      .channel(`routine-sessions-${routineId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'routine_sessions', filter: `routine_id=eq.${routineId}` },
+        onChange
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  },
+
   async getSessionExercisesByBox(sessionId) {
     try {
       const { data, error } = await supabase
