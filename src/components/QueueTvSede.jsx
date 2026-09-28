@@ -8,7 +8,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useCountdown, formatMMSS, explicacionSegDeLinea, estacionSegDeLinea } from '../lib/tvClock'
+import { useCountdown, formatMMSS, explicacionSegDeLinea, estacionSegDeLinea, transicionSegDeLinea } from '../lib/tvClock'
 
 const GEIST = "'Geist', system-ui, -apple-system, sans-serif"
 const MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
@@ -151,8 +151,10 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
   // buscarlo en `lineas`, que ya vino en el mismo payload.
   const nombreDeLinea = (lineNumber) => lineas.find((l) => l.line_number === lineNumber)?.name
 
+  // Incluye la transición (2026-09-28): si no, esta pantalla dice un total menor al que
+  // en verdad tarda un box en liberarse (E+S+T, ver duracion_box_seg en la base).
   const minutosEstacion = lineas[0]
-    ? Math.round((explicacionSegDeLinea(lineas[0]) + estacionSegDeLinea(lineas[0])) / 60)
+    ? Math.round((explicacionSegDeLinea(lineas[0]) + estacionSegDeLinea(lineas[0]) + transicionSegDeLinea(lineas[0])) / 60)
     : null
 
   return (

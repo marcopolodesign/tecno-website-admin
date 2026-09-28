@@ -12,6 +12,11 @@ import VideoEjercicio from '../VideoEjercicio'
 // El reloj de formato (AMRAP/EMOM/Tabata/...), a partir de CUÁNDO ARRANCÓ LA ESTACIÓN — no de
 // cuándo entró al box. Con explicación, esos dos instantes ya no son el mismo: entró, miró un
 // minuto de explicación, y recién ahí arranca el reloj que cuenta rondas.
+//
+// setInterval(250ms) y no requestAnimationFrame (2026-09-28): rAF se pausa en una pestaña en
+// background/ocluida, y una TV minimizada o tapada se quedaba con la pantalla vieja aunque el
+// tiempo real ya hubiera pasado de fase. Sigue siendo drift-free porque todo se deriva de
+// estacionInicioIso (timestamp absoluto), no de un contador propio.
 export function useFaseEstacion(estacionInicioIso, formato) {
   const [fase, setFase] = useState(null)
 
@@ -21,8 +26,7 @@ export function useFaseEstacion(estacionInicioIso, formato) {
       return
     }
     const inicioMs = new Date(estacionInicioIso).getTime()
-    let rafId
-    const loop = () => {
+    const tick = () => {
       const transcurrido = Math.floor((Date.now() - inicioMs) / 1000)
       const f = faseDelFormato(Math.max(0, transcurrido), formato)
       setFase((prev) =>
@@ -30,10 +34,10 @@ export function useFaseEstacion(estacionInicioIso, formato) {
           ? prev
           : f
       )
-      rafId = window.requestAnimationFrame(loop)
     }
-    rafId = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(rafId)
+    tick()
+    const id = window.setInterval(tick, 250)
+    return () => window.clearInterval(id)
   }, [estacionInicioIso, formato?.formato, formato?.rondas, formato?.trabajoSeg, formato?.descansoSeg])
 
   return fase
@@ -186,6 +190,28 @@ export function ExplicacionPanel({ exercises, restanteSeg }) {
   )
 }
 
+// Lo que se ve en el box angosto durante la fase de transición (2026-09-28): terminó la
+// estación, todavía no lo movió el tick. Mismo lenguaje visual que ExplicacionPanel, en
+// naranja (el color de "box ocupado" en QueueTv.jsx) en vez de ámbar, para que de un vistazo
+// se distinga de la explicación.
+// `restante` llega ya formateado (mm:ss) — el mismo string que el countdown grande del box,
+// para no formatear dos veces el mismo useCountdown.
+export function TransicionPanel({ posicion, esUltima, siguienteLabel, restante }) {
+  return (
+    <div style={panelStyles.wrapper}>
+      <span style={panelStyles.transicionLabel}>¡BIEN!</span>
+      <span style={panelStyles.explicacionTitulo}>Terminaste la estación {posicion}</span>
+      <span style={panelStyles.explicacionTexto}>
+        {esUltima ? '¡Terminaste el circuito!' : `Avanzá a ${siguienteLabel || 'la próxima estación'}`}
+      </span>
+      <div style={panelStyles.transicionCountdown}>
+        <span style={panelStyles.transicionCountdownLabel}>{esUltima ? 'Termina en' : 'Avanza en'}</span>
+        <span style={panelStyles.transicionCountdownValor}>{restante}</span>
+      </div>
+    </div>
+  )
+}
+
 export const panelStyles = {
   wrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%' },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 90 },
@@ -225,4 +251,12 @@ export const panelStyles = {
   },
   explicacionCountdownLabel: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: '#FBBF24' },
   explicacionCountdownValor: { fontSize: 32, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1, color: '#FBBF24' },
+  // Transición — mismo bloque que la explicación, en naranja de marca.
+  transicionLabel: { color: '#F45F37', fontSize: 12, fontWeight: 800, letterSpacing: 2 },
+  transicionCountdown: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
+    border: '2px solid #F45F37', borderRadius: 14, padding: '6px 14px', minWidth: 110,
+  },
+  transicionCountdownLabel: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: '#F45F37' },
+  transicionCountdownValor: { fontSize: 32, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1, color: '#F45F37' },
 }

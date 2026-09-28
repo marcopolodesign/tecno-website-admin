@@ -2,10 +2,10 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
-import { useCountdown, useBoxPhase, explicacionSegDeLinea, formatMMSS } from '../lib/tvClock'
-import { ExercisePanel, ExplicacionPanel } from './tv/BoxPanels'
+import { useCountdown, useBoxPhase, explicacionSegDeLinea, estacionSegDeLinea, formatMMSS } from '../lib/tvClock'
+import { ExercisePanel, ExplicacionPanel, TransicionPanel } from './tv/BoxPanels'
 
-function BoxSlot({ box, line }) {
+function BoxSlot({ box, line, boxes }) {
   const countdown = formatMMSS(useCountdown(box.status === 'occupied' ? box.advances_at : null))
   const isOccupied = box.status === 'occupied'
   // El exercise arrives with the box in a single payload — no per-box fetch, so five
@@ -13,11 +13,17 @@ function BoxSlot({ box, line }) {
   const exercise = box.ejercicio
   const exercises = box.ejercicios?.length ? box.ejercicios : exercise ? [exercise] : []
 
-  // Explicación (los primeros explicacion_seg del box) vs. estación (el resto, hasta
-  // advances_at). `line?.explicacion_seg` todavía puede no venir en el payload de tv_linea —
-  // useBoxPhase cae al default de la migración (60s) mientras tanto, ver tvClock.js.
-  const phase = useBoxPhase(isOccupied ? box.entered_at : null, explicacionSegDeLinea(line))
+  // Explicación (los primeros explicacion_seg del box), estación (los estacion_seg que
+  // siguen) o transición (lo que queda hasta advances_at) — 2026-09-28. `line?.explicacion_seg`
+  // /`line?.estacion_seg` todavía pueden no venir en el payload de tv_linea — useBoxPhase cae a
+  // los defaults de la migración mientras tanto, ver tvClock.js.
+  const phase = useBoxPhase(isOccupied ? box.entered_at : null, explicacionSegDeLinea(line), estacionSegDeLinea(line))
   const enExplicacion = isOccupied && phase.fase === 'explicacion'
+  const enTransicion = isOccupied && phase.fase === 'transicion'
+  const totalBoxes = boxes?.length || 0
+  const esUltima = Number(box.line_position) >= totalBoxes
+  const siguiente = boxes?.find((b) => Number(b.line_position) === Number(box.line_position) + 1)
+  const siguienteLabel = siguiente ? `box ${boxLabel(line?.line_number, siguiente.line_position)}` : null
 
   return (
     <div
@@ -48,6 +54,13 @@ function BoxSlot({ box, line }) {
           </span>
           {enExplicacion ? (
             <ExplicacionPanel exercises={exercises} restanteSeg={phase.restanteExplicacionSeg} />
+          ) : enTransicion ? (
+            <TransicionPanel
+              posicion={box.line_position}
+              esUltima={esUltima}
+              siguienteLabel={siguienteLabel}
+              restante={countdown}
+            />
           ) : (
             <ExercisePanel exercise={exercise} exercises={exercises} estacionInicioIso={phase.estacionInicioIso} />
           )}
@@ -149,7 +162,7 @@ export default function QueueTv({ overrideLineaId } = {}) {
 
       <div style={{ display: 'flex', gap: 16, flex: 1 }}>
         {boxes.map((box) => (
-          <BoxSlot key={box.line_position} box={box} line={line} />
+          <BoxSlot key={box.line_position} box={box} line={line} boxes={boxes} />
         ))}
         {boxes.length === 0 && (
           <p style={{ color: 'rgba(255,255,255,0.4)', margin: 'auto' }}>Sin boxes configurados</p>

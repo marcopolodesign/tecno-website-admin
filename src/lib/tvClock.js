@@ -1,19 +1,30 @@
-// Reloj compartido de las pantallas de TV — el mismo patrón drift-free (timestamp absoluto +
-// requestAnimationFrame, nunca un setInterval que cuenta) que ya usaban QueueTv.jsx y
+// Reloj compartido de las pantallas de TV — timestamp absoluto + un timer que sólo dispara el
+// recálculo (nunca cuenta él mismo) — el mismo patrón que ya usaban QueueTv.jsx y
 // QueueMonitor.jsx por separado. Vive acá una sola vez porque ahora lo usan cuatro pantallas
 // (línea, estación, sede, monitor) y una TV que cuenta mal ocho horas por día no se nota hasta
 // que alguien la mira fijo.
 //
-// Explicación + demo (Mateo, 2026-09-23): cada box ocupado son DOS fases seguidas —
-// explicación (los primeros `explicacion_seg` segundos desde `entered_at`) y después la
-// estación (hasta `advances_at`, que el servidor ya calcula con explicación + estación
-// incluidas). Estos defaults son los mismos que trae la migración de production_lines por si
-// el payload todavía no los manda — ver nota en QueueTv.jsx.
+// 2026-09-28: el timer pasó de requestAnimationFrame a setInterval(250ms). rAF sólo dispara en
+// un tab visible y sin ocluir — Chrome lo pausa en segundo plano o detrás de otra ventana, así
+// que una TV minimizada o tapada por el mouse se quedaba congelada aunque el reloj de verdad
+// (Date.now(), server-side) siguiera corriendo: "no cambió de pantalla cuando me tocaba
+// entrenar" (prueba de la sala). setInterval sigue disparando igual en background; como todo
+// acá deriva de un timestamp absoluto y no de un contador propio, no hay drift que perder.
+//
+// Explicación + estación + transición (Mateo, 2026-09-23, transición sumada 2026-09-28): cada
+// box ocupado son TRES fases seguidas — explicación (los primeros `explicacion_seg` segundos
+// desde `entered_at`), estación (los `estacion_seg` que siguen) y transición (lo que queda
+// hasta `advances_at`, que el servidor ya calcula con las tres sumadas). Estos defaults son
+// los mismos que trae la migración de production_lines por si el payload todavía no los manda.
 import { useEffect, useState } from 'react'
+
+const TICK_MS = 250
 
 export const DEFAULT_EXPLICACION_SEG = 60
 export const DEFAULT_ESTACION_SEG = 420
 export const DEFAULT_DEMO_ESTACION_SEG = 60
+export const DEFAULT_TRANSICION_SEG = 45
+export const DEFAULT_DEMO_TRANSICION_SEG = 30
 
 export function explicacionSegDeLinea(linea) {
   return Number(linea?.explicacion_seg ?? DEFAULT_EXPLICACION_SEG)
@@ -25,9 +36,22 @@ export function estacionSegDeLinea(linea) {
   return linea?.modo_demo ? demo : real
 }
 
+export function transicionSegDeLinea(linea) {
+  const real = Number(linea?.transicion_seg ?? DEFAULT_TRANSICION_SEG)
+  const demo = Number(linea?.demo_transicion_seg ?? DEFAULT_DEMO_TRANSICION_SEG)
+  return linea?.modo_demo ? demo : real
+}
+
+// Cuánto ocupa un box en total — explicación + estación + transición. Mismo número que
+// duracion_box_seg() en la base (ver 20260928140000_transicion_entre_estaciones.sql).
+export function duracionBoxSegDeLinea(linea) {
+  return explicacionSegDeLinea(linea) + estacionSegDeLinea(linea) + transicionSegDeLinea(linea)
+}
+
 // Cuenta regresiva contra un timestamp absoluto (ISO). Nunca cuenta hacia abajo desde un
-// número guardado — deriva el restante de Date.now() en cada frame, así una pestaña en
-// segundo plano (que es lo que es una TV para el navegador) no acumula drift.
+// número guardado — deriva el restante de Date.now() en cada tick, así una pestaña en
+// segundo plano o tapada (que es lo que es una TV para el navegador) no se congela ni acumula
+// drift.
 export function useCountdown(targetIso) {
   const [secondsLeft, setSecondsLeft] = useState(() =>
     targetIso ? Math.max(0, Math.ceil((new Date(targetIso).getTime() - Date.now()) / 1000)) : null
@@ -39,14 +63,13 @@ export function useCountdown(targetIso) {
       return
     }
     const targetMs = new Date(targetIso).getTime()
-    let rafId
-    const loop = () => {
+    const tick = () => {
       const remaining = Math.max(0, Math.ceil((targetMs - Date.now()) / 1000))
       setSecondsLeft((prev) => (prev !== remaining ? remaining : prev))
-      rafId = window.requestAnimationFrame(loop)
     }
-    rafId = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(rafId)
+    tick()
+    const id = window.setInterval(tick, TICK_MS)
+    return () => window.clearInterval(id)
   }, [targetIso])
 
   return secondsLeft
@@ -60,43 +83,52 @@ export function formatMMSS(secondsLeft) {
 }
 
 // En qué fase está un box ocupado: explicación (los primeros explicacionSeg segundos desde que
-// entró) o estación (todo lo que sigue). Devuelve también el instante en que arrancó la
-// estación — entered_at + explicacionSeg — que es lo que el reloj de formato (AMRAP/EMOM/
-// Tabata/...) tiene que usar como origen en vez de entered_at crudo, o un Tabata que en
-// realidad arranca recién al minuto 1 se ve corriendo un minuto adelantado.
-export function useBoxPhase(enteredAtIso, explicacionSeg) {
-  const [estado, setEstado] = useState(() => calcular(enteredAtIso, explicacionSeg))
+// entró), estación (los estacionSeg que siguen) o transición (todo lo que sigue, hasta que el
+// tick lo mueva). Devuelve también los instantes en que arrancó la estación —
+// entered_at + explicacionSeg, que es lo que el reloj de formato (AMRAP/EMOM/Tabata/...) tiene
+// que usar como origen en vez de entered_at crudo— y en que arrancó la transición.
+//
+// estacionSeg es opcional: sin él (compatibilidad con pantallas que todavía no lo pasan) la
+// fase nunca llega a 'transicion' — se comporta como antes de 2026-09-28, estación indefinida.
+export function useBoxPhase(enteredAtIso, explicacionSeg, estacionSeg) {
+  const [estado, setEstado] = useState(() => calcular(enteredAtIso, explicacionSeg, estacionSeg))
 
   useEffect(() => {
     if (!enteredAtIso) {
-      setEstado({ fase: null, restanteExplicacionSeg: 0, estacionInicioIso: null })
+      setEstado({ fase: null, restanteExplicacionSeg: 0, estacionInicioIso: null, transicionInicioIso: null })
       return
     }
-    let rafId
-    const loop = () => {
+    const tick = () => {
       setEstado((prev) => {
-        const next = calcular(enteredAtIso, explicacionSeg)
+        const next = calcular(enteredAtIso, explicacionSeg, estacionSeg)
         return prev.fase === next.fase && prev.restanteExplicacionSeg === next.restanteExplicacionSeg
           ? prev
           : next
       })
-      rafId = window.requestAnimationFrame(loop)
     }
-    rafId = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(rafId)
-  }, [enteredAtIso, explicacionSeg])
+    tick()
+    const id = window.setInterval(tick, TICK_MS)
+    return () => window.clearInterval(id)
+  }, [enteredAtIso, explicacionSeg, estacionSeg])
 
   return estado
 }
 
-function calcular(enteredAtIso, explicacionSeg) {
-  if (!enteredAtIso) return { fase: null, restanteExplicacionSeg: 0, estacionInicioIso: null }
+function calcular(enteredAtIso, explicacionSeg, estacionSeg) {
+  if (!enteredAtIso) return { fase: null, restanteExplicacionSeg: 0, estacionInicioIso: null, transicionInicioIso: null }
   const inicioMs = new Date(enteredAtIso).getTime()
   const explicSeg = Math.max(0, Number(explicacionSeg) || 0)
+  const estacSeg = estacionSeg == null ? null : Math.max(0, Number(estacionSeg) || 0)
   const estacionInicioIso = new Date(inicioMs + explicSeg * 1000).toISOString()
+  const transicionInicioIso =
+    estacSeg == null ? null : new Date(inicioMs + (explicSeg + estacSeg) * 1000).toISOString()
   const transcurridoSeg = Math.floor((Date.now() - inicioMs) / 1000)
+
   if (transcurridoSeg < explicSeg) {
-    return { fase: 'explicacion', restanteExplicacionSeg: explicSeg - transcurridoSeg, estacionInicioIso }
+    return { fase: 'explicacion', restanteExplicacionSeg: explicSeg - transcurridoSeg, estacionInicioIso, transicionInicioIso }
   }
-  return { fase: 'estacion', restanteExplicacionSeg: 0, estacionInicioIso }
+  if (estacSeg == null || transcurridoSeg < explicSeg + estacSeg) {
+    return { fase: 'estacion', restanteExplicacionSeg: 0, estacionInicioIso, transicionInicioIso }
+  }
+  return { fase: 'transicion', restanteExplicacionSeg: 0, estacionInicioIso, transicionInicioIso }
 }

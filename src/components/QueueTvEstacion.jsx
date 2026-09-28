@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
 import { esPorTiempo, faseDelFormato, comoTexto, mmss, filasDelMinuto, prescripcionTexto } from '../lib/formatos'
 import { explicacionDeFormato } from '../lib/modalidadTexto'
-import { useCountdown, useBoxPhase, explicacionSegDeLinea, formatMMSS } from '../lib/tvClock'
+import { useCountdown, useBoxPhase, explicacionSegDeLinea, estacionSegDeLinea, formatMMSS } from '../lib/tvClock'
 import { exerciseMedia } from '../lib/exerciseMedia'
 import VideoEjercicio from './VideoEjercicio'
 
@@ -30,8 +30,7 @@ function useFaseEstacion(estacionInicioIso, formato) {
       return
     }
     const inicioMs = new Date(estacionInicioIso).getTime()
-    let rafId
-    const loop = () => {
+    const tick = () => {
       const transcurrido = Math.floor((Date.now() - inicioMs) / 1000)
       const f = faseDelFormato(Math.max(0, transcurrido), formato)
       setFase((prev) =>
@@ -39,10 +38,10 @@ function useFaseEstacion(estacionInicioIso, formato) {
           ? prev
           : f
       )
-      rafId = window.requestAnimationFrame(loop)
     }
-    rafId = window.requestAnimationFrame(loop)
-    return () => window.cancelAnimationFrame(rafId)
+    tick()
+    const id = window.setInterval(tick, 250)
+    return () => window.clearInterval(id)
   }, [estacionInicioIso, formato?.formato, formato?.rondas, formato?.trabajoSeg, formato?.descansoSeg])
   return fase
 }
@@ -130,22 +129,31 @@ function Circulo({ n, activo }) {
   )
 }
 
-function TarjetaEjercicio({ n, fila, activa }) {
+// `grande`: modo pantalla de explicación (2026-09-28) — el video pasa a llenar el card
+// entero (flex: 1 en vez de una altura fija de 220px) para que domine la pantalla, con el
+// encabezado y la prescripción comprimidos alrededor. Ver EstacionCorriendo.
+function TarjetaEjercicio({ n, fila, activa, grande }) {
   const media = exerciseMedia(fila, 'tv')
   const prescripcion = fila.sets_reps || prescripcionTexto({ segundos: fila.segundos_por_ejercicio })
   return (
     <div
       style={{
-        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18,
+        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: grande ? 14 : 18,
         background: '#ffffff', border: `2px solid ${activa ? AZUL : '#e5e7eb'}`,
-        borderRadius: 36, padding: 26,
+        borderRadius: 36, padding: grande ? 20 : 26, minHeight: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: grande ? 14 : 18, flexShrink: 0 }}>
         <Circulo n={n} activo={activa} />
-        <span style={{ fontSize: 36, fontWeight: 600, color: '#111827', lineHeight: 1.1, minWidth: 0 }}>{fila.name}</span>
+        <span style={{ fontSize: grande ? 30 : 36, fontWeight: 600, color: '#111827', lineHeight: 1.1, minWidth: 0 }}>{fila.name}</span>
       </div>
-      <div style={{ width: '100%', height: 220, borderRadius: 28, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div
+        style={{
+          width: '100%',
+          ...(grande ? { flex: 1, minHeight: 0 } : { height: 220 }),
+          borderRadius: 28, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+        }}
+      >
         {media.kind === 'hosted' ? (
           <VideoEjercicio src={media.src} poster={media.poster} recorte={media.recorte} style={{ width: '100%', height: '100%', objectFit: 'cover', ...media.style }} />
         ) : media.kind === 'image' ? (
@@ -156,7 +164,7 @@ function TarjetaEjercicio({ n, fila, activa }) {
           </div>
         )}
       </div>
-      {prescripcion && <div><Pill>{prescripcion}</Pill></div>}
+      {prescripcion && <div style={{ flexShrink: 0 }}><Pill>{prescripcion}</Pill></div>}
     </div>
   )
 }
@@ -186,8 +194,86 @@ function EncabezadoEstacion({ posicion, rotuloDerecha, nombre, boxCodigo, tiempo
   )
 }
 
-function EstacionCorriendo({ box, line, posicion }) {
-  const phase = useBoxPhase(box.entered_at, explicacionSegDeLinea(line))
+// Countdown final de la explicación (2026-09-28): los últimos 10 segundos, la pantalla entera
+// se tapa con un aviso de "preparáte" — nadie mira la tarjeta chica de un video cuando lo que
+// importa es que en 3... 2... 1... arranca el reloj de la estación de verdad. El degradado
+// reusa el mismo lenguaje que Fondo()/BarraInferior (elipse difuminada), en naranja de marca
+// hacia oscuro. Cada número se anima con keyframes CSS (sin framer-motion): un remount por
+// `key={segundos}` dispara la animación de entrada de nuevo en cada tick, como el contador
+// "pensando" de Claude — un morph suave de blur/escala/opacidad, con un pulso sutil encima.
+const PREPARATE_KEYFRAMES = `
+@keyframes preparateNumIn {
+  0% { opacity: 0; transform: scale(0.55); filter: blur(22px); }
+  60% { opacity: 1; transform: scale(1.08); filter: blur(0px); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0px); }
+}
+@keyframes preparatePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@keyframes preparateBgPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.09); }
+}
+@keyframes preparateLabelIn {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+`
+
+function PreparateOverlay({ segundos }) {
+  return (
+    <div
+      style={{
+        position: 'absolute', inset: 0, zIndex: 30, overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 44,
+      }}
+    >
+      <style>{PREPARATE_KEYFRAMES}</style>
+      <div style={{ position: 'absolute', inset: 0, background: '#170b06' }} />
+      <svg width="1920" height="1080" viewBox="0 0 1920 1080" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+        <defs>
+          <filter id="prepbg" x="-500" y="-500" width="2920" height="2280" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+            <feGaussianBlur stdDeviation="140" />
+          </filter>
+          <linearGradient id="prepbgg" x1="960" y1="0" x2="960" y2="1080" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor={NARANJA} />
+            <stop offset="0.55" stopColor="#7a2e1c" />
+            <stop offset="1" stopColor="#170b06" />
+          </linearGradient>
+        </defs>
+        <g filter="url(#prepbg)" style={{ transformOrigin: '1210px 780px' }}>
+          <ellipse
+            cx="0" cy="0" rx="900" ry="760"
+            transform="translate(1210 780) rotate(-21)"
+            fill="url(#prepbgg)"
+            style={{ animation: 'preparateBgPulse 5s ease-in-out infinite', transformOrigin: 'center' }}
+          />
+        </g>
+      </svg>
+      <span
+        style={{
+          position: 'relative', fontSize: 46, fontWeight: 700, letterSpacing: 6, textTransform: 'uppercase',
+          color: '#ffffff', animation: 'preparateLabelIn 0.6s ease-out',
+        }}
+      >
+        Preparate para empezar
+      </span>
+      <span
+        key={segundos}
+        style={{
+          position: 'relative', fontFamily: MONO, fontSize: 440, fontWeight: 800, color: '#ffffff', lineHeight: 1,
+          animation: 'preparateNumIn 0.7s cubic-bezier(0.16,1,0.3,1), preparatePulse 1s ease-in-out 0.35s',
+        }}
+      >
+        {segundos}
+      </span>
+    </div>
+  )
+}
+
+function EstacionCorriendo({ box, line, posicion, boxes }) {
+  const phase = useBoxPhase(box.entered_at, explicacionSegDeLinea(line), estacionSegDeLinea(line))
   const boxCountdown = formatMMSS(useCountdown(box.advances_at))
   const exercises = box.ejercicios?.length ? box.ejercicios : box.ejercicio ? [box.ejercicio] : []
   const primero = box.ejercicio
@@ -203,6 +289,8 @@ function EstacionCorriendo({ box, line, posicion }) {
       descansoSeg: primero?.descanso_seg,
       ejerciciosPorMinuto: primero?.ejercicios_por_minuto,
     })
+    // Últimos 10 segundos: se tapa todo con el aviso de "preparáte" (PreparateOverlay).
+    const mostrarPreparate = phase.restanteExplicacionSeg > 0 && phase.restanteExplicacionSeg <= 10
     return (
       <>
         <EncabezadoEstacion
@@ -213,18 +301,67 @@ function EstacionCorriendo({ box, line, posicion }) {
           tiempoLabel="Empieza en"
           tiempoValor={formatMMSS(phase.restanteExplicacionSeg)}
         />
-        <div style={{ flex: 1, minHeight: 0, padding: '36px 0 246px', display: 'flex', flexDirection: 'column', gap: 28 }}>
-          <div style={{ background: '#ffffff', border: '2px solid #e5e7eb', borderRadius: 36, padding: '30px 36px' }}>
-            <span style={{ fontSize: 28, fontWeight: 500, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6b7280' }}>{titulo}</span>
-            <p style={{ fontSize: 38, fontWeight: 500, color: '#111827', margin: '10px 0 0' }}>{texto}</p>
+        {/* Franja compacta de modalidad + tarjetas con el video dominando la pantalla
+            (2026-09-28): antes el video medía 220px fijos dentro de una tarjeta genérica;
+            ahora el texto de modalidad es una línea angosta arriba y las tarjetas se reparten
+            todo el alto que queda, con `grande` haciendo que el video ocupe flex:1 del card. */}
+        <div style={{ flex: 1, minHeight: 0, padding: '28px 0 246px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, background: '#ffffff', border: '2px solid #e5e7eb', borderRadius: 24, padding: '16px 30px', flexShrink: 0 }}>
+            <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6b7280', flexShrink: 0 }}>{titulo}</span>
+            <span style={{ fontSize: 24, fontWeight: 500, color: '#111827' }}>{texto}</span>
           </div>
-          <div style={{ display: 'flex', gap: 28, flex: 1 }}>
+          <div style={{ display: 'flex', gap: 28, flex: 1, minHeight: 0 }}>
             {exercises.map((f, i) => (
-              <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={false} />
+              <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={false} grande />
             ))}
           </div>
         </div>
         <BarraInferior label="La estación arranca sola cuando termine este minuto." sublabel="EXPLICACIÓN" mmssActual={formatMMSS(phase.restanteExplicacionSeg)} mmssTotal={null} />
+        {mostrarPreparate && <PreparateOverlay segundos={phase.restanteExplicacionSeg} />}
+      </>
+    )
+  }
+
+  if (phase.fase === 'transicion') {
+    const totalBoxes = boxes?.length || 0
+    const esUltima = posicion >= totalBoxes
+    const siguiente = boxes?.find((b) => Number(b.line_position) === posicion + 1)
+    const siguienteEjercicio = siguiente?.ejercicio?.name || siguiente?.ejercicios?.[0]?.name
+    return (
+      <>
+        <EncabezadoEstacion
+          posicion={posicion}
+          rotuloDerecha={['TRANSICIÓN']}
+          nombre={box.socio}
+          boxCodigo={boxLabel(line?.line_number, posicion)}
+          tiempoLabel={esUltima ? 'Termina en' : 'Avanza en'}
+          tiempoValor={boxCountdown}
+        />
+        <div style={{ flex: 1, minHeight: 0, padding: '36px 0 246px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
+              background: '#ffffff', border: `4px solid ${NARANJA}`, borderRadius: 48, padding: '56px 72px', maxWidth: 1500,
+            }}
+          >
+            <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: NARANJA }}>¡Bien!</span>
+            <span style={{ fontSize: 64, fontWeight: 700, color: '#111827', textAlign: 'center', lineHeight: 1.15 }}>
+              Terminaste la estación {posicion}
+            </span>
+            <span style={{ fontSize: 42, fontWeight: 600, color: '#4b5563', textAlign: 'center', lineHeight: 1.3 }}>
+              {esUltima
+                ? '¡Terminaste el circuito!'
+                : `Avanzá a la estación ${posicion + 1} — Box ${boxLabel(line?.line_number, posicion + 1)}${siguienteEjercicio ? ` · ${siguienteEjercicio}` : ''}`}
+            </span>
+            <span style={{ fontFamily: MONO, fontSize: 100, color: NARANJA, fontWeight: 800 }}>{boxCountdown}</span>
+          </div>
+        </div>
+        <BarraInferior
+          label={esUltima ? '¡Terminaste el circuito!' : `Avanzá a la estación ${posicion + 1}`}
+          sublabel="TRANSICIÓN"
+          mmssActual={boxCountdown}
+          mmssTotal={null}
+        />
       </>
     )
   }
@@ -369,7 +506,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
             {boxes.length === 0 ? 'Cargando…' : `Esta línea no tiene box en la posición ${posicion}.`}
           </div>
         ) : box.status === 'occupied' ? (
-          <EstacionCorriendo box={box} line={line} posicion={pos} />
+          <EstacionCorriendo box={box} line={line} posicion={pos} boxes={boxes} />
         ) : (
           <EstacionLibre box={box} line={line} posicion={pos} confirming={confirming} />
         )}
