@@ -199,8 +199,14 @@ function GrillaEjercicios({ exercises, activos }) {
       </div>
     )
   }
+  // gridTemplateRows explícito (2026-09-28): sin esto, una grilla con filas 'auto' les da a
+  // los cards la altura MÍNIMA de su contenido (el slot flex:1 del video vale 0 en ese
+  // cálculo), y el video terminaba como un ícono de 20px en vez de un bloque 16:10 — el
+  // mismo problema de fondo que TarjetaEjercicio, acá a nivel fila.
+  const columnas = 2
+  const filas = Math.ceil(exercises.length / columnas)
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24, flex: 1, minHeight: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gridTemplateRows: `repeat(${filas}, 1fr)`, gap: 24, flex: 1, minHeight: 0 }}>
       {exercises.map((f, i) => (
         <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={exercises.length} />
       ))}
