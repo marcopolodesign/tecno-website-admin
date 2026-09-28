@@ -129,13 +129,25 @@ function LogoTF({ grupo }) {
   const reproducir = useCallback(() => {
     if (anim.current || !cont.current) return
     setReproduciendo(true)
-    const a = lottie.loadAnimation({ container: cont.current, renderer: 'svg', loop: false, autoplay: true, animationData: logoLottie })
-    if (window.__tvLogoSpeed) a.setSpeed(window.__tvLogoSpeed)
-    a.addEventListener('complete', () => {
-      a.destroy()
-      anim.current = null
-      setReproduciendo(false)
-    })
+    // autoplay:false y avance manual con setInterval: lottie-web anima con requestAnimationFrame,
+    // que Chrome pausa en una pestaña/ventana en segundo plano (una TV tapada quedaba con el
+    // logo trabado en el cuadro 0) — el mismo problema que tenía el reloj.
+    const a = lottie.loadAnimation({ container: cont.current, renderer: 'svg', loop: false, autoplay: false, animationData: logoLottie })
+    const velocidad = window.__tvLogoSpeed || 1
+    const inicio = Date.now()
+    const total = a.totalFrames
+    const id = window.setInterval(() => {
+      const frame = ((Date.now() - inicio) / 1000) * logoLottie.fr * velocidad
+      if (frame >= total - 1) {
+        window.clearInterval(id)
+        a.destroy()
+        anim.current = null
+        setReproduciendo(false)
+      } else {
+        a.goToAndStop(frame, true)
+      }
+    }, 33)
+    a.__id = id
     anim.current = a
   }, [])
 
@@ -143,6 +155,7 @@ function LogoTF({ grupo }) {
     window.__tvReproducirLogo = reproducir // gancho para verificar a mano
     return () => {
       delete window.__tvReproducirLogo
+      if (anim.current) window.clearInterval(anim.current.__id)
       anim.current?.destroy()
       anim.current = null
     }
