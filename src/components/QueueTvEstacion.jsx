@@ -181,34 +181,24 @@ function TarjetaEjercicio({ n, fila, activa, total = 2 }) {
   )
 }
 
-// Fila/grilla de N≥2 ejercicios: 2 entran en una fila (16:9 cada uno); 3+ arman una grilla
-// de 2 columnas (16:10 cada uno) para no volver a angostar demasiado el video. `alignItems`/
-// `alignContent` por default (stretch): cada card se estira a la altura real de su fila/celda,
-// que es lo que le da al slot interno de TarjetaEjercicio una altura de verdad para calcular
-// el bloque de aspecto fijo — con 'center' el card se quedaba con su altura de contenido y
-// terminaba desbordando (ver comentario en TarjetaEjercicio).
+// Fila de N≥2 ejercicios, todos en una sola fila horizontal — nunca en 2 filas
+// (2026-09-28, verificado en Chrome a 1920×1080 contra staging real). La franja de arriba +
+// el header + la barra de abajo ya se comen la mayoría del alto del lienzo: lo que le queda a
+// esta fila son ~350px fijos, sea 1 fila de 2 cards o 2 filas de 2. Repartir eso en DOS filas
+// (una grilla 2×2 para 3-4 ejercicios) le dejaba a cada card ~160px de alto total — header +
+// pill + padding ya se comen esos 160px, y el video terminaba como un ícono de 20px. Una sola
+// fila le da a CADA card el alto completo (~350px) sin importar cuántos entren: se angostan
+// (aspectRatio + maxWidth:100% los deja anchos proporcionales, nunca recortados) en vez de
+// achatarse. Esto es, en la práctica, el caso común (1-2 ejercicios); 3+ es raro en las
+// rutinas reales del gym, pero cuando pasa se ve proporcionado igual, sólo más angosto.
 function GrillaEjercicios({ exercises, activos }) {
-  if (exercises.length === 2) {
-    return (
-      <div style={{ display: 'flex', gap: 32, flex: 1, minHeight: 0 }}>
-        {exercises.map((f, i) => (
-          <div key={f.exercise_order ?? i} style={{ flex: 1, minWidth: 0 }}>
-            <TarjetaEjercicio n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={2} />
-          </div>
-        ))}
-      </div>
-    )
-  }
-  // gridTemplateRows explícito (2026-09-28): sin esto, una grilla con filas 'auto' les da a
-  // los cards la altura MÍNIMA de su contenido (el slot flex:1 del video vale 0 en ese
-  // cálculo), y el video terminaba como un ícono de 20px en vez de un bloque 16:10 — el
-  // mismo problema de fondo que TarjetaEjercicio, acá a nivel fila.
-  const columnas = 2
-  const filas = Math.ceil(exercises.length / columnas)
+  const total = exercises.length
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gridTemplateRows: `repeat(${filas}, 1fr)`, gap: 24, flex: 1, minHeight: 0 }}>
+    <div style={{ display: 'flex', gap: total <= 2 ? 32 : 24, flex: 1, minHeight: 0 }}>
       {exercises.map((f, i) => (
-        <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={exercises.length} />
+        <div key={f.exercise_order ?? i} style={{ flex: 1, minWidth: 0 }}>
+          <TarjetaEjercicio n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={total} />
+        </div>
       ))}
     </div>
   )
