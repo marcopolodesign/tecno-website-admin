@@ -489,36 +489,80 @@ function EstacionCorriendo({ box, line, posicion, boxes }) {
   )
 }
 
-function EstacionLibre({ box, line, posicion, confirming }) {
+// Estado LIBRE (Mateo, 2026-09-28): negro como el modo oscuro de la app, con unas manchas
+// naranjas difuminadas que derivan muy lento (keyframes CSS, sin framer-motion), el monograma
+// "TF" grande al centro y un pie mínimo — línea blanca fina + "ESTACIÓN N" a la izquierda y un
+// slot a la derecha (hoy la hora). Sin el encabezado de antes: el pie lo reemplaza.
+const LIBRE_KEYFRAMES = `
+@keyframes libreBlobA {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(220px, 120px) scale(1.25); }
+}
+@keyframes libreBlobB {
+  0%, 100% { transform: translate(0px, 0px) scale(1.1); }
+  50% { transform: translate(-260px, -140px) scale(0.9); }
+}
+@keyframes libreBlobC {
+  0%, 100% { transform: translate(0px, 0px) scale(0.9); }
+  50% { transform: translate(-160px, 180px) scale(1.2); }
+}
+`
+
+// Mismo vector que tecnofit-app/components/TFMark.tsx (viewBox 283.24 x 199.37).
+function TFMarca({ width = 520, color = '#ffffff' }) {
+  return (
+    <svg width={width} height={Math.round(width * (199.37 / 283.24))} viewBox="0 0 283.24 199.37" fill="none">
+      <path
+        d="M0,45.97h72.88l-36.54,153.4h67.22l54.96-73.69h71.31l16.41-45.99h-69.83c-17.92,0-32.84,4.27-47.29,16.2-6.32,5.21-11.72,11.44-16.28,18.25l-16.87,25.15,23.58-93.31h147.91L283.24,0H12.62L0,45.97Z"
+        fill={color}
+      />
+    </svg>
+  )
+}
+
+// Slot derecho del pie de la pantalla libre: hoy la hora (HH:MM, 24 h, Buenos Aires). Es un
+// componente aparte para poder cambiarlo por otra cosa sin tocar el resto.
+function RelojPie() {
+  const fmt = () =>
+    new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })
+  const [hora, setHora] = useState(fmt)
+  useEffect(() => {
+    const id = window.setInterval(() => setHora(fmt()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  return <span style={{ fontFamily: MONO, fontSize: 44, color: '#ffffff' }}>{hora}</span>
+}
+
+function EstacionLibre({ posicion, confirming, slotDerecho = <RelojPie /> }) {
   // El que confirma siempre entra al box 1 de la línea (el tick lo estampa así) — mostrar el
   // "te toca" en cualquier otro box mentiría sobre a dónde va esa persona.
   const teToca = posicion === 1 ? confirming : null
+  const blob = (estilo) => ({ position: 'absolute', borderRadius: '50%', background: NARANJA, filter: 'blur(160px)', ...estilo })
   return (
-    <>
-      <EncabezadoEstacion
-        posicion={posicion}
-        rotuloDerecha={[posicion === 1 ? 'ESPERANDO A QUIEN CONFIRME' : 'LIBRE']}
-        nombre={null}
-        boxCodigo={boxLabel(line?.line_number, posicion)}
-      />
-      <div style={{ flex: 1, minHeight: 0, padding: '36px 0 246px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ position: 'absolute', inset: 0, background: '#000000', overflow: 'hidden', zIndex: 5 }}>
+      <style>{LIBRE_KEYFRAMES}</style>
+      <div style={blob({ width: 760, height: 760, left: -160, top: 620, opacity: 0.42, animation: 'libreBlobA 34s ease-in-out infinite' })} />
+      <div style={blob({ width: 640, height: 640, right: -120, top: -140, opacity: 0.3, animation: 'libreBlobB 28s ease-in-out infinite' })} />
+      <div style={blob({ width: 520, height: 520, left: 900, top: 520, opacity: 0.22, animation: 'libreBlobC 38s ease-in-out infinite' })} />
+
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 150, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {teToca ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 44, background: '#ffffff', border: `4px solid ${NARANJA}`, borderRadius: 48, padding: '48px 56px' }}>
-            <span style={{ width: 132, height: 132, borderRadius: 66, border: `6px solid ${NARANJA}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: 52, color: NARANJA, flexShrink: 0 }}>
-              1
-            </span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-              <span style={{ fontSize: 28, fontWeight: 500, letterSpacing: 1.5, textTransform: 'uppercase', color: NARANJA }}>Te toca</span>
-              <span style={{ fontSize: 82, fontWeight: 600, color: '#111827', lineHeight: 1 }}>{teToca.socio}</span>
-              <span style={{ fontSize: 36, color: '#4b5563' }}>Apoyá el teléfono en el sticker del box {posicion} o confirmá en la app.</span>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 36, textAlign: 'center', padding: '0 120px' }}>
+            <TFMarca width={220} />
+            <span style={{ fontSize: 34, fontWeight: 600, letterSpacing: 6, textTransform: 'uppercase', color: NARANJA }}>Te toca</span>
+            <span style={{ fontSize: 150, fontWeight: 600, color: '#ffffff', lineHeight: 1 }}>{teToca.socio}</span>
+            <span style={{ fontSize: 46, color: 'rgba(255,255,255,0.8)' }}>Apoyá el teléfono en el sticker</span>
           </div>
         ) : (
-          <span style={{ fontSize: 48, color: '#9ca3af' }}>Libre</span>
+          <TFMarca width={560} />
         )}
       </div>
-      <BarraInferior label="Cada estación explica y después corre." sublabel="EN ESPERA" mmssActual={null} mmssTotal={null} />
-    </>
+
+      <div style={{ position: 'absolute', left: 56, right: 56, bottom: 0, height: 120, borderTop: '2px solid #ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 44, fontWeight: 600, letterSpacing: 4, color: '#ffffff' }}>ESTACIÓN {posicion}</span>
+        {slotDerecho}
+      </div>
+    </div>
   )
 }
 
