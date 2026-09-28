@@ -114,7 +114,11 @@ export function useBoxPhase(enteredAtIso, explicacionSeg, estacionSeg) {
   return estado
 }
 
-function calcular(enteredAtIso, explicacionSeg, estacionSeg) {
+// Exportada aparte de useBoxPhase para poder testear la matemática de fases sin React ni
+// timers — ver scripts/check-tvclock-phases.mjs ("lo arreglado no vuelve" del lado del
+// admin: rAF->setInterval y la fase de transición no tienen test runner en este repo, así
+// que el control es un script de Node que llama esta función pura directamente).
+export function calcular(enteredAtIso, explicacionSeg, estacionSeg) {
   if (!enteredAtIso) return { fase: null, restanteExplicacionSeg: 0, estacionInicioIso: null, transicionInicioIso: null }
   const inicioMs = new Date(enteredAtIso).getTime()
   const explicSeg = Math.max(0, Number(explicacionSeg) || 0)

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { PlusIcon, PencilIcon, TrashIcon, TvIcon } from '@heroicons/react/24/outline'
 import { queueService, boxLabel } from '../services/queueService'
 import { locationsService } from '../services/locationsService'
-import { explicacionSegDeLinea, estacionSegDeLinea, DEFAULT_DEMO_ESTACION_SEG } from '../lib/tvClock'
+import { explicacionSegDeLinea, estacionSegDeLinea, transicionSegDeLinea, DEFAULT_DEMO_ESTACION_SEG } from '../lib/tvClock'
 import { mmss } from '../lib/formatos'
 import { tvUrlSede, tvUrlLinea, tvUrlEstacion } from '../lib/slug'
 import toast from 'react-hot-toast'
@@ -338,6 +338,7 @@ export default function QueueConfig() {
             const modoDemo = Boolean(primera?.modo_demo)
             const explicSeg = explicacionSegDeLinea(primera)
             const estacionSegActual = estacionSegDeLinea(primera)
+            const transicionSegActual = transicionSegDeLinea(primera)
 
             return (
               <div key={locationId} className="space-y-3">
@@ -345,8 +346,8 @@ export default function QueueConfig() {
                   <div>
                     <h2 className="text-sm font-semibold text-text-primary">{nombreSede}</h2>
                     <p className="text-xs text-text-tertiary mt-0.5">
-                      Explicación {mmss(explicSeg)} + Estación {mmss(estacionSegActual)}
-                      {modoDemo ? ` (demo — normal ${mmss(estacionSegDeLinea({ ...primera, modo_demo: false }))})` : ''}
+                      Explicación {mmss(explicSeg)} + Estación {mmss(estacionSegActual)} + Transición {mmss(transicionSegActual)}
+                      {modoDemo ? ` (demo — normal ${mmss(estacionSegDeLinea({ ...primera, modo_demo: false }))} + ${mmss(transicionSegDeLinea({ ...primera, modo_demo: false }))})` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
