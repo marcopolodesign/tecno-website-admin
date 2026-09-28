@@ -13,7 +13,7 @@
 // este script llama calcular() en momentos salteados, no en una secuencia continua, y eso ya
 // es la prueba de que no depende de haber sido invocada a tiempo.
 
-import { calcular } from '../src/lib/tvClock.js'
+import { calcular, calcularEstadoEstacion, HOLA_SEG, primerNombre } from '../src/lib/tvClock.js'
 
 let fallos = 0
 
@@ -94,6 +94,48 @@ assertEq('sin enteredAtIso -> fase null', calcular(null, E, S), {
   const inicioMs = new Date(entrada).getTime()
   assert('estacionInicioIso = entered_at + E', Math.abs(new Date(r.estacionInicioIso).getTime() - (inicioMs + E * 1000)) < 5)
   assert('transicionInicioIso = entered_at + E + S', Math.abs(new Date(r.transicionInicioIso).getTime() - (inicioMs + (E + S) * 1000)) < 5)
+}
+
+// ── Estado de la pantalla de estación: off / llegando (hola) / explicacion / preparate /
+//    estacion / chau (2026-09-28) ───────────────────────────────────────────────────────────
+{
+  const linea = { explicacion_seg: 60, estacion_seg: 420, demo_estacion_seg: 60, modo_demo: true }
+  const ocupado = (segAtras, socio = 'Valentina R.') => ({ status: 'occupied', line_position: 1, entered_at: haceSeg(segAtras), socio })
+  const est = (o) => calcularEstadoEstacion({ line: linea, posicion: 1, boxes: [], nowMs: ahoraMs, ...o })
+
+  assertEq('primerNombre toma sólo el nombre de pila', primerNombre('Valentina R.'), 'Valentina')
+
+  // socio recién entrado: los primeros HOLA_SEG segundos son "Hola" con contador 5..1
+  assertEq('recién entró -> llegando con contador HOLA_SEG', est({ box: ocupado(0) }),
+    { estado: 'llegando', nombre: 'Valentina', sticker: false, restanteHolaSeg: HOLA_SEG })
+  assertEq('a los 4 s -> llegando, contador 1', est({ box: ocupado(HOLA_SEG - 1) }).restanteHolaSeg, 1)
+  assertEq('a los 5 s -> ya es explicacion', est({ box: ocupado(HOLA_SEG) }).estado, 'explicacion')
+  assertEq('explicacion conserva el restante del minuto entero (los 5 s salen de ahí)', est({ box: ocupado(20) }).restanteExplicacionSeg, 40)
+
+  // últimos 10 s de la explicación -> preparate
+  assertEq('a 11 s del final -> explicacion', est({ box: ocupado(49) }).estado, 'explicacion')
+  assertEq('a 10 s del final -> preparate', est({ box: ocupado(50) }), { estado: 'preparate', restanteExplicacionSeg: 10 })
+  assertEq('a 1 s del final -> preparate, restante 1', est({ box: ocupado(59) }).restanteExplicacionSeg, 1)
+
+  // estación y chau (transición)
+  assertEq('estación corriendo', est({ box: ocupado(60) }).estado, 'estacion')
+  assertEq('fin de estación -> chau', est({ box: ocupado(120) }).estado, 'chau')
+
+  // box libre
+  assertEq('libre y nadie viene -> off', est({ box: { status: 'free', line_position: 1 } }).estado, 'off')
+  assertEq('box 1 libre con confirmando -> llegando con sticker', est({ box: { status: 'free', line_position: 1 }, confirmando: { socio: 'Joaquín P.' } }),
+    { estado: 'llegando', nombre: 'Joaquín', sticker: true, restanteHolaSeg: null })
+  {
+    const boxes = (segAtras) => [
+      { status: 'occupied', line_position: 1, entered_at: haceSeg(segAtras), socio: 'Valentina R.' },
+      { status: 'free', line_position: 2 },
+    ]
+    const libre2 = { status: 'free', line_position: 2 }
+    const e2 = (segAtras) => est({ posicion: 2, box: libre2, boxes: boxes(segAtras), confirmando: { socio: 'No importa' } })
+    assertEq('box 2 libre, el del box 1 sigue en estación -> off (confirmando no aplica al box 2)', e2(90).estado, 'off')
+    assertEq('box 2 libre, el del box 1 entró en transición -> llegando SIN sticker', e2(125),
+      { estado: 'llegando', nombre: 'Valentina', sticker: false, restanteHolaSeg: null })
+  }
 }
 
 console.log('')

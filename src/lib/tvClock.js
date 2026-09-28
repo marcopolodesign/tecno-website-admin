@@ -118,7 +118,7 @@ export function useBoxPhase(enteredAtIso, explicacionSeg, estacionSeg) {
 // timers — ver scripts/check-tvclock-phases.mjs ("lo arreglado no vuelve" del lado del
 // admin: rAF->setInterval y la fase de transición no tienen test runner en este repo, así
 // que el control es un script de Node que llama esta función pura directamente).
-export function calcular(enteredAtIso, explicacionSeg, estacionSeg) {
+export function calcular(enteredAtIso, explicacionSeg, estacionSeg, nowMs = Date.now()) {
   if (!enteredAtIso) return { fase: null, restanteExplicacionSeg: 0, estacionInicioIso: null, transicionInicioIso: null }
   const inicioMs = new Date(enteredAtIso).getTime()
   const explicSeg = Math.max(0, Number(explicacionSeg) || 0)
@@ -126,7 +126,7 @@ export function calcular(enteredAtIso, explicacionSeg, estacionSeg) {
   const estacionInicioIso = new Date(inicioMs + explicSeg * 1000).toISOString()
   const transicionInicioIso =
     estacSeg == null ? null : new Date(inicioMs + (explicSeg + estacSeg) * 1000).toISOString()
-  const transcurridoSeg = Math.floor((Date.now() - inicioMs) / 1000)
+  const transcurridoSeg = Math.floor((nowMs - inicioMs) / 1000)
 
   if (transcurridoSeg < explicSeg) {
     return { fase: 'explicacion', restanteExplicacionSeg: explicSeg - transcurridoSeg, estacionInicioIso, transicionInicioIso }
@@ -135,4 +135,54 @@ export function calcular(enteredAtIso, explicacionSeg, estacionSeg) {
     return { fase: 'estacion', restanteExplicacionSeg: 0, estacionInicioIso, transicionInicioIso }
   }
   return { fase: 'transicion', restanteExplicacionSeg: 0, estacionInicioIso, transicionInicioIso }
+}
+
+// ── Estado de la pantalla de estación (2026-09-28) ─────────────────────────────────────────
+// La TV de estación es UNA pantalla con estados (off / llegando / explicacion / preparate /
+// estacion / chau). Esta función pura decide en cuál está a partir del payload de tv_linea y
+// de la hora, así se puede testear sin React (scripts/check-tvclock-phases.mjs).
+//
+// 'llegando' junta dos casos que se ven igual ("Hola <nombre>"):
+//   · el box está libre y viene alguien: en el box 1, `confirmando` apunta a esta línea (es el
+//     único donde se apoya el teléfono, `sticker: true`); en el box N>1, el socio del box N-1
+//     ya está en su transición (viene para acá).
+//   · el socio recién entró a ESTE box: los primeros HOLA_SEG segundos salen del minuto de
+//     explicación (sin cambios en la base) y llevan un contador 5-4-3-2-1.
+export const HOLA_SEG = 5
+export const PREPARATE_SEG = 10
+
+export function primerNombre(socio) {
+  return String(socio || '').trim().split(/\s+/)[0] || ''
+}
+
+export function calcularEstadoEstacion({ box, boxes = [], confirmando = null, posicion, line, nowMs = Date.now() }) {
+  const E = explicacionSegDeLinea(line)
+  const S = estacionSegDeLinea(line)
+  const pos = Number(posicion)
+
+  if (box?.status === 'occupied' && box.entered_at) {
+    const c = calcular(box.entered_at, E, S, nowMs)
+    const transcurrido = Math.floor((nowMs - new Date(box.entered_at).getTime()) / 1000)
+    if (c.fase === 'explicacion') {
+      if (transcurrido < HOLA_SEG) {
+        return { estado: 'llegando', nombre: primerNombre(box.socio), sticker: false, restanteHolaSeg: HOLA_SEG - transcurrido }
+      }
+      const r = c.restanteExplicacionSeg
+      if (r > 0 && r <= PREPARATE_SEG) return { estado: 'preparate', restanteExplicacionSeg: r }
+      return { estado: 'explicacion', restanteExplicacionSeg: r, estacionInicioIso: c.estacionInicioIso }
+    }
+    if (c.fase === 'transicion') return { estado: 'chau' }
+    return { estado: 'estacion', estacionInicioIso: c.estacionInicioIso }
+  }
+
+  if (pos === 1 && confirmando) {
+    return { estado: 'llegando', nombre: primerNombre(confirmando.socio), sticker: true, restanteHolaSeg: null }
+  }
+  if (pos > 1) {
+    const prev = boxes.find((b) => Number(b.line_position) === pos - 1)
+    if (prev?.status === 'occupied' && prev.entered_at && calcular(prev.entered_at, E, S, nowMs).fase === 'transicion') {
+      return { estado: 'llegando', nombre: primerNombre(prev.socio), sticker: false, restanteHolaSeg: null }
+    }
+  }
+  return { estado: 'off' }
 }
