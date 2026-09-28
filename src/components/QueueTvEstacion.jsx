@@ -156,17 +156,25 @@ function TarjetaEjercicio({ n, fila, activa, total = 2 }) {
   return (
     <div
       style={{
-        minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16,
+        minWidth: 0, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: 16,
         background: '#ffffff', border: `2px solid ${activa ? AZUL : '#e5e7eb'}`,
-        borderRadius: 32, padding: 22, justifyContent: 'center',
+        borderRadius: 32, padding: 22,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
         <Circulo n={n} activo={activa} />
         <span style={{ fontSize: 28, fontWeight: 600, color: '#111827', lineHeight: 1.15, minWidth: 0 }}>{fila.name}</span>
       </div>
-      <div style={{ width: '100%', aspectRatio, borderRadius: 24, background: '#f3f4f6', overflow: 'hidden', flexShrink: 0 }}>
-        <MediaEjercicio fila={fila} />
+      {/* El slot ocupa lo que sobre del card (flex:1, altura real porque el card entero se
+          estira a la altura de su fila/celda — ver GrillaEjercicios) y adentro el bloque de
+          aspecto fijo se ajusta por ALTURA (height:100% + maxWidth:100%), nunca por ancho: así
+          nunca se pasa del alto disponible ni fuerza al card a crecer más de la cuenta (el bug
+          reportado 2026-09-28: con aspecto derivado del ANCHO, el video terminaba más alto que
+          la fila y se superponía con la franja de modalidad de arriba). */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ height: '100%', maxWidth: '100%', aspectRatio, borderRadius: 24, background: '#f3f4f6', overflow: 'hidden' }}>
+          <MediaEjercicio fila={fila} />
+        </div>
       </div>
       {prescripcion && <div style={{ flexShrink: 0 }}><Pill>{prescripcion}</Pill></div>}
     </div>
@@ -174,11 +182,15 @@ function TarjetaEjercicio({ n, fila, activa, total = 2 }) {
 }
 
 // Fila/grilla de N≥2 ejercicios: 2 entran en una fila (16:9 cada uno); 3+ arman una grilla
-// de 2 columnas (16:10 cada uno) para no volver a angostar demasiado el video.
+// de 2 columnas (16:10 cada uno) para no volver a angostar demasiado el video. `alignItems`/
+// `alignContent` por default (stretch): cada card se estira a la altura real de su fila/celda,
+// que es lo que le da al slot interno de TarjetaEjercicio una altura de verdad para calcular
+// el bloque de aspecto fijo — con 'center' el card se quedaba con su altura de contenido y
+// terminaba desbordando (ver comentario en TarjetaEjercicio).
 function GrillaEjercicios({ exercises, activos }) {
   if (exercises.length === 2) {
     return (
-      <div style={{ display: 'flex', gap: 32, flex: 1, minHeight: 0, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 32, flex: 1, minHeight: 0 }}>
         {exercises.map((f, i) => (
           <div key={f.exercise_order ?? i} style={{ flex: 1, minWidth: 0 }}>
             <TarjetaEjercicio n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={2} />
@@ -188,7 +200,7 @@ function GrillaEjercicios({ exercises, activos }) {
     )
   }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24, flex: 1, minHeight: 0, alignContent: 'center' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24, flex: 1, minHeight: 0 }}>
       {exercises.map((f, i) => (
         <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={exercises.length} />
       ))}
@@ -377,7 +389,7 @@ function EstacionCorriendo({ box, line, posicion, boxes }) {
               <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6b7280', flexShrink: 0 }}>{titulo}</span>
               <span style={{ fontSize: 24, fontWeight: 500, color: '#111827' }}>{texto}</span>
             </div>
-            <GrillaEjercicios exercises={exercises} />
+            <GrillaEjercicios exercises={exercises} activos={new Set()} />
           </div>
         )}
         <BarraInferior label="La estación arranca sola cuando termine este minuto." sublabel="EXPLICACIÓN" mmssActual={formatMMSS(phase.restanteExplicacionSeg)} mmssTotal={null} />
