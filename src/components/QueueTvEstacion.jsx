@@ -129,42 +129,102 @@ function Circulo({ n, activo }) {
   )
 }
 
-// `grande`: modo pantalla de explicación (2026-09-28) — el video pasa a llenar el card
-// entero (flex: 1 en vez de una altura fija de 220px) para que domine la pantalla, con el
-// encabezado y la prescripción comprimidos alrededor. Ver EstacionCorriendo.
-function TarjetaEjercicio({ n, fila, activa, grande }) {
+// El video es un bloque de aspecto FIJO, nunca un rectángulo que se estira a lo que sobre
+// del card (bug reportado 2026-09-28: con 1-2 ejercicios el video terminaba siendo una tira
+// angosta ~5:1 que le cortaba la cabeza a la persona). `total` es cuántas tarjetas hay en la
+// fila/grilla: con 2 entra un 16:9 completo por tarjeta; con 3+ (grilla de 2 columnas), al
+// menos 16:10 para no repetir el mismo apriete. El caso de 1 solo ejercicio NO usa esta
+// tarjeta — usa EjercicioProtagonista, con el video como bloque grande a la izquierda.
+function MediaEjercicio({ fila, style }) {
   const media = exerciseMedia(fila, 'tv')
+  if (media.kind === 'hosted') {
+    return <VideoEjercicio src={media.src} poster={media.poster} recorte={media.recorte} style={{ width: '100%', height: '100%', objectFit: 'cover', ...media.style, ...style }} />
+  }
+  if (media.kind === 'image') {
+    return <img src={media.src} alt={fila.name} style={{ width: '100%', height: '100%', objectFit: 'cover', ...style }} />
+  }
+  return (
+    <div style={{ width: 120, height: 120, borderRadius: 60, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="#ffffff"><path d="M8 5.5 19 12 8 18.5z" /></svg>
+    </div>
+  )
+}
+
+function TarjetaEjercicio({ n, fila, activa, total = 2 }) {
   const prescripcion = fila.sets_reps || prescripcionTexto({ segundos: fila.segundos_por_ejercicio })
+  const aspectRatio = total <= 2 ? '16 / 9' : '16 / 10'
   return (
     <div
       style={{
-        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: grande ? 14 : 18,
+        minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16,
         background: '#ffffff', border: `2px solid ${activa ? AZUL : '#e5e7eb'}`,
-        borderRadius: 36, padding: grande ? 20 : 26, minHeight: 0,
+        borderRadius: 32, padding: 22, justifyContent: 'center',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: grande ? 14 : 18, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
         <Circulo n={n} activo={activa} />
-        <span style={{ fontSize: grande ? 30 : 36, fontWeight: 600, color: '#111827', lineHeight: 1.1, minWidth: 0 }}>{fila.name}</span>
+        <span style={{ fontSize: 28, fontWeight: 600, color: '#111827', lineHeight: 1.15, minWidth: 0 }}>{fila.name}</span>
       </div>
-      <div
-        style={{
-          width: '100%',
-          ...(grande ? { flex: 1, minHeight: 0 } : { height: 220 }),
-          borderRadius: 28, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-        }}
-      >
-        {media.kind === 'hosted' ? (
-          <VideoEjercicio src={media.src} poster={media.poster} recorte={media.recorte} style={{ width: '100%', height: '100%', objectFit: 'cover', ...media.style }} />
-        ) : media.kind === 'image' ? (
-          <img src={media.src} alt={fila.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div style={{ width: 120, height: 120, borderRadius: 60, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="#ffffff"><path d="M8 5.5 19 12 8 18.5z" /></svg>
-          </div>
-        )}
+      <div style={{ width: '100%', aspectRatio, borderRadius: 24, background: '#f3f4f6', overflow: 'hidden', flexShrink: 0 }}>
+        <MediaEjercicio fila={fila} />
       </div>
       {prescripcion && <div style={{ flexShrink: 0 }}><Pill>{prescripcion}</Pill></div>}
+    </div>
+  )
+}
+
+// Fila/grilla de N≥2 ejercicios: 2 entran en una fila (16:9 cada uno); 3+ arman una grilla
+// de 2 columnas (16:10 cada uno) para no volver a angostar demasiado el video.
+function GrillaEjercicios({ exercises, activos }) {
+  if (exercises.length === 2) {
+    return (
+      <div style={{ display: 'flex', gap: 32, flex: 1, minHeight: 0, alignItems: 'center' }}>
+        {exercises.map((f, i) => (
+          <div key={f.exercise_order ?? i} style={{ flex: 1, minWidth: 0 }}>
+            <TarjetaEjercicio n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={2} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24, flex: 1, minHeight: 0, alignContent: 'center' }}>
+      {exercises.map((f, i) => (
+        <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={exercises.length} />
+      ))}
+    </div>
+  )
+}
+
+// Un solo ejercicio: el video es el protagonista de la pantalla — un bloque grande de 16:9
+// a la izquierda (hasta ~1150×650, el número que pidió Mateo mirando el corte de cabeza en
+// el bug), con el nombre, la prescripción y (en explicación) la modalidad en una columna a la
+// derecha en letra grande. Nada de tira angosta: el bloque nunca se estira más allá de su
+// propio 16:9, así que cover recorta apenas lo que el video ya trae de sobrante, no la
+// cabeza de la persona.
+function EjercicioProtagonista({ fila, activa, modalidad }) {
+  const prescripcion = fila.sets_reps || prescripcionTexto({ segundos: fila.segundos_por_ejercicio })
+  return (
+    <div style={{ display: 'flex', gap: 56, flex: 1, minHeight: 0, alignItems: 'center' }}>
+      <div
+        style={{
+          height: '100%', maxHeight: 650, maxWidth: 1150, aspectRatio: '16 / 9',
+          borderRadius: 40, background: '#f3f4f6', overflow: 'hidden', flexShrink: 0,
+          border: activa ? `3px solid ${AZUL}` : 'none',
+        }}
+      >
+        <MediaEjercicio fila={fila} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 28 }}>
+        {modalidad && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6b7280' }}>{modalidad.titulo}</span>
+            <span style={{ fontSize: 30, fontWeight: 500, color: '#111827', lineHeight: 1.3 }}>{modalidad.texto}</span>
+          </div>
+        )}
+        <span style={{ fontSize: 84, fontWeight: 700, color: '#111827', lineHeight: 1.1 }}>{fila.name}</span>
+        {prescripcion && <div><Pill>{prescripcion}</Pill></div>}
+      </div>
     </div>
   )
 }
@@ -301,21 +361,25 @@ function EstacionCorriendo({ box, line, posicion, boxes }) {
           tiempoLabel="Empieza en"
           tiempoValor={formatMMSS(phase.restanteExplicacionSeg)}
         />
-        {/* Franja compacta de modalidad + tarjetas con el video dominando la pantalla
-            (2026-09-28): antes el video medía 220px fijos dentro de una tarjeta genérica;
-            ahora el texto de modalidad es una línea angosta arriba y las tarjetas se reparten
-            todo el alto que queda, con `grande` haciendo que el video ocupe flex:1 del card. */}
-        <div style={{ flex: 1, minHeight: 0, padding: '28px 0 246px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, background: '#ffffff', border: '2px solid #e5e7eb', borderRadius: 24, padding: '16px 30px', flexShrink: 0 }}>
-            <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6b7280', flexShrink: 0 }}>{titulo}</span>
-            <span style={{ fontSize: 24, fontWeight: 500, color: '#111827' }}>{texto}</span>
+        {/* Un solo ejercicio: el video es protagonista (EjercicioProtagonista, bloque 16:9
+            grande a la izquierda + nombre/modalidad grande a la derecha — sin la franja de
+            arriba, la modalidad va en la columna). Dos o más: franja compacta de modalidad +
+            GrillaEjercicios, cada video en su propio bloque de aspecto fijo (2026-09-28: antes
+            el video se estiraba a lo que sobrara del card y terminaba como una tira angosta
+            que cortaba cabezas). */}
+        {exercises.length === 1 ? (
+          <div style={{ flex: 1, minHeight: 0, padding: '28px 0 246px', display: 'flex' }}>
+            <EjercicioProtagonista fila={exercises[0]} modalidad={{ titulo, texto }} />
           </div>
-          <div style={{ display: 'flex', gap: 28, flex: 1, minHeight: 0 }}>
-            {exercises.map((f, i) => (
-              <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={false} grande />
-            ))}
+        ) : (
+          <div style={{ flex: 1, minHeight: 0, padding: '28px 0 246px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, background: '#ffffff', border: '2px solid #e5e7eb', borderRadius: 24, padding: '16px 30px', flexShrink: 0 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6b7280', flexShrink: 0 }}>{titulo}</span>
+              <span style={{ fontSize: 24, fontWeight: 500, color: '#111827' }}>{texto}</span>
+            </div>
+            <GrillaEjercicios exercises={exercises} />
           </div>
-        </div>
+        )}
         <BarraInferior label="La estación arranca sola cuando termine este minuto." sublabel="EXPLICACIÓN" mmssActual={formatMMSS(phase.restanteExplicacionSeg)} mmssTotal={null} />
         {mostrarPreparate && <PreparateOverlay segundos={phase.restanteExplicacionSeg} />}
       </>
@@ -401,20 +465,16 @@ function EstacionCorriendo({ box, line, posicion, boxes }) {
         tiempoLabel="Sale del box en"
         tiempoValor={boxCountdown}
       />
-      <div style={{ flex: 1, minHeight: 0, padding: '36px 0 246px' }}>
-        <div style={{ display: 'flex', gap: 28, height: '100%' }}>
-          {delMinuto.length > 1 ? (
-            delMinuto.map((f, i) => <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa />)
-          ) : exercises.length > 1 ? (
-            exercises.map((f, i) => (
-              <TarjetaEjercicio key={f.exercise_order ?? i} n={i + 1} fila={f} activa={activos.has(f.exercise_order)} />
-            ))
-          ) : primero ? (
-            <TarjetaEjercicio n={1} fila={primero} activa />
-          ) : (
-            <span style={{ margin: 'auto', color: '#6b7280', fontSize: 28 }}>Entrenando</span>
-          )}
-        </div>
+      <div style={{ flex: 1, minHeight: 0, padding: '36px 0 246px', display: 'flex' }}>
+        {delMinuto.length > 1 ? (
+          <GrillaEjercicios exercises={delMinuto} />
+        ) : exercises.length > 1 ? (
+          <GrillaEjercicios exercises={exercises} activos={activos} />
+        ) : primero ? (
+          <EjercicioProtagonista fila={primero} activa />
+        ) : (
+          <span style={{ margin: 'auto', color: '#6b7280', fontSize: 28 }}>Entrenando</span>
+        )}
       </div>
       <BarraInferior {...barra} />
     </>
