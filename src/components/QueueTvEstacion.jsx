@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase'
 import { queueService } from '../services/queueService'
 import { esPorTiempo, faseDelFormato, comoTexto, mmss, filasDelMinuto, prescripcionTexto } from '../lib/formatos'
 import { explicacionDeFormato } from '../lib/modalidadTexto'
-import { useCountdown, formatMMSS, calcularEstadoEstacion } from '../lib/tvClock'
+import { useCountdown, formatMMSS, calcularEstadoEstacion, predecirBoxes } from '../lib/tvClock'
 import { exerciseMedia } from '../lib/exerciseMedia'
 import logoLottie from '../assets/tf-logo.lottie.json'
 import VideoEjercicio from './VideoEjercicio'
@@ -71,18 +71,28 @@ function useFaseEstacion(estacionInicioIso, formato) {
 function useEstadoEstacion(args) {
   const ref = useRef(args)
   ref.current = args
-  const [estado, setEstado] = useState(() => calcularEstadoEstacion(args))
+  const calcular = () => {
+    const { box, boxes, confirmando, posicion, line } = ref.current
+    const nowMs = Date.now()
+    const pred = predecirBoxes(boxes, line, nowMs)
+    const predBox = pred.find((b) => Number(b.line_position) === Number(posicion)) ?? box
+    return { estado: calcularEstadoEstacion({ box, boxes, confirmando, posicion, line, nowMs }), box: predBox, boxes: pred }
+  }
+  // Firma de lo que se ve: sin cambios de firma no hay re-render (y no hay parpadeo cuando el
+  // servidor confirma lo que la TV ya había predicho).
+  const firma = (r) => JSON.stringify([r.estado, r.boxes.map((b) => [b.line_position, b.status, b.socio, b.entered_at, b.advances_at])])
+  const [res, setRes] = useState(calcular)
   useEffect(() => {
     const tick = () =>
-      setEstado((prev) => {
-        const next = calcularEstadoEstacion({ ...ref.current, nowMs: Date.now() })
-        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+      setRes((prev) => {
+        const next = calcular()
+        return firma(prev) === firma(next) ? prev : next
       })
     tick()
     const id = window.setInterval(tick, 250)
     return () => window.clearInterval(id)
   }, [args.box, args.boxes, args.confirmando, args.line, args.posicion])
-  return estado
+  return res
 }
 
 // ── Fondo, logo y pie: persistentes ──────────────────────────────────────────────────────
@@ -603,7 +613,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
   }, [lineaId, refresh])
 
   const box = boxes.find((b) => Number(b.line_position) === pos)
-  const estado = useEstadoEstacion({ box, boxes, confirmando: confirming, posicion: pos, line })
+  const { estado, box: boxVista, boxes: boxesVista } = useEstadoEstacion({ box, boxes, confirmando: confirming, posicion: pos, line })
   const grupo = estado.estado === 'off' ? 'off' : estado.estado === 'llegando' ? 'llegando' : 'chico'
 
   return (
@@ -613,7 +623,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
         <FondoNegro />
         <LogoTF grupo={grupo} />
         <Crossfade stateKey={estado.estado}>
-          <VistaEstado estado={estado} box={box} boxes={boxes} posicion={pos} />
+          <VistaEstado estado={estado} box={boxVista} boxes={boxesVista} posicion={pos} />
         </Crossfade>
         <Pie posicion={pos} />
         {!connected && (

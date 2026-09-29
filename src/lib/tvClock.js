@@ -155,7 +155,55 @@ export function primerNombre(socio) {
   return String(socio || '').trim().split(/\s+/)[0] || ''
 }
 
-export function calcularEstadoEstacion({ box, boxes = [], confirmando = null, posicion, line, nowMs = Date.now() }) {
+// Movimiento box→box PREDICHO en el instante de advances_at (2026-09-29). El tick del servidor
+// corre cada 10 s y la TV se enteraba recién por realtime/poll: hasta ~20 s clavada en 0:00.
+// Como todo sale de timestamps que ya vienen en tv_linea, se calcula acá mismo, sin ida y
+// vuelta, con la misma regla que advance-queue-tick (de atrás para adelante, así el box que
+// se libera en el mismo instante ya cuenta como libre para el de atrás):
+//   · el último box: quien vence sale (queda libre).
+//   · el siguiente libre: el socio entra ahí con entered_at = su advances_at (o cuando el
+//     siguiente se liberó, si fue después) y advances_at = entered_at + duración del box.
+//   · el siguiente ocupado y que NO vence: cuello de botella, no se predice nada.
+// Idempotente: sobre un payload ya movido por el servidor no cambia nada (reconciliación
+// silenciosa: si el servidor coincide no hay parpadeo; si no, manda el servidor).
+export function predecirBoxes(boxes = [], line, nowMs = Date.now()) {
+  if (!boxes.length) return boxes
+  const dur = duracionBoxSegDeLinea(line)
+  const orden = [...boxes].sort((a, b) => Number(b.line_position) - Number(a.line_position))
+  const por = new Map(boxes.map((b) => [Number(b.line_position), { ...b }]))
+  const liberadoEn = new Map()
+  let huboCambios = false
+  for (const orig of orden) {
+    const b = por.get(Number(orig.line_position))
+    if (b.status !== 'occupied' || !b.advances_at) continue
+    const vence = new Date(b.advances_at).getTime()
+    if (vence > nowMs) continue
+    const sig = por.get(Number(b.line_position) + 1)
+    const libre = (x) => ({ ...x, status: 'free', socio: null, entered_at: null, advances_at: null, riesgo: null })
+    if (!sig) {
+      por.set(Number(b.line_position), libre(b))
+      liberadoEn.set(Number(b.line_position), vence)
+      huboCambios = true
+    } else if (sig.status === 'free') {
+      const entrada = Math.max(vence, liberadoEn.get(Number(sig.line_position)) ?? 0)
+      por.set(Number(sig.line_position), {
+        ...sig,
+        status: 'occupied',
+        socio: b.socio,
+        entered_at: new Date(entrada).toISOString(),
+        advances_at: new Date(entrada + dur * 1000).toISOString(),
+      })
+      por.set(Number(b.line_position), libre(b))
+      liberadoEn.set(Number(b.line_position), vence)
+      huboCambios = true
+    }
+  }
+  return huboCambios ? boxes.map((b) => por.get(Number(b.line_position))) : boxes
+}
+
+export function calcularEstadoEstacion({ box: boxCrudo, boxes: boxesCrudos = [], confirmando = null, posicion, line, nowMs = Date.now() }) {
+  const boxes = predecirBoxes(boxesCrudos, line, nowMs)
+  const box = boxes.find((b) => Number(b.line_position) === Number(posicion)) ?? boxCrudo
   const E = explicacionSegDeLinea(line)
   const S = estacionSegDeLinea(line)
   const pos = Number(posicion)

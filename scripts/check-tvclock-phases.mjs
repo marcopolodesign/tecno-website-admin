@@ -13,7 +13,7 @@
 // este script llama calcular() en momentos salteados, no en una secuencia continua, y eso ya
 // es la prueba de que no depende de haber sido invocada a tiempo.
 
-import { calcular, calcularEstadoEstacion, HOLA_SEG, primerNombre } from '../src/lib/tvClock.js'
+import { calcular, calcularEstadoEstacion, predecirBoxes, HOLA_SEG, primerNombre } from '../src/lib/tvClock.js'
 
 let fallos = 0
 
@@ -135,6 +135,55 @@ assertEq('sin enteredAtIso -> fase null', calcular(null, E, S), {
     assertEq('box 2 libre, el del box 1 sigue en estación -> off (confirmando no aplica al box 2)', e2(90).estado, 'off')
     assertEq('box 2 libre, el del box 1 entró en transición -> llegando SIN sticker', e2(125),
       { estado: 'llegando', nombre: 'Valentina', sticker: false, restanteHolaSeg: null })
+  }
+}
+
+// ── Transición optimista box→box (2026-09-29): en advances_at la TV predice el movimiento ──
+{
+  const linea = { explicacion_seg: 60, estacion_seg: 420, demo_estacion_seg: 60, transicion_seg: 45, demo_transicion_seg: 30, modo_demo: true }
+  const DUR = 150 // 60 + 60 + 30
+  const iso = (ms) => new Date(ms).toISOString()
+  const b = (pos, o = {}) => ({ line_position: pos, status: 'free', socio: null, entered_at: null, advances_at: null, ...o })
+  const oc = (pos, socio, venceHaceSeg) => b(pos, { status: 'occupied', socio, entered_at: iso(ahoraMs - (DUR + venceHaceSeg) * 1000), advances_at: iso(ahoraMs - venceHaceSeg * 1000) })
+
+  // el box 1 venció hace 1 s y el 2 está libre: 1 se libera, 2 recibe al socio con entered_at = advances_at del 1
+  {
+    const crudo = [oc(1, 'Valentina R.', 1), b(2)]
+    const pred = predecirBoxes(crudo, linea, ahoraMs)
+    assertEq('box 1 vencido -> queda libre', pred[0].status, 'free')
+    assertEq('box 2 libre -> recibe al socio', [pred[1].status, pred[1].socio], ['occupied', 'Valentina R.'])
+    assertEq('entered_at del box 2 = advances_at del box 1 (exacto)', pred[1].entered_at, crudo[0].advances_at)
+    assertEq('advances_at del box 2 = entered_at + duración del box', new Date(pred[1].advances_at).getTime() - new Date(pred[1].entered_at).getTime(), DUR * 1000)
+    assertEq('A/1 va directo a off', calcularEstadoEstacion({ box: crudo[0], boxes: crudo, posicion: 1, line: linea, nowMs: ahoraMs }).estado, 'off')
+    assertEq('A/2 va directo a "Hola" con contador', calcularEstadoEstacion({ box: crudo[1], boxes: crudo, posicion: 2, line: linea, nowMs: ahoraMs }),
+      { estado: 'llegando', nombre: 'Valentina', sticker: false, restanteHolaSeg: HOLA_SEG - 1 })
+    assertEq('A/1 va a llegando (con sticker) si viene alguien a confirmar', calcularEstadoEstacion({ box: crudo[0], boxes: crudo, posicion: 1, line: linea, nowMs: ahoraMs, confirmando: { socio: 'Joaquín P.' } }).estado, 'llegando')
+    const otra = predecirBoxes(pred, linea, ahoraMs)
+    assertEq('idempotente: sobre un payload ya movido no cambia nada', JSON.stringify(otra), JSON.stringify(pred))
+  }
+  // cuello de botella: el box 2 está ocupado y NO vence -> no se predice nada, el 1 queda en chau
+  {
+    const crudo = [oc(1, 'Valentina R.', 1), { ...oc(2, 'Otro S.', -40) }]
+    assertEq('cuello de botella: no se predice', predecirBoxes(crudo, linea, ahoraMs), crudo)
+    assertEq('cuello de botella: el box 1 sigue en chau', calcularEstadoEstacion({ box: crudo[0], boxes: crudo, posicion: 1, line: linea, nowMs: ahoraMs }).estado, 'chau')
+  }
+  // cadena: 1 y 2 vencen a la vez, 3 libre -> se mueven los dos; entered_at del 2 = el más tardío de los dos vencimientos
+  {
+    const crudo = [oc(1, 'A A.', 2), oc(2, 'B B.', 1), b(3)]
+    const pred = predecirBoxes(crudo, linea, ahoraMs)
+    assertEq('cadena: B pasa al box 3', [pred[2].socio, pred[2].entered_at], ['B B.', crudo[1].advances_at])
+    assertEq('cadena: A pasa al box 2 con entered_at = max(vence A, se liberó el 2)', [pred[1].socio, pred[1].entered_at], ['A A.', crudo[1].advances_at])
+    assertEq('cadena: el box 1 queda libre', pred[0].status, 'free')
+  }
+  // el último box que vence sale
+  {
+    const crudo = [b(1), oc(2, 'Z Z.', 1)]
+    assertEq('último box vencido -> libre', predecirBoxes(crudo, linea, ahoraMs)[1].status, 'free')
+  }
+  // nada vencido: mismo array
+  {
+    const crudo = [oc(1, 'V V.', -20), b(2)]
+    assertEq('nada vencido: no cambia', predecirBoxes(crudo, linea, ahoraMs), crudo)
   }
 }
 
