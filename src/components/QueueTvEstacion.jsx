@@ -519,16 +519,27 @@ function VistaEstacion({ box, estado }) {
 }
 
 function VistaChau({ box, boxes, posicion }) {
-  const cuenta = formatMMSS(useCountdown(box.advances_at))
+  const segundos = useCountdown(box.advances_at)
   const esUltima = posicion >= (boxes?.length || 0)
+  // Al llegar a 0 el tick todavía puede tardar en mover al socio: no se muestra "0:00" clavado,
+  // se pasa a la instrucción sin timer.
+  const terminado = segundos != null && segundos <= 0
   return (
     <div style={{ position: 'absolute', left: 56, right: 56, top: 190, bottom: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, textAlign: 'center' }}>
       <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: 6, textTransform: 'uppercase', color: NARANJA }}>¡Felicitaciones!</span>
       <span style={{ fontSize: 110, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>Terminaste la estación {posicion}</span>
-      <span style={{ fontSize: 60, fontWeight: 600, color: TENUE }}>
-        {esUltima ? '¡Terminaste el circuito!' : `Avanzá a la estación ${posicion + 1}`}
-      </span>
-      <span style={{ fontFamily: MONO, fontSize: 170, color: NARANJA, fontWeight: 800, lineHeight: 1.1 }}>{cuenta}</span>
+      {terminado ? (
+        <span style={{ fontSize: 96, fontWeight: 700, color: NARANJA, lineHeight: 1.2, marginTop: 20 }}>
+          {esUltima ? '¡Terminaste el circuito!' : `Pasá a la estación ${posicion + 1} →`}
+        </span>
+      ) : (
+        <>
+          <span style={{ fontSize: 60, fontWeight: 600, color: TENUE }}>
+            {esUltima ? '¡Terminaste el circuito!' : `Avanzá a la estación ${posicion + 1}`}
+          </span>
+          <span style={{ fontFamily: MONO, fontSize: 170, color: NARANJA, fontWeight: 800, lineHeight: 1.1 }}>{formatMMSS(segundos)}</span>
+        </>
+      )}
     </div>
   )
 }
@@ -556,6 +567,8 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
   const [confirming, setConfirming] = useState(null)
   const [connected, setConnected] = useState(true)
   const unsubRef = useRef(null)
+  const boxesRef = useRef([])
+  boxesRef.current = boxes
 
   const refresh = useCallback(async () => {
     try {
@@ -575,9 +588,17 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
     refresh()
     unsubRef.current = queueService.subscribeToLine(lineaId, refresh)
     const staleCheck = setInterval(refresh, 15000)
+    // Si algún box ocupado ya pasó su advances_at, el que lo mueve es el tick del servidor
+    // (cada 10 s) y la TV se enteraría recién por el poll de 15 s: mientras haya un
+    // vencido se vuelve a pedir tv_linea cada 2 s, hasta que el estado cambie.
+    const vencidoCheck = setInterval(() => {
+      const ahora = Date.now()
+      if (boxesRef.current.some((b) => b.status === 'occupied' && b.advances_at && new Date(b.advances_at).getTime() < ahora)) refresh()
+    }, 2000)
     return () => {
       unsubRef.current?.()
       clearInterval(staleCheck)
+      clearInterval(vencidoCheck)
     }
   }, [lineaId, refresh])
 
