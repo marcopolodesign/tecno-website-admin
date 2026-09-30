@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { queueService, boxLabel } from '../services/queueService'
 import { useCountdown, useBoxPhase, explicacionSegDeLinea, estacionSegDeLinea, formatMMSS } from '../lib/tvClock'
 import { ExercisePanel, ExplicacionPanel, TransicionPanel } from './tv/BoxPanels'
+import { ControlesTv } from './tv/TvChrome'
 
 function BoxSlot({ box, line, boxes }) {
   const countdown = formatMMSS(useCountdown(box.status === 'occupied' ? box.advances_at : null))
@@ -168,6 +169,8 @@ export default function QueueTv({ overrideLineaId } = {}) {
           <p style={{ color: 'rgba(255,255,255,0.4)', margin: 'auto' }}>Sin boxes configurados</p>
         )}
       </div>
+
+      <ControlesTv />
 
       {confirming && (
         <div

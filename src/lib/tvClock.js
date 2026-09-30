@@ -17,13 +17,14 @@
 // hasta `advances_at`, que el servidor ya calcula con las tres sumadas). Estos defaults son
 // los mismos que trae la migración de production_lines por si el payload todavía no los manda.
 import { useEffect, useState } from 'react'
+import { serverNow } from './serverClock.js'
 
 const TICK_MS = 250
 
 export const DEFAULT_EXPLICACION_SEG = 60
 export const DEFAULT_ESTACION_SEG = 420
 export const DEFAULT_DEMO_ESTACION_SEG = 60
-export const DEFAULT_TRANSICION_SEG = 45
+export const DEFAULT_TRANSICION_SEG = 30
 export const DEFAULT_DEMO_TRANSICION_SEG = 30
 
 export function explicacionSegDeLinea(linea) {
@@ -49,12 +50,12 @@ export function duracionBoxSegDeLinea(linea) {
 }
 
 // Cuenta regresiva contra un timestamp absoluto (ISO). Nunca cuenta hacia abajo desde un
-// número guardado — deriva el restante de Date.now() en cada tick, así una pestaña en
+// número guardado — deriva el restante de serverNow() en cada tick, así una pestaña en
 // segundo plano o tapada (que es lo que es una TV para el navegador) no se congela ni acumula
 // drift.
 export function useCountdown(targetIso) {
   const [secondsLeft, setSecondsLeft] = useState(() =>
-    targetIso ? Math.max(0, Math.ceil((new Date(targetIso).getTime() - Date.now()) / 1000)) : null
+    targetIso ? Math.max(0, Math.ceil((new Date(targetIso).getTime() - serverNow()) / 1000)) : null
   )
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export function useCountdown(targetIso) {
     }
     const targetMs = new Date(targetIso).getTime()
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((targetMs - Date.now()) / 1000))
+      const remaining = Math.max(0, Math.ceil((targetMs - serverNow()) / 1000))
       setSecondsLeft((prev) => (prev !== remaining ? remaining : prev))
     }
     tick()
@@ -118,7 +119,7 @@ export function useBoxPhase(enteredAtIso, explicacionSeg, estacionSeg) {
 // timers — ver scripts/check-tvclock-phases.mjs ("lo arreglado no vuelve" del lado del
 // admin: rAF->setInterval y la fase de transición no tienen test runner en este repo, así
 // que el control es un script de Node que llama esta función pura directamente).
-export function calcular(enteredAtIso, explicacionSeg, estacionSeg, nowMs = Date.now()) {
+export function calcular(enteredAtIso, explicacionSeg, estacionSeg, nowMs = serverNow()) {
   if (!enteredAtIso) return { fase: null, restanteExplicacionSeg: 0, estacionInicioIso: null, transicionInicioIso: null }
   const inicioMs = new Date(enteredAtIso).getTime()
   const explicSeg = Math.max(0, Number(explicacionSeg) || 0)
@@ -149,11 +150,23 @@ export function calcular(enteredAtIso, explicacionSeg, estacionSeg, nowMs = Date
 //   · el socio recién entró a ESTE box: los primeros HOLA_SEG segundos salen del minuto de
 //     explicación (sin cambios en la base) y llevan un contador 5-4-3-2-1.
 export const HOLA_SEG = 5
-export const PREPARATE_SEG = 10
+export const PREPARATE_SEG = 5
 
 export function primerNombre(socio) {
   return String(socio || '').trim().split(/\s+/)[0] || ''
 }
+
+// Cómo saludar (2026-09-30): el nombre de pila (users.first_name) o, si falta, el apodo
+// (preferred_name) — los dos ya vienen resueltos en `nombre` desde tv_linea. Si el payload es
+// viejo y no trae `nombre`, cae al primer token de `socio` ("Valentina R." -> "Valentina").
+export function nombreDeSaludo(obj) {
+  return String(obj?.nombre || '').trim() || primerNombre(obj?.socio)
+}
+
+// Resumen de fin de circuito en la TV de la última estación: los últimos RESUMEN_MAX_SEG de la
+// transición (o la mitad de ella si es más corta). Va DENTRO de la transición y no después:
+// cuando el box se libera el que llega ya está entrando y le taparía la explicación.
+export const RESUMEN_MAX_SEG = 15
 
 // Movimiento box→box PREDICHO en el instante de advances_at (2026-09-29). El tick del servidor
 // corre cada 10 s y la TV se enteraba recién por realtime/poll: hasta ~20 s clavada en 0:00.
@@ -166,7 +179,7 @@ export function primerNombre(socio) {
 //   · el siguiente ocupado y que NO vence: cuello de botella, no se predice nada.
 // Idempotente: sobre un payload ya movido por el servidor no cambia nada (reconciliación
 // silenciosa: si el servidor coincide no hay parpadeo; si no, manda el servidor).
-export function predecirBoxes(boxes = [], line, nowMs = Date.now()) {
+export function predecirBoxes(boxes = [], line, nowMs = serverNow()) {
   if (!boxes.length) return boxes
   const dur = duracionBoxSegDeLinea(line)
   const orden = [...boxes].sort((a, b) => Number(b.line_position) - Number(a.line_position))
@@ -179,7 +192,7 @@ export function predecirBoxes(boxes = [], line, nowMs = Date.now()) {
     const vence = new Date(b.advances_at).getTime()
     if (vence > nowMs) continue
     const sig = por.get(Number(b.line_position) + 1)
-    const libre = (x) => ({ ...x, status: 'free', socio: null, entered_at: null, advances_at: null, riesgo: null })
+    const libre = (x) => ({ ...x, status: 'free', socio: null, nombre: null, ingreso_at: null, kg: null, entered_at: null, advances_at: null, riesgo: null })
     if (!sig) {
       por.set(Number(b.line_position), libre(b))
       liberadoEn.set(Number(b.line_position), vence)
@@ -190,6 +203,8 @@ export function predecirBoxes(boxes = [], line, nowMs = Date.now()) {
         ...sig,
         status: 'occupied',
         socio: b.socio,
+        nombre: b.nombre,
+        riesgo: b.riesgo,
         entered_at: new Date(entrada).toISOString(),
         advances_at: new Date(entrada + dur * 1000).toISOString(),
       })
@@ -201,7 +216,7 @@ export function predecirBoxes(boxes = [], line, nowMs = Date.now()) {
   return huboCambios ? boxes.map((b) => por.get(Number(b.line_position))) : boxes
 }
 
-export function calcularEstadoEstacion({ box: boxCrudo, boxes: boxesCrudos = [], confirmando = null, posicion, line, nowMs = Date.now() }) {
+export function calcularEstadoEstacion({ box: boxCrudo, boxes: boxesCrudos = [], confirmando = null, posicion, line, nowMs = serverNow() }) {
   const boxes = predecirBoxes(boxesCrudos, line, nowMs)
   const box = boxes.find((b) => Number(b.line_position) === Number(posicion)) ?? boxCrudo
   const E = explicacionSegDeLinea(line)
@@ -213,23 +228,40 @@ export function calcularEstadoEstacion({ box: boxCrudo, boxes: boxesCrudos = [],
     const transcurrido = Math.floor((nowMs - new Date(box.entered_at).getTime()) / 1000)
     if (c.fase === 'explicacion') {
       if (transcurrido < HOLA_SEG) {
-        return { estado: 'llegando', nombre: primerNombre(box.socio), sticker: false, restanteHolaSeg: HOLA_SEG - transcurrido }
+        return { estado: 'llegando', nombre: nombreDeSaludo(box), sticker: false, restanteHolaSeg: HOLA_SEG - transcurrido }
       }
       const r = c.restanteExplicacionSeg
       if (r > 0 && r <= PREPARATE_SEG) return { estado: 'preparate', restanteExplicacionSeg: r }
       return { estado: 'explicacion', restanteExplicacionSeg: r, estacionInicioIso: c.estacionInicioIso }
     }
-    if (c.fase === 'transicion') return { estado: 'chau' }
+    if (c.fase === 'transicion') {
+      const esUltima = pos === Math.max(...boxes.map((b) => Number(b.line_position)))
+      if (esUltima && box.advances_at) {
+        const resumenSeg = Math.min(RESUMEN_MAX_SEG, Math.floor(transicionSegDeLinea(line) / 2))
+        const finMs = new Date(box.advances_at).getTime()
+        if (resumenSeg > 0 && nowMs >= finMs - resumenSeg * 1000) {
+          const desdeMs = new Date(box.ingreso_at || box.entered_at).getTime()
+          return {
+            estado: 'resumen',
+            nombre: nombreDeSaludo(box),
+            minutos: box.ingreso_at ? Math.max(1, Math.round((finMs - desdeMs) / 60000)) : null,
+            estaciones: boxes.length,
+            kg: Number(box.kg) > 0 ? Number(box.kg) : null,
+          }
+        }
+      }
+      return { estado: 'chau' }
+    }
     return { estado: 'estacion', estacionInicioIso: c.estacionInicioIso }
   }
 
   if (pos === 1 && confirmando) {
-    return { estado: 'llegando', nombre: primerNombre(confirmando.socio), sticker: true, restanteHolaSeg: null }
+    return { estado: 'llegando', nombre: nombreDeSaludo(confirmando), sticker: true, restanteHolaSeg: null }
   }
   if (pos > 1) {
     const prev = boxes.find((b) => Number(b.line_position) === pos - 1)
     if (prev?.status === 'occupied' && prev.entered_at && calcular(prev.entered_at, E, S, nowMs).fase === 'transicion') {
-      return { estado: 'llegando', nombre: primerNombre(prev.socio), sticker: false, restanteHolaSeg: null }
+      return { estado: 'llegando', nombre: nombreDeSaludo(prev), sticker: false, restanteHolaSeg: null }
     }
   }
   return { estado: 'off' }

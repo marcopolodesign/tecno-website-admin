@@ -9,7 +9,7 @@
 //               pista del sticker). Box N>1: el socio del box N-1 está en su transición. Y los
 //               primeros 5 s de un socio recién entrado (con contador 5-4-3-2-1).
 //   explicacion videos + modalidad. Los últimos 10 s → preparate.
-//   preparate   "Preparate para empezar" con cuenta regresiva.
+//   preparate   "Preparate para empezar" con cuenta regresiva 5-4-3-2-1.
 //   estacion    la estación corriendo (reloj de formato).
 //   chau        transición: felicitaciones + a dónde avanzar.
 // Sólo CSS (transiciones/keyframes); el reloj es setInterval, sin depender de rAF.
@@ -18,10 +18,13 @@ import { useParams } from 'react-router-dom'
 import lottie from 'lottie-web/build/player/lottie_light'
 import { supabase } from '../lib/supabase'
 import { queueService } from '../services/queueService'
-import { esPorTiempo, faseDelFormato, comoTexto, mmss, filasDelMinuto, prescripcionTexto } from '../lib/formatos'
+import { esPorTiempo, faseDelFormato, comoTexto, mmss, filasDelMinuto, prescripcionTexto, tabataDeFase } from '../lib/formatos'
 import { explicacionDeFormato } from '../lib/modalidadTexto'
 import { useCountdown, formatMMSS, calcularEstadoEstacion, predecirBoxes } from '../lib/tvClock'
 import { exerciseMedia } from '../lib/exerciseMedia'
+import { serverNow } from '../lib/serverClock'
+import { LienzoTv, useLienzo } from './tv/TvChrome'
+import { ChipsElementos, IconoElemento, infoElemento } from './tv/Elementos'
 import logoLottie from '../assets/tf-logo.lottie.json'
 import VideoEjercicio from './VideoEjercicio'
 
@@ -53,7 +56,7 @@ function useFaseEstacion(estacionInicioIso, formato) {
     }
     const inicioMs = new Date(estacionInicioIso).getTime()
     const tick = () => {
-      const transcurrido = Math.floor((Date.now() - inicioMs) / 1000)
+      const transcurrido = Math.floor((serverNow() - inicioMs) / 1000)
       const f = faseDelFormato(Math.max(0, transcurrido), formato)
       setFase((prev) =>
         prev && f && prev.fase === f.fase && prev.ronda === f.ronda && prev.restanteSeg === f.restanteSeg ? prev : f
@@ -73,7 +76,7 @@ function useEstadoEstacion(args) {
   ref.current = args
   const calcular = () => {
     const { box, boxes, confirmando, posicion, line } = ref.current
-    const nowMs = Date.now()
+    const nowMs = serverNow()
     const pred = predecirBoxes(boxes, line, nowMs)
     const predBox = pred.find((b) => Number(b.line_position) === Number(posicion)) ?? box
     return { estado: calcularEstadoEstacion({ box, boxes, confirmando, posicion, line, nowMs }), box: predBox, boxes: pred }
@@ -130,7 +133,10 @@ const LOGO_POS = {
 }
 
 function LogoTF({ grupo }) {
-  const p = LOGO_POS[grupo]
+  const { alto } = useLienzo()
+  const base = LOGO_POS[grupo]
+  // en el estado de reposo el logo vive en el centro de la pantalla: acompaña al alto fluido
+  const p = grupo === 'off' ? { ...base, cy: base.cy + (alto - 1080) / 2 } : base
   const S = p.marca / MARCA_RATIO
   const cont = useRef(null)
   const anim = useRef(null)
@@ -202,7 +208,7 @@ function LogoTF({ grupo }) {
 // cambiarlo por otra cosa sin tocar el resto.
 function RelojPie() {
   const fmt = () =>
-    new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })
+    new Date(serverNow()).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })
   const [hora, setHora] = useState(fmt)
   useEffect(() => {
     const id = window.setInterval(() => setHora(fmt()), 1000)
@@ -405,11 +411,18 @@ function BarraFormato({ label, sublabel, mmssActual, mmssTotal }) {
 }
 
 // ── Vistas por estado ────────────────────────────────────────────────────────────────────
-function VistaLlegando({ estado }) {
+function VistaLlegando({ estado, box }) {
+  const elementos = box?.elementos || []
+  const hayEjercicios = Boolean(box?.ejercicios?.length || box?.ejercicio)
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, top: 400, bottom: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, textAlign: 'center' }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, top: 340, bottom: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, textAlign: 'center' }}>
       <span style={{ fontSize: 170, fontWeight: 600, color: '#ffffff', lineHeight: 1.05 }}>Hola {estado.nombre}</span>
-      <span style={{ fontSize: 48, color: TENUE }}>Tu estación arranca en breve</span>
+      <span style={{ fontSize: 48, color: TENUE }}>{hayEjercicios ? 'Te presentamos tus ejercicios' : 'Tu estación arranca en breve'}</span>
+      {elementos.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <ChipsElementos elementos={elementos} titulo="Juntá estos materiales" />
+        </div>
+      )}
       {estado.sticker && (
         <span style={{ fontSize: 40, fontWeight: 600, color: NARANJA, marginTop: 10 }}>Apoyá el teléfono en el sticker</span>
       )}
@@ -417,7 +430,7 @@ function VistaLlegando({ estado }) {
         <span
           key={estado.restanteHolaSeg}
           style={{
-            marginTop: 18, width: 110, height: 110, borderRadius: 55, border: `5px solid ${NARANJA}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginTop: 12, width: 110, height: 110, borderRadius: 55, border: `5px solid ${NARANJA}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontFamily: MONO, fontSize: 56, color: NARANJA, animation: 'holaTick 0.5s ease-out',
           }}
         >
@@ -442,6 +455,24 @@ function VistaPreparate({ segundos }) {
   )
 }
 
+// Franja de materiales (chips) en el lugar donde antes estaba la segunda cuenta regresiva.
+function FranjaMateriales({ elementos }) {
+  if (!elementos?.length) return <div style={{ height: 24, flexShrink: 0 }} />
+  return (
+    <div data-testid="franja-materiales" style={{ minHeight: 130, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 28 }}>
+      <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: TENUE, flexShrink: 0 }}>Vas a necesitar</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+        {elementos.map((nombre) => (
+          <span key={nombre} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '10px 22px 10px 16px', borderRadius: 60, background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.22)', color: '#ffffff', fontSize: 30, fontWeight: 600, lineHeight: 1 }}>
+            <IconoElemento nombre={nombre} size={34} />
+            {infoElemento(nombre).label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function VistaExplicacion({ box, estado }) {
   const exercises = box.ejercicios?.length ? box.ejercicios : box.ejercicio ? [box.ejercicio] : []
   const primero = box.ejercicio
@@ -451,10 +482,11 @@ function VistaExplicacion({ box, estado }) {
     descansoSeg: primero?.descanso_seg,
     ejerciciosPorMinuto: primero?.ejercicios_por_minuto,
   })
+  // UN solo timer (2026-09-30): el del encabezado. Antes había otro abajo y una frase de relleno.
   const restante = formatMMSS(estado.restanteExplicacionSeg)
   return (
     <ZonaContenido>
-      <EncabezadoNegro nombre={box.socio} pills={['EXPLICACIÓN']} tiempoLabel="Empieza en" tiempoValor={restante} />
+      <EncabezadoNegro nombre={box.socio} pills={['EXPLICACIÓN']} tiempoLabel="Arrancás en" tiempoValor={restante} />
       <div style={{ flex: 1, minHeight: 0, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {exercises.length === 1 ? (
           <EjercicioProtagonista fila={exercises[0]} modalidad={{ titulo, texto }} />
@@ -468,8 +500,30 @@ function VistaExplicacion({ box, estado }) {
           </>
         )}
       </div>
-      <BarraFormato label="La estación arranca sola cuando termine este minuto." sublabel="EXPLICACIÓN" mmssActual={restante} mmssTotal={null} />
+      <FranjaMateriales elementos={box.elementos} />
     </ZonaContenido>
+  )
+}
+
+// Tabata: durante el descanso se muestra el PRÓXIMO ejercicio (video + nombre) para que el
+// socio se prepare; el video de una ronda de trabajo es el ejercicio de esa ronda.
+function DescansoTabata({ siguiente }) {
+  if (!siguiente) {
+    return <span style={{ margin: 'auto', fontSize: 150, fontWeight: 700, color: '#ffffff' }}>Descanso</span>
+  }
+  const prescripcion = siguiente.sets_reps || prescripcionTexto({ segundos: siguiente.segundos_por_ejercicio })
+  return (
+    <div data-testid="tabata-descanso" style={{ display: 'flex', gap: 56, flex: 1, minHeight: 0, alignItems: 'center' }}>
+      <div style={{ height: '100%', maxHeight: 650, maxWidth: 1150, aspectRatio: '16 / 9', borderRadius: 40, background: '#0b0b0b', overflow: 'hidden', flexShrink: 0, border: `2px solid ${BORDE}` }}>
+        <MediaEjercicio key={siguiente.exercise_order} fila={siguiente} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <span style={{ fontSize: 120, fontWeight: 800, color: '#FBBF24', lineHeight: 1 }}>Descanso</span>
+        <span style={{ fontSize: 40, fontWeight: 500, color: TENUE, lineHeight: 1.25 }}>Preparate para el próximo ejercicio</span>
+        <span style={{ fontSize: 76, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>{siguiente.name}</span>
+        {prescripcion && <div><Pill>{prescripcion}</Pill></div>}
+      </div>
+    </div>
   )
 }
 
@@ -486,6 +540,8 @@ function VistaEstacion({ box, estado }) {
   const porMinuto = primero?.formato === 'EMOM' ? Math.max(1, primero?.ejercicios_por_minuto || 1) : 1
   const delMinuto = primero?.formato === 'EMOM' && fase && !fase.terminado ? filasDelMinuto(exercises, porMinuto, fase.ronda) : exercises
   const activos = new Set(delMinuto.map((f) => f.exercise_order))
+  // Tabata: UN ejercicio por vez, rotando por ronda (ver tabataDeFase en formatos.js).
+  const tabata = primero?.formato === 'Tabata' && fase ? tabataDeFase(exercises, fase, formato.rondas) : null
 
   let barra = { label: 'Vos manejás tus tiempos.', sublabel: null, mmssActual: null, mmssTotal: null }
   if (fase) {
@@ -513,7 +569,11 @@ function VistaEstacion({ box, estado }) {
         tiempoValor={boxCountdown}
       />
       <div style={{ flex: 1, minHeight: 0, paddingTop: 12, display: 'flex' }}>
-        {delMinuto.length > 1 ? (
+        {tabata && tabata.modo === 'descanso' ? (
+          <DescansoTabata siguiente={tabata.siguiente} />
+        ) : tabata && tabata.modo === 'trabajo' && tabata.ejercicio ? (
+          <EjercicioProtagonista key={tabata.ejercicio.exercise_order + '-' + fase.ronda} fila={tabata.ejercicio} activa />
+        ) : delMinuto.length > 1 ? (
           <GrillaEjercicios exercises={delMinuto} />
         ) : exercises.length > 1 ? (
           <GrillaEjercicios exercises={exercises} activos={activos} />
@@ -554,9 +614,33 @@ function VistaChau({ box, boxes, posicion }) {
   )
 }
 
+// Fin de circuito en la última estación: lo que hizo en total. Mismos números que la app
+// (minutos = desde que confirmó su entrada hasta que termina, estaciones = boxes de la línea);
+// los kg salen de las cargas de la sesión y la línea se omite si no hay ninguna.
+function VistaResumen({ estado }) {
+  const dato = (valor, unidad) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '28px 56px', borderRadius: 36, background: SUPERFICIE, border: `2px solid ${BORDE}` }}>
+      <span style={{ fontFamily: MONO, fontSize: 150, fontWeight: 800, color: NARANJA, lineHeight: 1 }}>{valor}</span>
+      <span style={{ fontSize: 40, fontWeight: 600, color: '#ffffff' }}>{unidad}</span>
+    </div>
+  )
+  return (
+    <div data-testid="resumen-circuito" style={{ position: 'absolute', left: 56, right: 56, top: 190, bottom: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 36, textAlign: 'center' }}>
+      <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: 6, textTransform: 'uppercase', color: NARANJA }}>¡Circuito completo!</span>
+      <span style={{ fontSize: 120, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>Terminaste{estado.nombre ? `, ${estado.nombre}` : ''}</span>
+      <div style={{ display: 'flex', gap: 36, marginTop: 10 }}>
+        {estado.minutos != null && dato(estado.minutos, 'min entrenando')}
+        {dato(estado.estaciones, estado.estaciones === 1 ? 'estación' : 'estaciones')}
+        {estado.kg != null && dato(estado.kg.toLocaleString('es-AR'), 'kg movidos')}
+      </div>
+    </div>
+  )
+}
+
 function VistaEstado({ estado, box, boxes, posicion }) {
   switch (estado.estado) {
-    case 'llegando': return <VistaLlegando estado={estado} />
+    case 'llegando': return <VistaLlegando estado={estado} box={box} />
+    case 'resumen': return <VistaResumen estado={estado} />
     case 'preparate': return <VistaPreparate segundos={estado.restanteExplicacionSeg} />
     case 'explicacion': return <VistaExplicacion box={box} estado={estado} />
     case 'estacion': return <VistaEstacion box={box} estado={estado} />
@@ -602,7 +686,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
     // (cada 10 s) y la TV se enteraría recién por el poll de 15 s: mientras haya un
     // vencido se vuelve a pedir tv_linea cada 2 s, hasta que el estado cambie.
     const vencidoCheck = setInterval(() => {
-      const ahora = Date.now()
+      const ahora = serverNow()
       if (boxesRef.current.some((b) => b.status === 'occupied' && b.advances_at && new Date(b.advances_at).getTime() < ahora)) refresh()
     }, 2000)
     return () => {
@@ -618,7 +702,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
 
   return (
     <LienzoTv>
-      <div style={{ position: 'relative', width: 1920, height: 1080, overflow: 'hidden', background: '#000000', color: '#ffffff', fontFamily: GEIST }}>
+      <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#000000', color: '#ffffff', fontFamily: GEIST }}>
         <style>{KEYFRAMES}</style>
         <FondoNegro />
         <LogoTF grupo={grupo} />
@@ -627,7 +711,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
         </Crossfade>
         <Pie posicion={pos} />
         {!connected && (
-          <div style={{ position: 'absolute', top: 16, right: 56, zIndex: 50, color: '#f59e0b', fontSize: 18, fontWeight: 600 }}>Reconectando…</div>
+          <div style={{ position: 'absolute', top: 16, right: 100, zIndex: 50, color: '#f59e0b', fontSize: 18, fontWeight: 600 }}>Reconectando…</div>
         )}
         {boxes.length > 0 && !box && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TENUE, fontSize: 32 }}>
@@ -637,31 +721,4 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
       </div>
     </LienzoTv>
   )
-}
-
-// La pantalla está diseñada en 1920×1080 (el artboard aprobado) con tamaños fijos. En una TV
-// 16:9 se ve igual; en un iPad o una tablet —que en la weekly quedaron como opción válida— se
-// rompía: textos partidos, reloj cortado (prueba de la sala, 2026-09-24). Se escala el lienzo
-// entero para que entre en cualquier pantalla, con bandas si la proporción no es 16:9.
-function LienzoTv({ children }) {
-  const [escala, setEscala] = useState(() => calcularEscala())
-  useEffect(() => {
-    const onResize = () => setEscala(calcularEscala())
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: '#000000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: 1920 * escala, height: 1080 * escala, position: 'relative' }}>
-        <div style={{ width: 1920, height: 1080, transform: `scale(${escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function calcularEscala() {
-  if (typeof window === 'undefined') return 1
-  return Math.min(window.innerWidth / 1920, window.innerHeight / 1080)
 }

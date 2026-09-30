@@ -13,7 +13,10 @@
 // este script llama calcular() en momentos salteados, no en una secuencia continua, y eso ya
 // es la prueba de que no depende de haber sido invocada a tiempo.
 
-import { calcular, calcularEstadoEstacion, predecirBoxes, HOLA_SEG, primerNombre } from '../src/lib/tvClock.js'
+import { calcular, calcularEstadoEstacion, predecirBoxes, HOLA_SEG, PREPARATE_SEG, primerNombre, nombreDeSaludo } from '../src/lib/tvClock.js'
+import { calcularOffset } from '../src/lib/serverClock.js'
+import { faseDelFormato, ejercicioDeRonda, tabataDeFase } from '../src/lib/formatos.js'
+import { medidasLienzo } from '../src/lib/lienzo.js'
 
 let fallos = 0
 
@@ -112,9 +115,11 @@ assertEq('sin enteredAtIso -> fase null', calcular(null, E, S), {
   assertEq('a los 5 s -> ya es explicacion', est({ box: ocupado(HOLA_SEG) }).estado, 'explicacion')
   assertEq('explicacion conserva el restante del minuto entero (los 5 s salen de ahí)', est({ box: ocupado(20) }).restanteExplicacionSeg, 40)
 
-  // últimos 10 s de la explicación -> preparate
+  // últimos 5 s de la explicación (5-4-3-2-1) -> preparate
+  assertEq('PREPARATE_SEG es 5', PREPARATE_SEG, 5)
   assertEq('a 11 s del final -> explicacion', est({ box: ocupado(49) }).estado, 'explicacion')
-  assertEq('a 10 s del final -> preparate', est({ box: ocupado(50) }), { estado: 'preparate', restanteExplicacionSeg: 10 })
+  assertEq('a 10 s del final -> todavía explicación', est({ box: ocupado(50) }).estado, 'explicacion')
+  assertEq('a 5 s del final -> preparate, restante 5', est({ box: ocupado(55) }), { estado: 'preparate', restanteExplicacionSeg: 5 })
   assertEq('a 1 s del final -> preparate, restante 1', est({ box: ocupado(59) }).restanteExplicacionSeg, 1)
 
   // estación y chau (transición)
@@ -185,6 +190,82 @@ assertEq('sin enteredAtIso -> fase null', calcular(null, E, S), {
     const crudo = [oc(1, 'V V.', -20), b(2)]
     assertEq('nada vencido: no cambia', predecirBoxes(crudo, linea, ahoraMs), crudo)
   }
+}
+
+// ── Reloj del servidor (2026-09-30): el offset sale de la muestra de menor RTT ──
+{
+  // servidor 10 s adelantado del dispositivo; tres muestras con RTT 400, 50 y 120 ms.
+  const t = 1_000_000
+  const muestra = (rtt, errAsim = 0) => ({ t0: t, t1: t + rtt, serverMs: t + rtt / 2 + 10_000 + errAsim })
+  const r = calcularOffset([muestra(400, 150), muestra(50), muestra(120, 30)])
+  assertEq('offset = serverMs - (t0+t1)/2 de la muestra de menor RTT', r, { offsetMs: 10_000, rttMs: 50 })
+  assertEq('sin muestras -> null', calcularOffset([]), null)
+  // con el offset aplicado, el "ahora" del dispositivo coincide con el del servidor
+  const dispositivo = 5_000_000
+  assert('serverNow = Date.now + offset alinea con el servidor', dispositivo + r.offsetMs === dispositivo + 10_000)
+}
+
+// ── Tabata: un ejercicio por ronda, rotando; el descanso muestra el próximo (2026-09-30) ──
+{
+  const filas = ['A', 'B', 'C', 'D'].map((name, i) => ({ exercise_order: i + 1, name }))
+  const F = { rondas: 12, trabajoSeg: 20, descansoSeg: 10 }
+  assertEq('ronda 1 -> A', ejercicioDeRonda(filas, 1).name, 'A')
+  assertEq('ronda 4 -> D', ejercicioDeRonda(filas, 4).name, 'D')
+  assertEq('ronda 5 vuelve a A', ejercicioDeRonda(filas, 5).name, 'A')
+  assertEq('ronda 12 -> D', ejercicioDeRonda(filas, 12).name, 'D')
+  const en = (seg) => tabataDeFase(filas, faseDelFormato(seg, F), F.rondas)
+  assertEq('seg 0 (trabajo r1) -> ejercicio A', [en(0).modo, en(0).ejercicio.name], ['trabajo', 'A'])
+  assertEq('seg 19 (trabajo r1) -> A', en(19).ejercicio.name, 'A')
+  assertEq('seg 20 (descanso r1) -> muestra el PRÓXIMO: B', [en(20).modo, en(20).siguiente.name], ['descanso', 'B'])
+  assertEq('seg 30 (trabajo r2) -> B', [en(30).modo, en(30).ejercicio.name], ['trabajo', 'B'])
+  assertEq('seg 50 (descanso r2) -> próximo C', en(50).siguiente.name, 'C')
+  assertEq('seg 120 (trabajo r5) -> A otra vez', en(120).ejercicio.name, 'A')
+  assertEq('descanso de la r4 -> próximo A (vuelve a empezar)', en(110).siguiente.name, 'A')
+  assertEq('descanso de la última ronda -> sin próximo', en(12 * 30 - 5).siguiente, null)
+  assertEq('terminado -> fin', en(12 * 30).modo, 'fin')
+  assertEq('sin filas -> null', ejercicioDeRonda([], 3), null)
+}
+
+// ── Saludo: nombre de pila, o apodo, o primer token de "socio" (2026-09-30) ──
+{
+  assertEq('nombre manda', nombreDeSaludo({ nombre: 'Valentina', socio: 'Valentina R.' }), 'Valentina')
+  assertEq('apodo (tv_linea ya lo resuelve en `nombre`)', nombreDeSaludo({ nombre: 'Vale', socio: 'Vale R.' }), 'Vale')
+  assertEq('sin nombre: primer token de socio', nombreDeSaludo({ socio: 'Valentina R.' }), 'Valentina')
+  assertEq('nada -> vacío', nombreDeSaludo({}), '')
+}
+
+// ── Resumen de fin de circuito en la última estación (2026-09-30) ──
+{
+  const linea = { explicacion_seg: 60, estacion_seg: 420, demo_estacion_seg: 60, transicion_seg: 30, demo_transicion_seg: 30, modo_demo: true }
+  const DUR = 150
+  const iso = (ms) => new Date(ms).toISOString()
+  const ultimo = (segEnTransicionRestante, extra = {}) => {
+    const adv = ahoraMs + segEnTransicionRestante * 1000
+    return { line_position: 2, status: 'occupied', socio: 'Valentina R.', nombre: 'Valentina', entered_at: iso(adv - DUR * 1000), advances_at: iso(adv), ingreso_at: iso(adv - 9 * 60000), ...extra }
+  }
+  const primero = { line_position: 1, status: 'free' }
+  const est = (box, pos = 2) => calcularEstadoEstacion({ box, boxes: [primero, box], posicion: pos, line: linea, nowMs: ahoraMs })
+  assertEq('últimos 15 s de la transición de la última estación -> resumen', est(ultimo(14)),
+    { estado: 'resumen', nombre: 'Valentina', minutos: 9, estaciones: 2, kg: null })
+  assertEq('con kg en el payload -> kg en el resumen', est(ultimo(10, { kg: 1250 })).kg, 1250)
+  assertEq('antes de esos 15 s -> todavía chau', est(ultimo(20)).estado, 'chau')
+  const enBox1 = { ...ultimo(10), line_position: 1 }
+  assertEq('si no es la última estación -> chau, nunca resumen',
+    calcularEstadoEstacion({ box: enBox1, boxes: [enBox1, { line_position: 2, status: 'occupied', entered_at: iso(ahoraMs - 1000), advances_at: iso(ahoraMs + 149000), socio: 'Otro O.' }], posicion: 1, line: linea, nowMs: ahoraMs }).estado, 'chau')
+}
+
+// ── Lienzo: siempre a todo el ancho y alto (2026-09-30) ──
+{
+  const llena = (w, h) => {
+    const m = medidasLienzo(w, h)
+    return Math.abs(m.ancho * m.escala - w) < 0.01 && Math.abs(m.alto * m.escala - h) < 0.01
+  }
+  assert('1920x1080 llena y alto 1080', llena(1920, 1080) && medidasLienzo(1920, 1080).alto === 1080)
+  assert('1920x900 (TV con barra del navegador) llena, sin bandas', llena(1920, 900) && medidasLienzo(1920, 900).escala === 1)
+  assert('1280x1000 llena; el alto fluido absorbe', llena(1280, 1000) && medidasLienzo(1280, 1000).alto > 1080)
+  assert('1024x768 (iPad) llena, alto fluido mayor', llena(1024, 768) && medidasLienzo(1024, 768).alto > 1080)
+  assert('nunca hay menos de 900 de alto de diseño', medidasLienzo(1920, 700).alto >= 900 - 0.01 && llena(1920, 700))
+  assert('ancho de diseño nunca menor a 1920', medidasLienzo(1024, 768).ancho >= 1920 - 0.01)
 }
 
 console.log('')

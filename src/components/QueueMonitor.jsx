@@ -8,6 +8,7 @@ import cajaService from '../services/cajaService'
 import { supabase } from '../lib/supabase'
 import { useSede } from '../contexts/SedeContext'
 import { formatARS } from '../lib/dinero'
+import { serverNow } from '../lib/serverClock'
 import { toastOptions } from '../lib/themeStyles'
 import { useCountdown as useCountdownSeg, useBoxPhase, explicacionSegDeLinea, formatMMSS } from '../lib/tvClock'
 import { tvUrlSede, tvUrlLinea } from '../lib/slug'
@@ -26,7 +27,7 @@ function useCountdown(targetIso) {
 }
 
 function formatWait(createdAt) {
-  const mins = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000))
+  const mins = Math.max(0, Math.floor((serverNow() - new Date(createdAt).getTime()) / 60000))
   return `${mins} min`
 }
 

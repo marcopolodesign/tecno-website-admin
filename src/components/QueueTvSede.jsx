@@ -8,6 +8,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { serverNow } from '../lib/serverClock'
+import { LienzoTv } from './tv/TvChrome'
 import { useCountdown, formatMMSS, explicacionSegDeLinea, estacionSegDeLinea, transicionSegDeLinea } from '../lib/tvClock'
 
 const GEIST = "'Geist', system-ui, -apple-system, sans-serif"
@@ -21,12 +23,12 @@ function nombreCorto(u) {
 }
 
 function minutosEsperando(createdAt) {
-  return Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000))
+  return Math.max(0, Math.floor((serverNow() - new Date(createdAt).getTime()) / 60000))
 }
 
 function Fondo() {
   return (
-    <svg width="1920" height="1080" viewBox="0 0 1920 1080" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+    <svg width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
       <defs>
         <filter id="tvsbg" x="-500" y="-500" width="2920" height="2280" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
           <feGaussianBlur stdDeviation="134" />
@@ -109,9 +111,9 @@ function TarjetaLinea({ linea }) {
 }
 
 function Reloj() {
-  const [ahora, setAhora] = useState(new Date())
+  const [ahora, setAhora] = useState(() => new Date(serverNow()))
   useEffect(() => {
-    const id = setInterval(() => setAhora(new Date()), 1000)
+    const id = setInterval(() => setAhora(new Date(serverNow())), 1000)
     return () => clearInterval(id)
   }, [])
   return <span style={{ fontFamily: MONO, fontSize: 32, color: '#4b5563' }}>{ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -158,7 +160,8 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
     : null
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#F7F7FA', color: '#111827', fontFamily: GEIST }}>
+    <LienzoTv fondo="#F7F7FA">
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F7F7FA', color: '#111827', fontFamily: GEIST }}>
       <Fondo />
       <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', padding: '56px 56px 0' }}>
         {!connected && (
@@ -199,7 +202,7 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
         </div>
       </div>
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 210, overflow: 'hidden', background: '#111111' }}>
-        <svg width="1920" height="210" viewBox="0 0 1920 210" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+        <svg width="100%" height="210" viewBox="0 0 1920 210" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
           <defs>
             <filter id="tvsfg" x="-300" y="-300" width="2520" height="810" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
               <feGaussianBlur stdDeviation="90" />
@@ -230,5 +233,6 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
         </div>
       </div>
     </div>
+    </LienzoTv>
   )
 }

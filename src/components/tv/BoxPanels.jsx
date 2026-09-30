@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { esPorTiempo, faseDelFormato, comoTexto, filasDelMinuto, prescripcionTexto } from '../../lib/formatos'
 import { explicacionDeFormato } from '../../lib/modalidadTexto'
 import { formatMMSS } from '../../lib/tvClock'
+import { serverNow } from '../../lib/serverClock'
 import { exerciseMedia } from '../../lib/exerciseMedia'
 import VideoEjercicio from '../VideoEjercicio'
 
@@ -27,7 +28,7 @@ export function useFaseEstacion(estacionInicioIso, formato) {
     }
     const inicioMs = new Date(estacionInicioIso).getTime()
     const tick = () => {
-      const transcurrido = Math.floor((Date.now() - inicioMs) / 1000)
+      const transcurrido = Math.floor((serverNow() - inicioMs) / 1000)
       const f = faseDelFormato(Math.max(0, transcurrido), formato)
       setFase((prev) =>
         prev && f && prev.fase === f.fase && prev.ronda === f.ronda && prev.restanteSeg === f.restanteSeg

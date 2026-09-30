@@ -203,3 +203,28 @@ export function resumenDelMinuto(filas, nombreDe = (f) => f.nombre) {
     .filter(Boolean)
     .join(' + ')
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tabata en la TV (2026-09-30): UN ejercicio por vez. Los ejercicios de la estación rotan por
+// ronda (ronda 1 = el primero, ronda 2 = el segundo... y vuelve al primero). Durante el descanso
+// de la ronda r se muestra el de la ronda r+1, para que el socio se prepare.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El ejercicio que toca en una ronda (1 = la primera). */
+export function ejercicioDeRonda(filas, ronda) {
+  const lista = filas || []
+  if (!lista.length) return null
+  return lista[(Math.max(1, ronda) - 1) % lista.length]
+}
+
+/**
+ * Qué mostrar en un instante del Tabata. `fase` es lo que devuelve faseDelFormato.
+ *  trabajo  -> { modo: 'trabajo', ejercicio: el de esta ronda }
+ *  descanso -> { modo: 'descanso', siguiente: el de la ronda que viene (null tras la última) }
+ *  fin      -> { modo: 'fin' }
+ */
+export function tabataDeFase(filas, fase, rondas) {
+  if (!fase || fase.terminado) return { modo: 'fin', ejercicio: null, siguiente: null }
+  if (fase.fase === 'trabajo') return { modo: 'trabajo', ejercicio: ejercicioDeRonda(filas, fase.ronda), siguiente: null }
+  return { modo: 'descanso', ejercicio: null, siguiente: fase.ronda < rondas ? ejercicioDeRonda(filas, fase.ronda + 1) : null }
+}
