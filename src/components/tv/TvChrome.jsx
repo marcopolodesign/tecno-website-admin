@@ -3,7 +3,8 @@
 //     de Mateo (navegador Samsung con la barra visible) no es 16:9: escalar "para que entre"
 //     dejaba bandas negras a los costados. Ahora siempre llena el 100% del ancho y del alto; el
 //     área del medio absorbe la diferencia.
-//   · ControlesTv: botón de pantalla completa (sutil, aparece al mover el mouse/control y se
+//   · ControlesTv: botón de pantalla completa abajo al centro (es el único borde libre en las tres
+//     pantallas: arriba a la derecha está el reloj/cuenta regresiva) (sutil, aparece al mover el mouse/control y se
 //     oculta a los ~4 s), entrar a pantalla completa con el primer click / Enter (los navegadores
 //     exigen un gesto), cursor oculto tras inactividad y el debug ?reloj=1 con el corrimiento
 //     del reloj del servidor.
@@ -114,7 +115,7 @@ export function ControlesTv() {
             entrarPantallaCompleta()
           }}
           style={{
-            position: 'fixed', top: 14, right: 14, zIndex: 1000, width: 48, height: 48, borderRadius: 12,
+            position: 'fixed', bottom: 14, left: '50%', marginLeft: -24, zIndex: 1000, width: 48, height: 48, borderRadius: 12,
             border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(0,0,0,0.45)', color: '#ffffff',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
             opacity: visible ? 0.85 : 0, pointerEvents: visible ? 'auto' : 'none', transition: 'opacity 0.35s',

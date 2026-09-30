@@ -459,12 +459,12 @@ function VistaPreparate({ segundos }) {
 function FranjaMateriales({ elementos }) {
   if (!elementos?.length) return <div style={{ height: 24, flexShrink: 0 }} />
   return (
-    <div data-testid="franja-materiales" style={{ minHeight: 130, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 28 }}>
+    <div data-testid="franja-materiales" style={{ minHeight: 104, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 28 }}>
       <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: TENUE, flexShrink: 0 }}>Vas a necesitar</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
         {elementos.map((nombre) => (
-          <span key={nombre} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '10px 22px 10px 16px', borderRadius: 60, background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.22)', color: '#ffffff', fontSize: 30, fontWeight: 600, lineHeight: 1 }}>
-            <IconoElemento nombre={nombre} size={34} />
+          <span key={nombre} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '10px 22px 10px 16px', borderRadius: 60, background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.22)', color: '#ffffff', fontSize: 28, fontWeight: 600, lineHeight: 1 }}>
+            <IconoElemento nombre={nombre} size={32} />
             {infoElemento(nombre).label}
           </span>
         ))}

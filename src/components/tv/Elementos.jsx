@@ -6,7 +6,7 @@
 const T = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }
 
 const ICONOS = {
-  kettlebell: <><path d="M8.5 9.5a3.5 3.5 0 0 1 7 0" /><path d="M6 20a6 6 0 1 1 12 0z" /></>,
+  kettlebell: <><path d="M8.6 10.5V8a3.4 3.4 0 0 1 6.8 0v2.5" /><circle cx="12" cy="15.2" r="5.2" /></>,
   mancuernas: <><path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12" /></>,
   banda: <><path d="M4 12c0-4 3-7 8-7s8 3 8 7-3 7-8 7-8-3-8-7z" /><path d="M8 12c0-2 1.6-3.5 4-3.5s4 1.5 4 3.5" /></>,
   cajon: <><path d="M4 9l8-4 8 4v9l-8 3-8-3z" /><path d="M4 9l8 3 8-3M12 12v9" /></>,
