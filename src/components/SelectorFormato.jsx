@@ -7,11 +7,13 @@ import {
   esPorTiempo,
   duracionSeg,
   mmss,
+  TABATA_MIN_TRABAJO_SEG,
+  TABATA_MIN_DESCANSO_SEG,
 } from '../lib/formatos'
 
 // How the work at THIS STATION is measured — once, not per exercise.
 //
-// The formats are presets, not a blank form: a coach saying "Tabata" means 8 × (20s, 10s), and
+// The formats are presets, not a blank form: a coach saying "Tabata" means 7 × (30s, 20s), and
 // asking them to type it is how one station ends up as 6 × 25/10 by accident. The numbers stay
 // editable underneath, because a coach who wants 6 rounds should get 6 rounds.
 //
@@ -68,6 +70,17 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
     onChange({ formato, rondas, trabajoSeg, descansoSeg, ejerciciosPorMinuto: acotado })
   }
 
+  // Tabata: mínimo 30 s de trabajo y 20 s de descanso (se acota al soltar el campo, no por tecla,
+  // para poder escribir "40" pasando por "4").
+  const esTabata = formato === 'Tabata'
+  const tabataCorto = esTabata && (Number(trabajoSeg) < TABATA_MIN_TRABAJO_SEG || Number(descansoSeg ?? 0) < TABATA_MIN_DESCANSO_SEG)
+  const acotarTabata = () => {
+    if (!esTabata) return
+    const t = Math.max(TABATA_MIN_TRABAJO_SEG, Number(trabajoSeg) || 0)
+    const d = Math.max(TABATA_MIN_DESCANSO_SEG, Number(descansoSeg) || 0)
+    if (t !== trabajoSeg || d !== descansoSeg) onChange({ formato, rondas, trabajoSeg: t, descansoSeg: d, ejerciciosPorMinuto })
+  }
+
   const pct = Math.min(100, Math.round((estacion / BLOQUE_SEG) * 100))
 
   return (
@@ -94,7 +107,7 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
             </label>
             <label style={s.campo}>
               <span style={s.etiqueta}>{formato === 'AMRAP' || formato === 'A completar' ? 'Tiempo total (seg)' : 'Trabajo (seg)'}</span>
-              <input type="number" min="5" max={BLOQUE_SEG} value={trabajoSeg ?? ''} onChange={set('trabajoSeg')} style={s.input} />
+              <input type="number" min="5" max={BLOQUE_SEG} value={trabajoSeg ?? ''} onChange={set('trabajoSeg')} onBlur={acotarTabata} style={s.input} />
             </label>
             {formato === 'EMOM' ? (
               // El descanso de EMOM no se carga (es lo que sobra del minuto — ver la ayuda de
@@ -120,6 +133,7 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
                   max="600"
                   value={descansoSeg ?? 0}
                   onChange={set('descansoSeg')}
+                  onBlur={acotarTabata}
                   style={s.input}
                 />
               </label>
@@ -135,6 +149,13 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
                   ? 'Sin estructura fija ni tope de ejercicios. Si es una submodalidad con nombre (ej. escalera 1-1-2-2-3-3), describila en Notas.'
                   : 'Cada ronda: trabajo y después descanso.'}
           </span>
+          {esTabata && (
+            <span style={tabataCorto ? s.aviso : s.ayuda}>
+              {tabataCorto
+                ? `Tabata: mínimo ${TABATA_MIN_TRABAJO_SEG} s de trabajo y ${TABATA_MIN_DESCANSO_SEG} s de descanso — con menos la TV cambia muy rápido y el socio no llega a cambiar de ejercicio. Se ajusta al salir del campo.`
+                : `Mínimo ${TABATA_MIN_TRABAJO_SEG} s de trabajo y ${TABATA_MIN_DESCANSO_SEG} s de descanso.`}
+            </span>
+          )}
 
           <div style={{ ...s.medidor, ...(excede ? s.medidorRoto : {}) }}>
             <div style={s.barra}>

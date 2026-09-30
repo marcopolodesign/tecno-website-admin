@@ -7,6 +7,20 @@
 // countdown that stops because a request failed is worse than one derived locally. Both sides
 // are pure functions of elapsed seconds, so they cannot drift apart.
 
+export const TABATA_MIN_TRABAJO_SEG = 30
+export const TABATA_MIN_DESCANSO_SEG = 20
+
+// Acota trabajo/descanso de un Tabata a los mínimos de la sala. Es la red de seguridad al
+// escribir en la base (el SelectorFormato ya avisa y acota al soltar el campo). No toca otros
+// formatos. Devuelve { trabajoSeg, descansoSeg }.
+export function acotarTiemposTabata(formato, trabajoSeg, descansoSeg) {
+  if (formato !== 'Tabata') return { trabajoSeg, descansoSeg }
+  return {
+    trabajoSeg: Math.max(TABATA_MIN_TRABAJO_SEG, Number(trabajoSeg) || 0),
+    descansoSeg: Math.max(TABATA_MIN_DESCANSO_SEG, Number(descansoSeg) || 0),
+  }
+}
+
 export const FORMATOS = ['Series', 'AMRAP', 'EMOM', 'Tabata', 'A completar']
 
 // Una estación dura seis minutos. No es una preferencia de diseño: es el reloj con el que la
@@ -26,10 +40,11 @@ export const PRESETS = {
   // resto del contrato "qué entra en un minuto") — un movimiento por minuto, que es lo que ya
   // tenían las 1490 filas EMOM de antes de que esto fuera configurable.
   EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0, ejerciciosPorMinuto: 1 },
-  // 12 × (20+10) = 6:00 exacto. Antes eran 8 rondas (4:00) — el default dejaba 2:00 de la
-  // estación sin usar hasta que el coach subiera "Rondas" a mano; ningún otro preset tiene
-  // este problema (EMOM/AMRAP/A completar ya cierran justo en 6:00 desde el default).
-  Tabata: { rondas: 12, trabajoSeg: 20, descansoSeg: 10 },
+  // Mínimos de la sala (Mateo, 2026-09-30): 30 s de trabajo y 20 s de descanso — con menos la TV
+  // cambia demasiado rápido y el socio no llega a cambiar de ejercicio. 7 × (30+20) = 5:50, el
+  // máximo entero que entra en los 6:00 (8 rondas serían 6:40). Igual que trabajo_del_bloque()
+  // en Postgres (migración 20260930170000).
+  Tabata: { rondas: 7, trabajoSeg: 30, descansoSeg: 20 },
   // Sin estructura fija: el coach carga los ejercicios que quiera (sin el tope de 3 de AMRAP)
   // y describe la submodalidad a mano en las notas (ej. "escalera 1-1-2-2-3-3"). El bloque de
   // seis minutos es el mismo que el resto de los formatos por tiempo.

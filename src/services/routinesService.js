@@ -1,3 +1,4 @@
+import { acotarTiemposTabata } from '../lib/formatos'
 import { supabase, toCamelCase, toSnakeCase, getCurrentUser } from '../lib/supabase'
 
 export const routinesService = {
@@ -444,8 +445,8 @@ export const routinesService = {
         // format with no duration, and rejects Series carrying one.
         formato: sessionExerciseData.formato || 'Series',
         rondas: sessionExerciseData.rondas || null,
-        trabajo_seg: sessionExerciseData.trabajoSeg || null,
-        descanso_seg: sessionExerciseData.descansoSeg ?? null,
+        trabajo_seg: acotarTiemposTabata(sessionExerciseData.formato, sessionExerciseData.trabajoSeg, sessionExerciseData.descansoSeg).trabajoSeg || null,
+        descanso_seg: acotarTiemposTabata(sessionExerciseData.formato, sessionExerciseData.trabajoSeg, sessionExerciseData.descansoSeg).descansoSeg ?? null,
         // De la ESTACIÓN, como formato/rondas/trabajo_seg — se replica igual en todas sus filas
         // (ver syncEstacionFormato). segundos_por_ejercicio es de CADA fila: null = va por reps.
         ejercicios_por_minuto: sessionExerciseData.ejerciciosPorMinuto || null,
@@ -534,8 +535,8 @@ export const routinesService = {
         .update({
           formato: formatoData.formato || 'Series',
           rondas: formatoData.rondas || null,
-          trabajo_seg: formatoData.trabajoSeg || null,
-          descanso_seg: formatoData.descansoSeg ?? null,
+          trabajo_seg: acotarTiemposTabata(formatoData.formato, formatoData.trabajoSeg, formatoData.descansoSeg).trabajoSeg || null,
+          descanso_seg: acotarTiemposTabata(formatoData.formato, formatoData.trabajoSeg, formatoData.descansoSeg).descansoSeg ?? null,
           // De la estación, igual que los tres de arriba — no de cada fila (eso es
           // segundos_por_ejercicio, que cada fila trae y guarda por su cuenta).
           ejercicios_por_minuto: formatoData.ejerciciosPorMinuto || null
