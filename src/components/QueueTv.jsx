@@ -115,13 +115,19 @@ export default function QueueTv({ overrideLineaId } = {}) {
     // Lucas's box-display reconnect handling concept.
     const staleCheck = setInterval(() => {
       refresh()
-    }, 15000)
+    }, 3000) // respaldo; el aviso en vivo (broadcast) llega al instante
 
     return () => {
       unsubRef.current?.()
       clearInterval(staleCheck)
     }
   }, [lineaId, refresh])
+
+  const locationId = line?.location_id
+  useEffect(() => {
+    if (!locationId) return undefined
+    return queueService.subscribeToSala(locationId, refresh)
+  }, [locationId, refresh])
 
   return (
     <div

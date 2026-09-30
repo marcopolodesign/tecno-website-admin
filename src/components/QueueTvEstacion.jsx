@@ -18,7 +18,7 @@ import { useParams } from 'react-router-dom'
 import lottie from 'lottie-web/build/player/lottie_light'
 import { supabase } from '../lib/supabase'
 import { queueService } from '../services/queueService'
-import { esPorTiempo, faseDelFormato, comoTexto, mmss, filasDelMinuto, prescripcionTexto, tabataDeFase } from '../lib/formatos'
+import { esPorTiempo, faseDelFormato, comoTexto, mmss, filasDelMinuto, prescripcionTexto, tabataDeFase, ejercicioDeRonda } from '../lib/formatos'
 import { explicacionDeFormato } from '../lib/modalidadTexto'
 import { useCountdown, formatMMSS, calcularEstadoEstacion, predecirBoxes } from '../lib/tvClock'
 import { exerciseMedia } from '../lib/exerciseMedia'
@@ -26,7 +26,7 @@ import { serverNow } from '../lib/serverClock'
 import { LienzoTv, useLienzo } from './tv/TvChrome'
 import { ChipsElementos, IconoElemento, infoElemento } from './tv/Elementos'
 import logoLottie from '../assets/tf-logo.lottie.json'
-import VideoEjercicio from './VideoEjercicio'
+import VideoCruzado, { PrecargaVideos } from './tv/VideoCruzado'
 
 const GEIST = "'Geist', system-ui, -apple-system, sans-serif"
 const MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
@@ -43,6 +43,7 @@ const KEYFRAMES = `
 @keyframes libreBlobC { 0%,100% { transform: translate(0,0) scale(0.9); } 50% { transform: translate(-160px,180px) scale(1.2); } }
 @keyframes preparateNumIn { 0% { opacity: 0; transform: scale(0.55); filter: blur(22px); } 60% { opacity: 1; transform: scale(1.08); filter: blur(0); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
 @keyframes preparatePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+@keyframes tvTextoIn { 0% { opacity: 0; transform: translateY(22px) scale(0.97); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes holaTick { 0% { transform: scale(1.35); opacity: 0.4; } 100% { transform: scale(1); opacity: 1; } }
 `
 
@@ -284,25 +285,20 @@ function Circulo({ n, activo }) {
   )
 }
 
-function MediaEjercicio({ fila, style }) {
-  const media = exerciseMedia(fila, 'tv')
-  if (media.kind === 'hosted') {
-    return <VideoEjercicio src={media.src} poster={media.poster} recorte={media.recorte} style={{ width: '100%', height: '100%', objectFit: 'cover', ...media.style, ...style }} />
-  }
-  if (media.kind === 'image') {
-    return <img src={media.src} alt={fila.name} style={{ width: '100%', height: '100%', objectFit: 'cover', ...style }} />
-  }
-  return (
-    <div style={{ width: 120, height: 120, borderRadius: 60, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <svg width="52" height="52" viewBox="0 0 24 24" fill="#ffffff"><path d="M8 5.5 19 12 8 18.5z" /></svg>
-    </div>
-  )
+// Video con cruce suave (ver tv/VideoCruzado.jsx): `proximas` se precargan ocultas.
+function MediaEjercicio({ fila, proximas }) {
+  return <VideoCruzado fila={fila} proximas={proximas} />
+}
+
+// Texto que entra con un deslizamiento suave cada vez que cambia `k` (nombre, TRABAJO/DESCANSO...).
+function Anima({ k, children, style }) {
+  return <div key={k} style={{ animation: 'tvTextoIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both', ...style }}>{children}</div>
 }
 
 // El video es un bloque de aspecto fijo dimensionado por ALTURA dentro de un slot flex:1
 // (letterbox: height:100% + maxWidth:100% + aspectRatio) — ver el historial de este archivo:
 // dimensionarlo por ancho lo hacía desbordar y cortaba cabezas.
-function TarjetaEjercicio({ n, fila, activa, total = 2 }) {
+function TarjetaEjercicio({ n, fila, activa, total = 2, atenuada = false }) {
   const prescripcion = fila.sets_reps || prescripcionTexto({ segundos: fila.segundos_por_ejercicio })
   const aspectRatio = total <= 2 ? '16 / 9' : '16 / 10'
   return (
@@ -310,6 +306,7 @@ function TarjetaEjercicio({ n, fila, activa, total = 2 }) {
       style={{
         minWidth: 0, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: 16,
         background: SUPERFICIE, border: `2px solid ${activa ? NARANJA : BORDE}`, borderRadius: 32, padding: 22,
+        opacity: atenuada ? 0.55 : 1, transition: 'border-color 0.5s ease, opacity 0.5s ease', animation: 'tvFadeIn 0.5s ease both',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
@@ -333,7 +330,7 @@ function GrillaEjercicios({ exercises, activos }) {
     <div style={{ display: 'flex', gap: total <= 2 ? 32 : 24, flex: 1, minHeight: 0 }}>
       {exercises.map((f, i) => (
         <div key={f.exercise_order ?? i} style={{ flex: 1, minWidth: 0 }}>
-          <TarjetaEjercicio n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} total={total} />
+          <TarjetaEjercicio n={i + 1} fila={f} activa={activos ? activos.has(f.exercise_order) : true} atenuada={Boolean(activos && activos.size > 0 && !activos.has(f.exercise_order))} total={total} />
         </div>
       ))}
     </div>
@@ -342,7 +339,7 @@ function GrillaEjercicios({ exercises, activos }) {
 
 // Un solo ejercicio: video 16:9 grande a la izquierda (hasta ~1150×650), y a la derecha el
 // nombre, la prescripción y (en explicación) la modalidad, en letra grande.
-function EjercicioProtagonista({ fila, activa, modalidad }) {
+function EjercicioProtagonista({ fila, activa, modalidad, proximas }) {
   const prescripcion = fila.sets_reps || prescripcionTexto({ segundos: fila.segundos_por_ejercicio })
   return (
     <div style={{ display: 'flex', gap: 56, flex: 1, minHeight: 0, alignItems: 'center' }}>
@@ -352,7 +349,7 @@ function EjercicioProtagonista({ fila, activa, modalidad }) {
           overflow: 'hidden', flexShrink: 0, border: activa ? `3px solid ${NARANJA}` : `2px solid ${BORDE}`,
         }}
       >
-        <MediaEjercicio fila={fila} />
+        <MediaEjercicio fila={fila} proximas={proximas} />
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 28 }}>
         {modalidad && (
@@ -361,8 +358,10 @@ function EjercicioProtagonista({ fila, activa, modalidad }) {
             <span style={{ fontSize: 30, fontWeight: 500, color: '#ffffff', lineHeight: 1.3 }}>{modalidad.texto}</span>
           </div>
         )}
-        <span style={{ fontSize: 84, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>{fila.name}</span>
-        {prescripcion && <div><Pill>{prescripcion}</Pill></div>}
+        <Anima k={fila.name} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          <span style={{ fontSize: 84, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>{fila.name}</span>
+          {prescripcion && <div><Pill>{prescripcion}</Pill></div>}
+        </Anima>
       </div>
     </div>
   )
@@ -398,7 +397,7 @@ function BarraFormato({ label, sublabel, mmssActual, mmssTotal }) {
     <div style={{ height: 130, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
         {sublabel && <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: 3, color: TENUE }}>{sublabel}</span>}
-        <span style={{ fontSize: 48, fontWeight: 600, color: '#ffffff', lineHeight: 1.1 }}>{label}</span>
+        <Anima k={label} style={{ display: 'inline-block' }}><span style={{ fontSize: 48, fontWeight: 600, color: '#ffffff', lineHeight: 1.1 }}>{label}</span></Anima>
       </div>
       {mmssActual != null && (
         <div style={{ display: 'flex', alignItems: 'flex-end', flexShrink: 0 }}>
@@ -505,23 +504,33 @@ function VistaExplicacion({ box, estado }) {
   )
 }
 
-// Tabata: durante el descanso se muestra el PRÓXIMO ejercicio (video + nombre) para que el
-// socio se prepare; el video de una ronda de trabajo es el ejercicio de esa ronda.
-function DescansoTabata({ siguiente }) {
-  if (!siguiente) {
-    return <span style={{ margin: 'auto', fontSize: 150, fontWeight: 700, color: '#ffffff' }}>Descanso</span>
-  }
-  const prescripcion = siguiente.sets_reps || prescripcionTexto({ segundos: siguiente.segundos_por_ejercicio })
+// Tabata (2026-09-30): UNA escena que no se remonta. El video es el ejercicio de la ronda; en el
+// descanso cruza al PRÓXIMO (ya precargado) y se queda ahí durante la ronda siguiente; el
+// texto (TRABAJO/DESCANSO, nombre) entra con un deslizamiento suave.
+function TabataEscena({ exercises, tabata, ronda }) {
+  const enDescanso = tabata.modo === 'descanso'
+  const mostrado = enDescanso && tabata.siguiente ? tabata.siguiente : tabata.ejercicio || ejercicioDeRonda(exercises, ronda)
+  const idx = Math.max(0, exercises.findIndex((f) => f.exercise_order === mostrado.exercise_order))
+  const proximas = exercises.length > 1 ? [exercises[(idx + 1) % exercises.length], exercises[(idx + 2) % exercises.length]] : []
+  const prescripcion = mostrado.sets_reps || prescripcionTexto({ segundos: mostrado.segundos_por_ejercicio })
   return (
-    <div data-testid="tabata-descanso" style={{ display: 'flex', gap: 56, flex: 1, minHeight: 0, alignItems: 'center' }}>
-      <div style={{ height: '100%', maxHeight: 650, maxWidth: 1150, aspectRatio: '16 / 9', borderRadius: 40, background: '#0b0b0b', overflow: 'hidden', flexShrink: 0, border: `2px solid ${BORDE}` }}>
-        <MediaEjercicio key={siguiente.exercise_order} fila={siguiente} />
+    <div data-testid={enDescanso ? 'tabata-descanso' : 'tabata-trabajo'} style={{ display: 'flex', gap: 56, flex: 1, minHeight: 0, alignItems: 'center' }}>
+      <div style={{ height: '100%', maxHeight: 650, maxWidth: 1150, aspectRatio: '16 / 9', borderRadius: 40, background: '#0b0b0b', overflow: 'hidden', flexShrink: 0, border: `3px solid ${enDescanso ? '#FBBF24' : NARANJA}`, transition: 'border-color 0.5s ease' }}>
+        <MediaEjercicio fila={mostrado} proximas={proximas.filter((f) => f && f.exercise_order !== mostrado.exercise_order)} />
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 22 }}>
-        <span style={{ fontSize: 120, fontWeight: 800, color: '#FBBF24', lineHeight: 1 }}>Descanso</span>
-        <span style={{ fontSize: 40, fontWeight: 500, color: TENUE, lineHeight: 1.25 }}>Preparate para el próximo ejercicio</span>
-        <span style={{ fontSize: 76, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>{siguiente.name}</span>
-        {prescripcion && <div><Pill>{prescripcion}</Pill></div>}
+        <Anima k={enDescanso ? 'descanso' : 'trabajo'} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <span style={{ fontSize: 120, fontWeight: 800, color: enDescanso ? '#FBBF24' : '#4ADE80', lineHeight: 1 }}>{enDescanso ? 'Descanso' : 'Trabajo'}</span>
+          {enDescanso && (
+            <span style={{ fontSize: 40, fontWeight: 500, color: TENUE, lineHeight: 1.25 }}>
+              {tabata.siguiente ? 'Preparate para el próximo ejercicio' : 'Ya casi terminás'}
+            </span>
+          )}
+        </Anima>
+        <Anima k={mostrado.name} style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+          <span style={{ fontSize: 76, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>{mostrado.name}</span>
+          {prescripcion && <div><Pill>{prescripcion}</Pill></div>}
+        </Anima>
       </div>
     </div>
   )
@@ -569,10 +578,8 @@ function VistaEstacion({ box, estado }) {
         tiempoValor={boxCountdown}
       />
       <div style={{ flex: 1, minHeight: 0, paddingTop: 12, display: 'flex' }}>
-        {tabata && tabata.modo === 'descanso' ? (
-          <DescansoTabata siguiente={tabata.siguiente} />
-        ) : tabata && tabata.modo === 'trabajo' && tabata.ejercicio ? (
-          <EjercicioProtagonista key={tabata.ejercicio.exercise_order + '-' + fase.ronda} fila={tabata.ejercicio} activa />
+        {tabata && (tabata.modo === 'descanso' || (tabata.modo === 'trabajo' && tabata.ejercicio)) ? (
+          <TabataEscena exercises={exercises} tabata={tabata} ronda={fase.ronda} />
         ) : delMinuto.length > 1 ? (
           <GrillaEjercicios exercises={delMinuto} />
         ) : exercises.length > 1 ? (
@@ -681,7 +688,8 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
   useEffect(() => {
     refresh()
     unsubRef.current = queueService.subscribeToLine(lineaId, refresh)
-    const staleCheck = setInterval(refresh, 15000)
+    const staleCheck = setInterval(refresh, 3000) // respaldo: el aviso en vivo (broadcast) llega al instante
+    // (la suscripción al broadcast se hace aparte, cuando se conoce la sede)
     // Si algún box ocupado ya pasó su advances_at, el que lo mueve es el tick del servidor
     // (cada 10 s) y la TV se enteraría recién por el poll de 15 s: mientras haya un
     // vencido se vuelve a pedir tv_linea cada 2 s, hasta que el estado cambie.
@@ -696,6 +704,13 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
     }
   }, [lineaId, refresh])
 
+  // Aviso en vivo por sede: refresca tv_linea al instante cuando cambia la cola o un box.
+  const locationId = line?.location_id
+  useEffect(() => {
+    if (!locationId) return undefined
+    return queueService.subscribeToSala(locationId, refresh)
+  }, [locationId, refresh])
+
   const box = boxes.find((b) => Number(b.line_position) === pos)
   const { estado, box: boxVista, boxes: boxesVista } = useEstadoEstacion({ box, boxes, confirmando: confirming, posicion: pos, line })
   const grupo = estado.estado === 'off' ? 'off' : estado.estado === 'llegando' ? 'llegando' : 'chico'
@@ -705,6 +720,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
       <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#000000', color: '#ffffff', fontFamily: GEIST }}>
         <style>{KEYFRAMES}</style>
         <FondoNegro />
+        <PrecargaVideos filas={boxVista?.ejercicios || []} />
         <LogoTF grupo={grupo} />
         <Crossfade stateKey={estado.estado}>
           <VistaEstado estado={estado} box={boxVista} boxes={boxesVista} posicion={pos} />

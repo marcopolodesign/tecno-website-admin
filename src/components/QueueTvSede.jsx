@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { queueService } from '../services/queueService'
 import { serverNow } from '../lib/serverClock'
 import { LienzoTv } from './tv/TvChrome'
 import { useCountdown, formatMMSS, explicacionSegDeLinea, estacionSegDeLinea, transicionSegDeLinea } from '../lib/tvClock'
@@ -145,6 +146,13 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
     pollRef.current = setInterval(refresh, POLL_MS)
     return () => clearInterval(pollRef.current)
   }, [refresh])
+
+  // Aviso en vivo (broadcast por sede) además del poll de 3 s.
+  const sedeId = data?.sede?.id
+  useEffect(() => {
+    if (!sedeId) return undefined
+    return queueService.subscribeToSala(sedeId, refresh)
+  }, [sedeId, refresh])
 
   const sede = data?.sede
   const lineas = data?.lineas || []

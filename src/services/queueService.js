@@ -321,6 +321,37 @@ export const queueService = {
     return () => supabase.removeChannel(channel)
   },
 
+  // Aviso en vivo para las TVs (2026-09-30). Las TVs son anon y las tablas tienen RLS sólo para
+  // authenticated, así que postgres_changes no les llega: la base publica un broadcast mínimo
+  // (sólo el id de línea) en `sala:<location_id>` desde un trigger (tv_avisar_cambio). Los avisos
+  // en ráfaga (el tick toca varias filas) se juntan: máximo un refresh cada 250 ms.
+  subscribeToSala(locationId, onChange) {
+    if (!locationId) return () => {}
+    let pendiente = null
+    let ultimo = 0
+    const disparar = () => {
+      const espera = 250 - (Date.now() - ultimo)
+      if (espera <= 0) {
+        ultimo = Date.now()
+        onChange()
+      } else if (!pendiente) {
+        pendiente = setTimeout(() => {
+          pendiente = null
+          ultimo = Date.now()
+          onChange()
+        }, espera)
+      }
+    }
+    const channel = supabase
+      .channel(`sala:${locationId}`)
+      .on('broadcast', { event: 'cambio' }, disparar)
+      .subscribe()
+    return () => {
+      clearTimeout(pendiente)
+      supabase.removeChannel(channel)
+    }
+  },
+
   subscribeToLine(productionLineId, onChange) {
     const channel = supabase
       .channel(`queue-line-${productionLineId}`)
