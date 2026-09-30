@@ -9,11 +9,15 @@ import {
   mmss,
   TABATA_MIN_TRABAJO_SEG,
   TABATA_MIN_DESCANSO_SEG,
+  TABATA_MAX_TRABAJO_SEG,
+  TABATA_RONDA_SEG,
+  TABATA_PRESETS,
+  acotarTiemposTabata,
 } from '../lib/formatos'
 
 // How the work at THIS STATION is measured — once, not per exercise.
 //
-// The formats are presets, not a blank form: a coach saying "Tabata" means 7 × (30s, 20s), and
+// The formats are presets, not a blank form: a coach saying "Tabata" means 6 × (40s, 20s) — o 6 × (30s, 30s) para quien recién arranca —, and
 // asking them to type it is how one station ends up as 6 × 25/10 by accident. The numbers stay
 // editable underneath, because a coach who wants 6 rounds should get 6 rounds.
 //
@@ -70,16 +74,23 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
     onChange({ formato, rondas, trabajoSeg, descansoSeg, ejerciciosPorMinuto: acotado })
   }
 
-  // Tabata: mínimo 30 s de trabajo y 20 s de descanso (se acota al soltar el campo, no por tecla,
-  // para poder escribir "40" pasando por "4").
+  // Tabata: cada ronda dura 60 s y la estación son 6 rondas. El coach sólo elige el trabajo
+  // (30-40 s); el descanso es lo que queda del minuto. Se acota al soltar el campo, no por tecla,
+  // para poder escribir "40" pasando por "4".
   const esTabata = formato === 'Tabata'
-  const tabataCorto = esTabata && (Number(trabajoSeg) < TABATA_MIN_TRABAJO_SEG || Number(descansoSeg ?? 0) < TABATA_MIN_DESCANSO_SEG)
+  const tabataFueraDeRango = esTabata && (Number(trabajoSeg) < TABATA_MIN_TRABAJO_SEG || Number(trabajoSeg) > TABATA_MAX_TRABAJO_SEG)
+  const setTrabajoTabata = (ev) => {
+    const n = ev.target.value === '' ? '' : Math.max(0, Math.min(TABATA_RONDA_SEG, Number(ev.target.value)))
+    onChange({ formato, rondas: 6, trabajoSeg: n, descansoSeg: n === '' ? '' : TABATA_RONDA_SEG - n, ejerciciosPorMinuto })
+  }
   const acotarTabata = () => {
     if (!esTabata) return
-    const t = Math.max(TABATA_MIN_TRABAJO_SEG, Number(trabajoSeg) || 0)
-    const d = Math.max(TABATA_MIN_DESCANSO_SEG, Number(descansoSeg) || 0)
-    if (t !== trabajoSeg || d !== descansoSeg) onChange({ formato, rondas, trabajoSeg: t, descansoSeg: d, ejerciciosPorMinuto })
+    const a = acotarTiemposTabata(formato, trabajoSeg, descansoSeg, rondas)
+    if (a.trabajoSeg !== trabajoSeg || a.descansoSeg !== descansoSeg || a.rondas !== rondas) {
+      onChange({ formato, ...a, ejerciciosPorMinuto })
+    }
   }
+  const elegirPresetTabata = (p) => onChange({ formato, rondas: p.rondas, trabajoSeg: p.trabajoSeg, descansoSeg: p.descansoSeg, ejerciciosPorMinuto: null })
 
   const pct = Math.min(100, Math.round((estacion / BLOQUE_SEG) * 100))
 
@@ -98,16 +109,44 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
         ))}
       </div>
 
+      {esTabata && (
+        <div style={s.chips}>
+          {Object.entries(TABATA_PRESETS).map(([clave, p]) => {
+            const activo = Number(trabajoSeg) === p.trabajoSeg && Number(descansoSeg) === p.descansoSeg && Number(rondas) === p.rondas
+            return (
+              <button
+                key={clave}
+                type="button"
+                data-testid={`tabata-preset-${clave}`}
+                onClick={() => elegirPresetTabata(p)}
+                style={{ ...s.chip, ...(activo ? s.chipActivo : {}) }}
+              >
+                {p.etiqueta}{clave === 'suave' ? ' · principiante' : ' · normal/avanzado'}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {porTiempo && (
         <>
           <div style={s.numeros}>
             <label style={s.campo}>
               <span style={s.etiqueta}>Rondas</span>
-              <input type="number" min="1" max="60" value={rondas ?? ''} onChange={set('rondas')} style={s.input} />
+              <input type="number" min="1" max="60" value={rondas ?? ''} onChange={set('rondas')} disabled={esTabata} style={s.input} />
             </label>
             <label style={s.campo}>
               <span style={s.etiqueta}>{formato === 'AMRAP' || formato === 'A completar' ? 'Tiempo total (seg)' : 'Trabajo (seg)'}</span>
-              <input type="number" min="5" max={BLOQUE_SEG} value={trabajoSeg ?? ''} onChange={set('trabajoSeg')} onBlur={acotarTabata} style={s.input} />
+              <input
+                type="number"
+                min={esTabata ? TABATA_MIN_TRABAJO_SEG : 5}
+                max={esTabata ? TABATA_MAX_TRABAJO_SEG : BLOQUE_SEG}
+                value={trabajoSeg ?? ''}
+                onChange={esTabata ? setTrabajoTabata : set('trabajoSeg')}
+                onBlur={acotarTabata}
+                data-testid="tabata-trabajo"
+                style={s.input}
+              />
             </label>
             {formato === 'EMOM' ? (
               // El descanso de EMOM no se carga (es lo que sobra del minuto — ver la ayuda de
@@ -133,7 +172,8 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
                   max="600"
                   value={descansoSeg ?? 0}
                   onChange={set('descansoSeg')}
-                  onBlur={acotarTabata}
+                  disabled={esTabata}
+                  data-testid="tabata-descanso-input"
                   style={s.input}
                 />
               </label>
@@ -150,10 +190,10 @@ export default function SelectorFormato({ valor, onChange, turnoSeg }) {
                   : 'Cada ronda: trabajo y después descanso.'}
           </span>
           {esTabata && (
-            <span style={tabataCorto ? s.aviso : s.ayuda}>
-              {tabataCorto
-                ? `Tabata: mínimo ${TABATA_MIN_TRABAJO_SEG} s de trabajo y ${TABATA_MIN_DESCANSO_SEG} s de descanso — con menos la TV cambia muy rápido y el socio no llega a cambiar de ejercicio. Se ajusta al salir del campo.`
-                : `Mínimo ${TABATA_MIN_TRABAJO_SEG} s de trabajo y ${TABATA_MIN_DESCANSO_SEG} s de descanso.`}
+            <span style={tabataFueraDeRango ? s.aviso : s.ayuda}>
+              {tabataFueraDeRango
+                ? `Tabata: el trabajo va de ${TABATA_MIN_TRABAJO_SEG} a ${TABATA_MAX_TRABAJO_SEG} s. Se ajusta al salir del campo.`
+                : `Cada ronda dura 1 minuto: el descanso es lo que queda del trabajo (mínimo ${TABATA_MIN_DESCANSO_SEG} s). Trabajo de ${TABATA_MIN_TRABAJO_SEG} a ${TABATA_MAX_TRABAJO_SEG} s; 30/30 para quien recién arranca.`}
             </span>
           )}
 

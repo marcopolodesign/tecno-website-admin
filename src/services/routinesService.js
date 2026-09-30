@@ -1,6 +1,9 @@
 import { acotarTiemposTabata } from '../lib/formatos'
 import { supabase, toCamelCase, toSnakeCase, getCurrentUser } from '../lib/supabase'
 
+// Tabata: 6 rondas de 60 s (trabajo 30-40, descanso = 60 - trabajo). Otros formatos pasan igual.
+const tabataAcotado = (d) => acotarTiemposTabata(d.formato, d.trabajoSeg, d.descansoSeg, d.rondas)
+
 export const routinesService = {
   // ==================== BOXES (STATIONS) ====================
   async getBoxes() {
@@ -444,9 +447,9 @@ export const routinesService = {
         // Series leaves these null on purpose — the CHECK on session_exercises rejects a timed
         // format with no duration, and rejects Series carrying one.
         formato: sessionExerciseData.formato || 'Series',
-        rondas: sessionExerciseData.rondas || null,
-        trabajo_seg: acotarTiemposTabata(sessionExerciseData.formato, sessionExerciseData.trabajoSeg, sessionExerciseData.descansoSeg).trabajoSeg || null,
-        descanso_seg: acotarTiemposTabata(sessionExerciseData.formato, sessionExerciseData.trabajoSeg, sessionExerciseData.descansoSeg).descansoSeg ?? null,
+        rondas: tabataAcotado(sessionExerciseData).rondas || null,
+        trabajo_seg: tabataAcotado(sessionExerciseData).trabajoSeg || null,
+        descanso_seg: tabataAcotado(sessionExerciseData).descansoSeg ?? null,
         // De la ESTACIÓN, como formato/rondas/trabajo_seg — se replica igual en todas sus filas
         // (ver syncEstacionFormato). segundos_por_ejercicio es de CADA fila: null = va por reps.
         ejercicios_por_minuto: sessionExerciseData.ejerciciosPorMinuto || null,
@@ -534,9 +537,9 @@ export const routinesService = {
         .from('session_exercises')
         .update({
           formato: formatoData.formato || 'Series',
-          rondas: formatoData.rondas || null,
-          trabajo_seg: acotarTiemposTabata(formatoData.formato, formatoData.trabajoSeg, formatoData.descansoSeg).trabajoSeg || null,
-          descanso_seg: acotarTiemposTabata(formatoData.formato, formatoData.trabajoSeg, formatoData.descansoSeg).descansoSeg ?? null,
+          rondas: tabataAcotado(formatoData).rondas || null,
+          trabajo_seg: tabataAcotado(formatoData).trabajoSeg || null,
+          descanso_seg: tabataAcotado(formatoData).descansoSeg ?? null,
           // De la estación, igual que los tres de arriba — no de cada fila (eso es
           // segundos_por_ejercicio, que cada fila trae y guarda por su cuenta).
           ejercicios_por_minuto: formatoData.ejerciciosPorMinuto || null

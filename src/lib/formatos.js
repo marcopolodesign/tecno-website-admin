@@ -1,24 +1,35 @@
 // The timed work formats, in one place, because three screens read them: the coach writing the
 // session, the box screen running the clock, and the app in the member's hand. "Tabata" has to
-// mean 8 × (20s, 10s) in all three or the wall and the phone disagree in front of the member.
+// mean 6 × 60s (40/20 or 30/30) in all three or the wall and the phone disagree in front of the member.
 //
 // Mirrors preset_formato() and fase_del_formato() in the database. Duplicated on purpose rather
 // than fetched: the box screen has to keep counting through a dropped connection, and a
 // countdown that stops because a request failed is worse than one derived locally. Both sides
 // are pure functions of elapsed seconds, so they cannot drift apart.
 
+// Tabata (Mateo, 2026-09-30): cada ronda dura EXACTAMENTE 1 minuto y la estación son 6 rondas
+// (6:00). El reparto depende del nivel del socio: 40 s trabajo / 20 s descanso (normal/avanzado) o
+// 30 s / 30 s (principiante / baja intensidad). Pisos de la sala: trabajo >= 30, descanso >= 20.
+// Igual que trabajo_del_bloque() en Postgres (migración 20260930190000).
+export const TABATA_RONDAS = 6
+export const TABATA_RONDA_SEG = 60
 export const TABATA_MIN_TRABAJO_SEG = 30
 export const TABATA_MIN_DESCANSO_SEG = 20
+export const TABATA_MAX_TRABAJO_SEG = TABATA_RONDA_SEG - TABATA_MIN_DESCANSO_SEG // 40
 
-// Acota trabajo/descanso de un Tabata a los mínimos de la sala. Es la red de seguridad al
-// escribir en la base (el SelectorFormato ya avisa y acota al soltar el campo). No toca otros
-// formatos. Devuelve { trabajoSeg, descansoSeg }.
-export function acotarTiemposTabata(formato, trabajoSeg, descansoSeg) {
-  if (formato !== 'Tabata') return { trabajoSeg, descansoSeg }
-  return {
-    trabajoSeg: Math.max(TABATA_MIN_TRABAJO_SEG, Number(trabajoSeg) || 0),
-    descansoSeg: Math.max(TABATA_MIN_DESCANSO_SEG, Number(descansoSeg) || 0),
-  }
+// Los dos repartos del Tabata, para el selector.
+export const TABATA_PRESETS = {
+  normal: { etiqueta: '6 × 40/20', rondas: TABATA_RONDAS, trabajoSeg: 40, descansoSeg: 20 },
+  suave: { etiqueta: '6 × 30/30', rondas: TABATA_RONDAS, trabajoSeg: 30, descansoSeg: 30 },
+}
+
+// Trabajo entre 30 y 40 s; el descanso es lo que queda del minuto (60 − trabajo) y las rondas son 6.
+// Es la red de seguridad al escribir en la base (el SelectorFormato ya lo aplica al editar). No toca
+// otros formatos. Devuelve { rondas, trabajoSeg, descansoSeg }.
+export function acotarTiemposTabata(formato, trabajoSeg, descansoSeg, rondas) {
+  if (formato !== 'Tabata') return { rondas, trabajoSeg, descansoSeg }
+  const t = Math.min(TABATA_MAX_TRABAJO_SEG, Math.max(TABATA_MIN_TRABAJO_SEG, Number(trabajoSeg) || TABATA_PRESETS.normal.trabajoSeg))
+  return { rondas: TABATA_RONDAS, trabajoSeg: t, descansoSeg: TABATA_RONDA_SEG - t }
 }
 
 export const FORMATOS = ['Series', 'AMRAP', 'EMOM', 'Tabata', 'A completar']
@@ -40,11 +51,8 @@ export const PRESETS = {
   // resto del contrato "qué entra en un minuto") — un movimiento por minuto, que es lo que ya
   // tenían las 1490 filas EMOM de antes de que esto fuera configurable.
   EMOM: { rondas: 6, trabajoSeg: 60, descansoSeg: 0, ejerciciosPorMinuto: 1 },
-  // Mínimos de la sala (Mateo, 2026-09-30): 30 s de trabajo y 20 s de descanso — con menos la TV
-  // cambia demasiado rápido y el socio no llega a cambiar de ejercicio. 7 × (30+20) = 5:50, el
-  // máximo entero que entra en los 6:00 (8 rondas serían 6:40). Igual que trabajo_del_bloque()
-  // en Postgres (migración 20260930170000).
-  Tabata: { rondas: 7, trabajoSeg: 30, descansoSeg: 20 },
+  // 6 × 60 s = 6:00. Default 40/20 (normal); el preset 30/30 está en TABATA_PRESETS.
+  Tabata: TABATA_PRESETS.normal,
   // Sin estructura fija: el coach carga los ejercicios que quiera (sin el tope de 3 de AMRAP)
   // y describe la submodalidad a mano en las notas (ej. "escalera 1-1-2-2-3-3"). El bloque de
   // seis minutos es el mismo que el resto de los formatos por tiempo.
