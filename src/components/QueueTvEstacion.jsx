@@ -214,7 +214,7 @@ const prescripcionDe = (f) => f?.sets_reps || prescripcionTexto({ segundos: f?.s
 
 // "10 por vuelta" / "10 reps" / "10" -> "10"; "30s" o cualquier otro texto se deja como está.
 function repsDe(f) {
-  const m = String(f?.sets_reps || '').match(/^\s*(\d+)(?:\s*(?:reps?|por vuelta|por ronda))?\s*$/i)
+  const m = String(f?.sets_reps || '').match(/^\s*(\d+)(?:\s*(?:reps?|por vuelta|por ronda|por minuto))?\s*$/i)
   return m ? m[1] : prescripcionDe(f)
 }
 
@@ -252,12 +252,12 @@ function tituloModalidad(p) {
   }
 }
 
-function pildoraFormato(p) {
+function pildoraFormato(p, varios = false) {
   if (!p) return null
   if (esPorTiempo(p.formato)) {
     return comoTexto(p.formato, { rondas: p.rondas, trabajoSeg: p.trabajo_seg, descansoSeg: p.descanso_seg }).replace('×', ' × ').toUpperCase()
   }
-  const s = seriesDe(p)
+  const s = varios ? null : seriesDe(p)
   return s ? `SERIES ${s.series} × ${s.reps}` : 'SERIES'
 }
 
@@ -291,7 +291,7 @@ function CabeceraBasica({ pos, line }) {
 // remonta entre trabajo y descanso: sólo cambia el ejercicio (cruce de video) y los textos.
 function MediaGrande({ fila, proximas, chips = [], numero, nombreSize = 92, pillSigue, acento }) {
   return (
-    <div style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
+    <div data-testid="tv-media" style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         <VideoCruzado fila={fila} proximas={proximas} />
       </div>
@@ -571,10 +571,10 @@ function VistaEstacion({ box, fase, pos, line }) {
     acento = COLOR.trabajo
     etiquetaEstado = 'A TU RITMO'
     valorReloj = restanteEstacion == null ? '' : formatMMSS(restanteEstacion)
-    const s = seriesDe(primero)
+    const s = exercises.length > 1 ? null : seriesDe(primero)
     medio =
       exercises.length > 1 ? (
-        <GrillaCards filas={exercises} acento={acento} valor={(x) => prescripcionDe(x)} />
+        <GrillaCards filas={exercises} acento={acento} valor={(x) => String(prescripcionDe(x)).replace(/\s*[x×]\s*/i, ' × ')} />
       ) : primero ? (
         <MediaGrande
           fila={primero}
@@ -601,15 +601,15 @@ function VistaEstacion({ box, fase, pos, line }) {
         numero={pos}
         eyebrow={`ESTACIÓN ${pos}${line?.name ? ` · ${nombreLinea(line)}` : ''}`}
         subtitulo={box.socio}
-        derecha={pildoraFormato(primero) ? <Pildora mono>{pildoraFormato(primero)}</Pildora> : null}
+        derecha={pildoraFormato(primero, exercises.length > 1) ? <Pildora mono>{pildoraFormato(primero, exercises.length > 1)}</Pildora> : null}
       />
       <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1180px minmax(0, 1fr)', gap: 48 }}>
         {medio}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28, minHeight: 0 }}>
-          <Anima k={etiquetaEstado} style={{ ...{ fontSize: 34, fontWeight: 800, letterSpacing: 8, color: acento, transition: 'color 0.5s ease' } }}>
+          <Anima k={etiquetaEstado} data-testid="tv-etiqueta" style={{ fontSize: 34, fontWeight: 800, letterSpacing: 8, color: acento, transition: 'color 0.5s ease' }}>
             {etiquetaEstado}
           </Anima>
-          <Cronometro valor={valorReloj} />
+          <Cronometro valor={valorReloj} data-testid="tv-reloj" />
           {debajoDelReloj}
           {tarjeta}
         </div>

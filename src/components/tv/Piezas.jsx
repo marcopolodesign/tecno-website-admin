@@ -34,8 +34,8 @@ export function TFMarca({ width, color = COLOR.texto }) {
 export const nombreLineaTv = (nombre) => String(nombre || '').toUpperCase().replace(/^LINEA\b/, 'LÍNEA')
 
 // Texto que entra con un deslizamiento suave cada vez que cambia `k`.
-export function Anima({ k, children, style }) {
-  return <div key={k} style={{ animation: 'tvTextoIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both', ...style }}>{children}</div>
+export function Anima({ k, children, style, ...resto }) {
+  return <div key={k} {...resto} style={{ animation: 'tvTextoIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both', ...style }}>{children}</div>
 }
 
 // Píldora de vidrio. `sobreVideo` la oscurece un poco para que se lea encima de la imagen.
@@ -87,10 +87,11 @@ export function Encabezado({ numero, eyebrow, titulo, subtitulo, linea3, derecha
 }
 
 // Cronómetro grande (Geist Mono 240 / 600).
-export function Cronometro({ valor, size = 240, color = COLOR.texto, estilo }) {
+export function Cronometro({ valor, size = 240, color = COLOR.texto, estilo, ...resto }) {
   const k = size / 240
   return (
     <span
+      {...resto}
       style={{
         fontFamily: MONO, fontSize: size, fontWeight: 600, lineHeight: 0.85, letterSpacing: -12 * k, color,
         fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', ...estilo,
@@ -105,7 +106,7 @@ export function Cronometro({ valor, size = 240, color = COLOR.texto, estilo }) {
 export function BarraProgreso({ fraccion, acento }) {
   const w = `${Math.round(Math.min(1, Math.max(0, fraccion || 0)) * 1000) / 10}%`
   return (
-    <div style={{ height: 14, flexShrink: 0, borderRadius: RADIO.pildora, background: COLOR.pista, overflow: 'hidden' }}>
+    <div data-testid="tv-progreso" style={{ height: 14, flexShrink: 0, borderRadius: RADIO.pildora, background: COLOR.pista, overflow: 'hidden' }}>
       <div style={{ width: w, height: '100%', borderRadius: RADIO.pildora, background: acento, transition: 'width 1s linear, background 0.5s ease' }} />
     </div>
   )
@@ -114,7 +115,7 @@ export function BarraProgreso({ fraccion, acento }) {
 // Rondas / minutos: n barritas. `estado(i)` -> 'hecha' | 'actual' | 'falta'.
 export function BarrasRondas({ n, estado, acento }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: 10 }}>
+    <div data-testid="tv-barras" style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: 10 }}>
       {Array.from({ length: n }, (_, i) => {
         const e = estado(i)
         return (
@@ -147,7 +148,7 @@ export function Miniatura({ fila, ancho = 176, alto = 100 }) {
 // Tarjeta de vidrio con miniatura: "SIGUE · Búlgara con KB". `fila` pone la miniatura, `texto` el nombre.
 export function TarjetaSigue({ etiquetaTexto, fila, texto }) {
   return (
-    <div style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', gap: 20, alignItems: 'center', padding: 16, flexShrink: 0 }}>
+    <div data-testid="tv-tarjeta" style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', gap: 20, alignItems: 'center', padding: 16, flexShrink: 0 }}>
       <Miniatura fila={fila} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
         <span style={etiqueta(COLOR.texto45, 22, 5)}>{etiquetaTexto}</span>
@@ -160,7 +161,7 @@ export function TarjetaSigue({ etiquetaTexto, fila, texto }) {
 // Tarjeta "CÓMO SE JUEGA".
 export function TarjetaComoSeJuega({ texto }) {
   return (
-    <div style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: 28, flexShrink: 0 }}>
+    <div data-testid="tv-tarjeta" style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: 28, flexShrink: 0 }}>
       <span style={etiqueta(COLOR.texto45, 22, 5)}>Cómo se juega</span>
       <span style={{ fontSize: 34, fontWeight: 600, lineHeight: 1.2 }}>{texto}</span>
     </div>
