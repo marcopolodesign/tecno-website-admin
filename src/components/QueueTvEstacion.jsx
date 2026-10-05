@@ -431,7 +431,7 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
       <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)', gap: 24 }}>
         {exercises.map((f, i) => {
           const turnos = turnosDe(i, ctx)
-          const prescripcion = capital(prescripcionDe(f))
+          const prescripcion = capital(String(prescripcionDe(f)).replace(/^(\d+)\s*[x×]\s*(\d+)$/i, '$1 × $2'))
           const sub = [turnos.length ? `${ctx.formato === 'EMOM' ? 'Minutos' : 'Rondas'} ${listaTexto(turnos)}` : null, prescripcion].filter(Boolean).join(' · ')
           return (
             <div key={f.exercise_order ?? i} style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
