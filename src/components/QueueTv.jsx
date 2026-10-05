@@ -5,6 +5,7 @@ import { queueService, boxLabel } from '../services/queueService'
 import { useCountdown, useBoxPhase, explicacionSegDeLinea, estacionSegDeLinea, formatMMSS } from '../lib/tvClock'
 import { ExercisePanel, ExplicacionPanel, TransicionPanel } from './tv/BoxPanels'
 import { ControlesTv } from './tv/TvChrome'
+import { BORDE, BORDE_PX, COLOR, RADIO } from './tv/tokens'
 
 function BoxSlot({ box, line, boxes }) {
   const countdown = formatMMSS(useCountdown(box.status === 'occupied' ? box.advances_at : null))
@@ -30,27 +31,27 @@ function BoxSlot({ box, line, boxes }) {
     <div
       style={{
         flex: 1,
-        borderRadius: 20,
+        borderRadius: RADIO.tarjeta,
         padding: '20px 16px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: isOccupied ? 'flex-start' : 'center',
         gap: 10,
-        background: isOccupied ? 'rgba(244,95,55,0.15)' : 'rgba(255,255,255,0.04)',
-        border: isOccupied ? '2px solid #F45F37' : '2px solid rgba(255,255,255,0.08)',
+        background: COLOR.superficie,
+        border: isOccupied ? `${BORDE_PX}px solid ${COLOR.trabajo}` : BORDE,
         minHeight: 340,
       }}
     >
-      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: 600, letterSpacing: 1 }}>
+      <span style={{ color: COLOR.texto66, fontSize: 14, fontWeight: 600, letterSpacing: 1 }}>
         BOX {boxLabel(line?.line_number, box.line_position)}
       </span>
       {isOccupied ? (
         <>
-          <span style={{ color: 'white', fontSize: 18, fontWeight: 700, textAlign: 'center' }}>
+          <span style={{ color: COLOR.texto, fontSize: 18, fontWeight: 700, textAlign: 'center' }}>
             {box.socio ?? 'Ocupado'}
           </span>
-          <span style={{ color: '#F45F37', fontSize: 22, fontWeight: 800, fontFamily: 'monospace' }}>
+          <span style={{ color: COLOR.trabajo, fontSize: 22, fontWeight: 800, fontFamily: 'monospace' }}>
             {countdown}
           </span>
           {enExplicacion ? (
@@ -67,7 +68,7 @@ function BoxSlot({ box, line, boxes }) {
           )}
         </>
       ) : (
-        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>Libre</span>
+        <span style={{ color: COLOR.texto45, fontSize: 18 }}>Libre</span>
       )}
     </div>
   )
@@ -134,7 +135,7 @@ export default function QueueTv({ overrideLineaId } = {}) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: '#0b0d12',
+        background: COLOR.fondo,
         fontFamily: 'system-ui, -apple-system, sans-serif',
         display: 'flex',
         flexDirection: 'column',
@@ -147,9 +148,10 @@ export default function QueueTv({ overrideLineaId } = {}) {
           style={{
             width: 48,
             height: 48,
-            borderRadius: 12,
-            background: '#F45F37',
-            color: 'white',
+            borderRadius: RADIO.mini,
+            background: COLOR.superficie,
+            border: BORDE,
+            color: COLOR.texto,
             fontSize: 24,
             fontWeight: 800,
             display: 'flex',
@@ -159,11 +161,11 @@ export default function QueueTv({ overrideLineaId } = {}) {
         >
           T
         </div>
-        <h1 style={{ color: 'white', fontSize: 28, fontWeight: 700, margin: 0 }}>
+        <h1 style={{ color: COLOR.texto, fontSize: 28, fontWeight: 700, margin: 0 }}>
           {line?.name ?? 'Línea'}
         </h1>
         {!connected && (
-          <span style={{ marginLeft: 'auto', color: '#f59e0b', fontSize: 14 }}>Reconectando…</span>
+          <span style={{ marginLeft: 'auto', color: COLOR.texto66, fontSize: 14 }}>Reconectando…</span>
         )}
       </div>
 
@@ -172,7 +174,7 @@ export default function QueueTv({ overrideLineaId } = {}) {
           <BoxSlot key={box.line_position} box={box} line={line} boxes={boxes} />
         ))}
         {boxes.length === 0 && (
-          <p style={{ color: 'rgba(255,255,255,0.4)', margin: 'auto' }}>Sin boxes configurados</p>
+          <p style={{ color: COLOR.texto45, margin: 'auto' }}>Sin boxes configurados</p>
         )}
       </div>
 
@@ -181,16 +183,16 @@ export default function QueueTv({ overrideLineaId } = {}) {
       {confirming && (
         <div
           style={{
-            background: 'rgba(245,158,11,0.15)',
-            border: '2px solid #f59e0b',
-            borderRadius: 16,
+            background: COLOR.superficie,
+            border: `${BORDE_PX}px solid ${COLOR.trabajo}`,
+            borderRadius: RADIO.tarjeta,
             padding: '20px 28px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <span style={{ color: 'white', fontSize: 22, fontWeight: 600 }}>
+          <span style={{ color: COLOR.texto, fontSize: 22, fontWeight: 600 }}>
             {confirming.socio ?? 'Socio'} — confirmá tu turno en la app
           </span>
         </div>

@@ -11,6 +11,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { estadoReloj, suscribirReloj } from '../../lib/serverClock'
 import { ANCHO_DISENO, medidasLienzo } from '../../lib/lienzo'
+import { BORDE, COLOR, RADIO } from './tokens'
 
 const OCULTAR_MS = 4000
 
@@ -22,7 +23,7 @@ function medir() {
   return medidasLienzo(window.innerWidth, window.innerHeight)
 }
 
-export function LienzoTv({ children, fondo = '#000000' }) {
+export function LienzoTv({ children, fondo = COLOR.fondo }) {
   const [m, setM] = useState(medir)
   useEffect(() => {
     const onResize = () => setM(medir())
@@ -115,8 +116,8 @@ export function ControlesTv() {
             entrarPantallaCompleta()
           }}
           style={{
-            position: 'fixed', bottom: 14, left: '50%', marginLeft: -24, zIndex: 1000, width: 48, height: 48, borderRadius: 12,
-            border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(0,0,0,0.45)', color: '#ffffff',
+            position: 'fixed', bottom: 0, left: '50%', marginLeft: -22, zIndex: 1000, width: 44, height: 44, borderRadius: RADIO.mini,
+            border: BORDE, background: COLOR.vidrio, color: COLOR.texto,
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
             opacity: visible ? 0.85 : 0, pointerEvents: visible ? 'auto' : 'none', transition: 'opacity 0.35s',
             backdropFilter: 'blur(6px)',
@@ -128,7 +129,7 @@ export function ControlesTv() {
         </button>
       )}
       {debug && (
-        <div style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 1000, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.7)', color: '#7dd3fc', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 14 }}>
+        <div style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 1000, padding: '6px 10px', borderRadius: RADIO.mini, background: COLOR.vidrio, color: '#7dd3fc', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 14 }}>
           {reloj.sincronizado
             ? `reloj: ${reloj.offsetMs >= 0 ? '+' : ''}${Math.round(reloj.offsetMs)} ms vs servidor (rtt ${reloj.rttMs} ms)`
             : 'reloj: sin sincronizar'}

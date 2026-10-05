@@ -5,119 +5,145 @@
 //
 // Sin Realtime: postgres_changes está sujeto a RLS igual que las tablas, así que anon no
 // recibiría nada — se refresca por polling cada 3s, que alcanza para una lista de espera.
+//
+// Rediseño 2026-10-05 (Lista.dc): mismo sistema que las TVs de estación (tv/tokens.js) — fondo
+// #050505 con manchas, superficies de vidrio, acento naranja sólo en texto y bordes.
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { queueService } from '../services/queueService'
 import { serverNow } from '../lib/serverClock'
 import { LienzoTv } from './tv/TvChrome'
-import { useCountdown, formatMMSS, explicacionSegDeLinea, estacionSegDeLinea, transicionSegDeLinea } from '../lib/tvClock'
+import { useCountdown, formatMMSS, duracionBoxSegDeLinea } from '../lib/tvClock'
+import { BORDE, BORDE_ACENTO_PX, COLOR, GEIST, MONO, RADIO, etiqueta, superficie } from './tv/tokens'
+import { FondoManchas, KEYFRAMES, TFMarca, nombreLineaTv } from './tv/Piezas'
 
-const GEIST = "'Geist', system-ui, -apple-system, sans-serif"
-const MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
-const NARANJA = '#F45F37'
-const ROTULO = '#E07C2C'
 const POLL_MS = 3000
+const BOXES_POR_LINEA = 5 // tv_sede no manda cuántos boxes tiene cada línea; las de Palermo son de 5
 
 function nombreCorto(u) {
   return u || 'Socio'
 }
 
-function minutosEsperando(createdAt) {
-  return Math.max(0, Math.floor((serverNow() - new Date(createdAt).getTime()) / 60000))
+// Segundos de espera estimados para cada persona de la fila, y para quien se sume ahora. Se
+// reparte la fila entre las líneas: cada una libera su box 1 en `advances_at` (o ya está libre) y
+// después cada persona lo ocupa una duración de box completa. Es una estimación: no ve los
+// cuellos de botella de adelante (por eso se muestra con "~").
+export function esperasEstimadas(fila = [], lineas = [], ahoraMs = serverNow()) {
+  const slots = lineas.map((l) => ({
+    t: l.box1?.status === 'occupied' && l.box1.advances_at ? Math.max(0, (new Date(l.box1.advances_at).getTime() - ahoraMs) / 1000) : 0,
+    dur: duracionBoxSegDeLinea(l),
+  }))
+  if (!slots.length) return { porPersona: fila.map(() => null), nuevo: null }
+  const tomar = () => {
+    const s = slots.reduce((a, b) => (b.t < a.t ? b : a))
+    const espera = s.t
+    s.t += s.dur
+    return espera
+  }
+  const porPersona = fila.map(() => tomar())
+  return { porPersona, nuevo: tomar() }
 }
 
-function Fondo() {
+const minutosTexto = (seg) => `~${Math.max(1, Math.round(seg / 60))} min`
+
+function useAhora() {
+  const [ahora, setAhora] = useState(() => serverNow())
+  useEffect(() => {
+    const id = setInterval(() => setAhora(serverNow()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return ahora
+}
+
+function Reloj() {
+  const ahora = useAhora()
   return (
-    <svg width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
-      <defs>
-        <filter id="tvsbg" x="-500" y="-500" width="2920" height="2280" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-          <feGaussianBlur stdDeviation="134" />
-        </filter>
-        <linearGradient id="tvsbgg" x1="960" y1="60" x2="960" y2="1320" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#F7F7FA" />
-          <stop offset="0.470588" stopColor="#EDEDED" />
-          <stop offset="0.929412" stopColor="#393939" />
-        </linearGradient>
-      </defs>
-      <g filter="url(#tvsbg)">
-        <ellipse cx="0" cy="0" rx="840" ry="700" transform="translate(1210 780) rotate(-21)" fill="url(#tvsbgg)" />
-      </g>
-    </svg>
+    <span style={{ fontFamily: MONO, color: COLOR.texto }}>
+      {new Date(ahora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })}
+    </span>
   )
 }
 
-function FilaEspera({ entry, i, nombreLinea }) {
+function FilaEspera({ entry, i, nombreLinea, espera }) {
   const confirmando = entry.status === 'confirming'
   const confirmCountdown = formatMMSS(useCountdown(confirmando ? entry.confirm_deadline : null))
   return (
     <div
       style={{
-        display: 'flex', alignItems: 'center', gap: 28,
-        background: '#ffffff',
-        border: confirmando ? `4px solid ${NARANJA}` : '2px solid #e5e7eb',
-        borderRadius: 36, padding: confirmando ? '24px 32px' : '16px 32px',
+        ...superficie(RADIO.tarjeta), display: 'flex', alignItems: 'center', gap: 28, padding: '22px 28px',
+        ...(confirmando ? { border: `${BORDE_ACENTO_PX}px solid ${COLOR.trabajo}` } : null),
       }}
     >
       <span
         style={{
-          width: confirmando ? 72 : 64, height: confirmando ? 72 : 64,
-          borderRadius: confirmando ? 36 : '50%',
-          border: `4px solid ${confirmando ? NARANJA : '#111827'}`,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: MONO, fontSize: confirmando ? 32 : 29, color: confirmando ? NARANJA : '#111827', flexShrink: 0,
+          width: 84, height: 84, borderRadius: RADIO.mini, background: COLOR.pista, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 48, fontWeight: 800, flexShrink: 0,
         }}
       >
         {i + 1}
       </span>
-      {confirmando ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-          <span style={{ fontSize: 46, fontWeight: 600, color: '#111827', lineHeight: 1.1 }}>{nombreCorto(entry.socio)}</span>
-          <span style={{ fontSize: 28, fontWeight: 500, color: NARANJA }}>
-            Apoyá el teléfono en el box 1{nombreLinea ? ` de ${nombreLinea}` : ''} o confirmá en la app
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontSize: 60, fontWeight: 800, lineHeight: 1.05 }}>{nombreCorto(entry.socio)}</span>
+        {confirmando && (
+          <span style={{ fontSize: 26, color: COLOR.texto66 }}>
+            Apoyá el teléfono en el box 1 o confirmá en la app
           </span>
+        )}
+      </div>
+      {confirmando ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+          <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: 4, color: COLOR.trabajo }}>
+            {`TE TOCA${nombreLinea ? ` · ${nombreLineaTv(nombreLinea)}` : ''}`}
+          </span>
+          <span style={{ fontFamily: MONO, fontSize: 38, color: COLOR.trabajo }}>{confirmCountdown}</span>
         </div>
       ) : (
-        <span style={{ fontSize: 42, fontWeight: 500, color: '#111827' }}>{nombreCorto(entry.socio)}</span>
+        <span style={{ fontFamily: MONO, fontSize: 38, color: COLOR.texto66, flexShrink: 0 }}>
+          {espera == null ? '' : espera <= 0 ? 'Ahora' : minutosTexto(espera)}
+        </span>
       )}
-      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 8, flexShrink: 0 }}>
-        {confirmando ? (
-          <span style={{ fontFamily: MONO, fontSize: 44, color: NARANJA, fontWeight: 700 }}>{confirmCountdown}</span>
-        ) : (
-          <span style={{ fontSize: 30, color: '#6b7280' }}>{minutosEsperando(entry.created_at)} min esperando</span>
-        )}
-      </span>
     </div>
   )
 }
 
-function TarjetaLinea({ linea }) {
-  const box1Countdown = formatMMSS(useCountdown(linea.box1?.status === 'occupied' ? linea.box1.advances_at : null))
-  const proximoLugar = linea.box1?.status === 'occupied' ? box1Countdown : 'Ahora'
-
+// Una línea en el panel de la derecha: libre ahora / libre en M:SS y sus boxes.
+function PanelLinea({ linea }) {
+  const ocupadoBox1 = linea.box1?.status === 'occupied'
+  const restante = formatMMSS(useCountdown(ocupadoBox1 ? linea.box1.advances_at : null))
+  const total = Math.max(BOXES_POR_LINEA, linea.ocupados || 0)
+  // box 1 con su estado real; del resto sólo se sabe cuántos están en uso en total
+  let restantesOcupados = Math.max(0, (linea.ocupados || 0) - (ocupadoBox1 ? 1 : 0))
+  const slots = Array.from({ length: total }, (_, i) => {
+    if (i === 0) return ocupadoBox1 ? 'ocupado' : 'libre'
+    if (restantesOcupados > 0) {
+      restantesOcupados -= 1
+      return 'ocupado'
+    }
+    return 'vacio'
+  })
   return (
-    <div style={{ background: '#ffffff', border: '2px solid #e5e7eb', borderRadius: 36, padding: '30px 34px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 36, fontWeight: 600, color: '#111827' }}>{linea.name}</span>
-        <span style={{ fontSize: 28, color: '#6b7280' }}>{linea.ocupados} en uso</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', paddingTop: 4 }}>
-        <span style={{ fontSize: 26, color: '#6b7280' }}>Próximo lugar en</span>
-        <span style={{ fontFamily: MONO, fontSize: 40, color: proximoLugar === 'Ahora' ? '#16a34a' : NARANJA, fontWeight: 700 }}>
-          {proximoLugar}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ fontSize: 40, fontWeight: 800 }}>{nombreLineaTv(linea.name)}</span>
+        <span style={{ fontSize: 26, color: COLOR.texto66 }}>
+          {ocupadoBox1 ? 'libre en ' : 'libre '}
+          <span style={{ fontFamily: MONO, fontSize: 36, color: ocupadoBox1 ? COLOR.texto : COLOR.trabajo }}>{ocupadoBox1 ? restante : 'ahora'}</span>
         </span>
       </div>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))`, gap: 10 }}>
+        {slots.map((e, i) => (
+          <div
+            key={i}
+            style={{
+              height: 56, borderRadius: RADIO.mini, boxSizing: 'border-box',
+              ...(e === 'ocupado' ? { background: 'rgba(245,245,244,0.8)' } : e === 'libre' ? { border: `2px dashed ${COLOR.trabajo}` } : { border: BORDE }),
+            }}
+          />
+        ))}
+      </div>
     </div>
   )
-}
-
-function Reloj() {
-  const [ahora, setAhora] = useState(() => new Date(serverNow()))
-  useEffect(() => {
-    const id = setInterval(() => setAhora(new Date(serverNow())), 1000)
-    return () => clearInterval(id)
-  }, [])
-  return <span style={{ fontFamily: MONO, fontSize: 32, color: '#4b5563' }}>{ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
 }
 
 // overrideLocationId: llega por prop cuando la pantalla se abre por slug (TvPorSlug.jsx) en
@@ -128,6 +154,7 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
   const [data, setData] = useState(null)
   const [connected, setConnected] = useState(true)
   const pollRef = useRef(null)
+  const ahora = useAhora()
 
   const refresh = useCallback(async () => {
     try {
@@ -161,86 +188,73 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
   // buscarlo en `lineas`, que ya vino en el mismo payload.
   const nombreDeLinea = (lineNumber) => lineas.find((l) => l.line_number === lineNumber)?.name
 
-  // Incluye la transición (2026-09-28): si no, esta pantalla dice un total menor al que
-  // en verdad tarda un box en liberarse (E+S+T, ver duracion_box_seg en la base).
-  const minutosEstacion = lineas[0]
-    ? Math.round((explicacionSegDeLinea(lineas[0]) + estacionSegDeLinea(lineas[0]) + transicionSegDeLinea(lineas[0])) / 60)
-    : null
+  const { porPersona, nuevo } = esperasEstimadas(fila, lineas, ahora)
+  // Con la fila larga se muestran 4 y "y N más" para que no se salga de la pantalla.
+  const visibles = fila.length > 5 ? 4 : fila.length
 
   return (
-    <LienzoTv fondo="#F7F7FA">
-    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F7F7FA', color: '#111827', fontFamily: GEIST }}>
-      <Fondo />
-      <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', padding: '56px 56px 0' }}>
+    <LienzoTv>
+      <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: COLOR.fondo, color: COLOR.texto, fontFamily: GEIST }}>
+        <style>{KEYFRAMES}</style>
+        <FondoManchas acento={COLOR.trabajo} />
         {!connected && (
-          <div style={{ position: 'absolute', top: 16, right: 56, color: '#f59e0b', fontSize: 18, fontWeight: 600 }}>Reconectando…</div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 20, borderBottom: '2px solid #e5e7eb' }}>
-          <span style={{ fontSize: 56, fontWeight: 700, letterSpacing: 1, color: ROTULO }}>LISTA DE ESPERA</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-            <span style={{ fontSize: 32, fontWeight: 500, color: '#4b5563' }}>{(sede?.name || '').toUpperCase()}</span>
-            <Reloj />
+          <div style={{ position: 'absolute', top: 16, right: 56, zIndex: 50, ...superficie(RADIO.pildora, { background: COLOR.vidrio }), padding: '8px 20px', fontSize: 26, color: COLOR.texto66 }}>
+            Reconectando…
           </div>
-        </div>
-        <div style={{ marginTop: 22 }}>
-          <span style={{ fontSize: 34, color: '#4b5563' }}>
-            Una sola lista para toda la sede — el sistema te asigna a la línea que se libere primero.
-          </span>
-        </div>
-        <div style={{ flex: 1, minHeight: 0, padding: '36px 0 246px' }}>
-          <div style={{ display: 'flex', gap: 36, height: '100%' }}>
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
+        )}
+        <div style={{ position: 'relative', height: '100%', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 640px', gap: 48, padding: 56, boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36, minHeight: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+              <TFMarca width={96} />
+              <span style={{ fontSize: 72, fontWeight: 900, letterSpacing: -2 }}>Lista de espera</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
               {fila.length === 0 ? (
-                <span style={{ margin: 'auto', color: '#9ca3af', fontSize: 36 }}>No hay nadie esperando.</span>
+                <span style={{ marginTop: 40, color: COLOR.texto45, fontSize: 36 }}>No hay nadie esperando.</span>
               ) : (
-                fila.slice(0, 6).map((entry, i) => (
-                  <FilaEspera key={entry.id} entry={entry} i={i} nombreLinea={nombreDeLinea(entry.line_number)} />
+                fila.slice(0, visibles).map((entry, i) => (
+                  <FilaEspera key={entry.id} entry={entry} i={i} nombreLinea={nombreDeLinea(entry.line_number)} espera={porPersona[i]} />
                 ))
               )}
-              {fila.length > 6 && (
-                <span style={{ fontSize: 30, color: '#6b7280', paddingLeft: 36 }}>y {fila.length - 6} personas más</span>
+              {fila.length > visibles && <span style={{ fontSize: 30, color: COLOR.texto66, paddingLeft: 28 }}>y {fila.length - visibles} personas más</span>}
+            </div>
+
+            <div style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 24, padding: '24px 32px', flexShrink: 0 }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="6" y="2" width="12" height="20" rx="2" />
+                <path d="M2 8a6 6 0 0 1 0 8" />
+                <path d="M22 8a6 6 0 0 1 0 8" />
+              </svg>
+              <span style={{ fontSize: 36, fontWeight: 700 }}>Anotate: apoyá el teléfono en el sticker de la entrada</span>
+            </div>
+          </div>
+
+          <div style={{ ...superficie(RADIO.panel), display: 'flex', flexDirection: 'column', gap: 32, padding: 40 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={etiqueta(COLOR.texto66, 24, 6)}>Espera estimada</span>
+              {nuevo == null ? null : nuevo <= 0 ? (
+                <span style={{ fontFamily: MONO, fontSize: 120, fontWeight: 600, lineHeight: 1, letterSpacing: -6 }}>Ahora</span>
+              ) : (
+                <span style={{ fontFamily: MONO, fontSize: 180, fontWeight: 600, lineHeight: 0.9, letterSpacing: -9 }}>
+                  {Math.max(1, Math.round(nuevo / 60))}
+                  <span style={{ fontSize: 64, letterSpacing: 0, color: COLOR.texto66 }}> min</span>
+                </span>
               )}
             </div>
-            <div style={{ width: 560, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {lineas.map((linea) => (
-                <TarjetaLinea key={linea.id} linea={linea} />
-              ))}
+            {lineas.map((linea) => <PanelLinea key={linea.id} linea={linea} />)}
+            <div
+              style={{
+                marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: 26, color: COLOR.texto66,
+                borderTop: BORDE, paddingTop: 20,
+              }}
+            >
+              <span style={{ fontWeight: 700, letterSpacing: 4 }}>{(sede?.name || '').toUpperCase()}</span>
+              <Reloj />
             </div>
           </div>
         </div>
       </div>
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 210, overflow: 'hidden', background: '#111111' }}>
-        <svg width="100%" height="210" viewBox="0 0 1920 210" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
-          <defs>
-            <filter id="tvsfg" x="-300" y="-300" width="2520" height="810" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-              <feGaussianBlur stdDeviation="90" />
-            </filter>
-            <linearGradient id="tvsfgg" x1="0" y1="0" x2="1920" y2="0" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stopColor="#111111" />
-              <stop offset="0.470588" stopColor="#111111" />
-              <stop offset="0.929412" stopColor={NARANJA} />
-            </linearGradient>
-          </defs>
-          <g filter="url(#tvsfg)">
-            <ellipse cx="1520" cy="170" rx="720" ry="210" fill="url(#tvsfgg)" />
-          </g>
-        </svg>
-        <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 56px', gap: 40 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-            <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: 3, color: 'rgba(255,255,255,0.7)' }}>ESPERA APROXIMADA</span>
-            <span style={{ fontSize: 52, fontWeight: 600, color: '#ffffff', lineHeight: 1.1 }}>
-              {minutosEstacion ? `Cada estación dura ${minutosEstacion} min` : 'Cada estación explica y después corre'}
-            </span>
-          </div>
-          {minutosEstacion && (
-            <div style={{ display: 'flex', alignItems: 'flex-end', flexShrink: 0 }}>
-              <span style={{ fontFamily: MONO, fontSize: 130, color: '#ffffff', lineHeight: 1 }}>{minutosEstacion}</span>
-              <span style={{ fontFamily: MONO, fontSize: 64, color: '#ffffff', opacity: 0.6, paddingBottom: 14 }}>/min</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
     </LienzoTv>
   )
 }

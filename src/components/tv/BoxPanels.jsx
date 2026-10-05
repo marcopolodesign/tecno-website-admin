@@ -9,6 +9,7 @@ import { formatMMSS } from '../../lib/tvClock'
 import { serverNow } from '../../lib/serverClock'
 import { exerciseMedia } from '../../lib/exerciseMedia'
 import VideoEjercicio from '../VideoEjercicio'
+import { BORDE_PX, COLOR, RADIO } from './tokens'
 
 // El reloj de formato (AMRAP/EMOM/Tabata/...), a partir de CUÁNDO ARRANCÓ LA ESTACIÓN — no de
 // cuándo entró al box. Con explicación, esos dos instantes ya no son el mismo: entró, miró un
@@ -47,7 +48,7 @@ export function useFaseEstacion(estacionInicioIso, formato) {
 export function RelojFormato({ fase, formato }) {
   if (!fase) return null
   const trabajando = fase.fase === 'trabajo'
-  const color = fase.terminado ? 'rgba(255,255,255,0.45)' : trabajando ? '#4ADE80' : '#FBBF24'
+  const color = fase.terminado ? COLOR.texto45 : trabajando ? COLOR.trabajo : COLOR.descanso
   return (
     <div style={{ ...panelStyles.formato, borderColor: color }}>
       <span style={{ ...panelStyles.formatoFase, color }}>
@@ -132,7 +133,7 @@ export function ExercisePanel({ exercise, exercises, estacionInicioIso }) {
         ) : media.kind === 'image' ? (
           <img src={media.src} alt={actual?.name} style={panelStyles.mediaEl} />
         ) : (
-          <div style={{ ...panelStyles.mediaEl, background: 'rgba(255,255,255,0.06)' }} />
+          <div style={{ ...panelStyles.mediaEl, background: COLOR.superficie }} />
         )}
       </div>
       <span style={panelStyles.exerciseName}>{actual?.name ?? 'Ejercicio'}</span>
@@ -219,16 +220,16 @@ export const panelStyles = {
   media: {
     width: '100%',
     aspectRatio: '16 / 10',
-    borderRadius: 12,
+    borderRadius: RADIO.mini,
     overflow: 'hidden',
-    background: '#000',
+    background: COLOR.fondo,
   },
   mediaEl: { width: '100%', height: '100%', objectFit: 'cover', border: 0 },
-  exerciseName: { color: 'white', fontSize: 15, fontWeight: 700, textAlign: 'center' },
+  exerciseName: { color: COLOR.texto, fontSize: 15, fontWeight: 700, textAlign: 'center' },
   exerciseMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' },
   formato: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
-    border: '2px solid', borderRadius: 14, padding: '6px 14px', minWidth: 110,
+    border: `${BORDE_PX}px solid`, borderRadius: RADIO.mini, padding: '6px 14px', minWidth: 110,
   },
   formatoFase: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5 },
   formatoSeg: { fontSize: 40, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1 },
@@ -236,28 +237,27 @@ export const panelStyles = {
   minuto: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%' },
   minutoFila: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-    padding: '10px 8px', borderRadius: 10,
-    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+    padding: '10px 8px', borderRadius: RADIO.mini,
+    background: COLOR.superficie, border: `${BORDE_PX}px solid ${COLOR.borde}`,
   },
-  minutoFilaPrescripcion: { color: '#F45F37', fontSize: 20, fontWeight: 800, fontFamily: 'monospace' },
-  minutoFilaNombre: { color: 'white', fontSize: 14, fontWeight: 700, textAlign: 'center' },
-  // Explicación — mismo lenguaje visual que el box en marcha, en tono ámbar para que se
-  // distinga de un vistazo del naranja de "estación corriendo".
-  explicacionLabel: { color: '#FBBF24', fontSize: 12, fontWeight: 800, letterSpacing: 2 },
-  explicacionTitulo: { color: 'white', fontSize: 16, fontWeight: 700, textAlign: 'center' },
+  minutoFilaPrescripcion: { color: COLOR.trabajo, fontSize: 20, fontWeight: 800, fontFamily: 'monospace' },
+  minutoFilaNombre: { color: COLOR.texto, fontSize: 14, fontWeight: 700, textAlign: 'center' },
+  // Explicación — mismo lenguaje visual que el box en marcha (acento sólo en texto y bordes).
+  explicacionLabel: { color: COLOR.trabajo, fontSize: 12, fontWeight: 800, letterSpacing: 2 },
+  explicacionTitulo: { color: COLOR.texto, fontSize: 16, fontWeight: 700, textAlign: 'center' },
   explicacionTexto: { color: 'rgba(255,255,255,0.6)', fontSize: 11.5, textAlign: 'center', lineHeight: 1.35 },
   explicacionCountdown: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
-    border: '2px solid #FBBF24', borderRadius: 14, padding: '6px 14px', minWidth: 110,
+    border: `${BORDE_PX}px solid ${COLOR.trabajo}`, borderRadius: RADIO.mini, padding: '6px 14px', minWidth: 110,
   },
-  explicacionCountdownLabel: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: '#FBBF24' },
-  explicacionCountdownValor: { fontSize: 32, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1, color: '#FBBF24' },
+  explicacionCountdownLabel: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: COLOR.trabajo },
+  explicacionCountdownValor: { fontSize: 32, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1, color: COLOR.trabajo },
   // Transición — mismo bloque que la explicación, en naranja de marca.
-  transicionLabel: { color: '#F45F37', fontSize: 12, fontWeight: 800, letterSpacing: 2 },
+  transicionLabel: { color: COLOR.trabajo, fontSize: 12, fontWeight: 800, letterSpacing: 2 },
   transicionCountdown: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
-    border: '2px solid #F45F37', borderRadius: 14, padding: '6px 14px', minWidth: 110,
+    border: `${BORDE_PX}px solid ${COLOR.trabajo}`, borderRadius: RADIO.mini, padding: '6px 14px', minWidth: 110,
   },
-  transicionCountdownLabel: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: '#F45F37' },
-  transicionCountdownValor: { fontSize: 32, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1, color: '#F45F37' },
+  transicionCountdownLabel: { fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: COLOR.trabajo },
+  transicionCountdownValor: { fontSize: 32, fontWeight: 800, fontFamily: 'monospace', lineHeight: 1, color: COLOR.trabajo },
 }

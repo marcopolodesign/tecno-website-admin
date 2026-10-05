@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { exerciseMedia } from '../../lib/exerciseMedia'
 import VideoEjercicio from '../VideoEjercicio'
+import { COLOR, RADIO } from './tokens'
 
 const FADE_MS = 450
 const ESPERA_MAX_MS = 2500 // si un video no carga, se muestra igual pasado este tiempo
@@ -80,7 +81,7 @@ export default function VideoCruzado({ fila, proximas = [], style }) {
         : { position: 'absolute', inset: 0, opacity: 0, zIndex: 1 }
 
   return (
-    <div ref={contenedor} style={{ position: 'relative', width: '100%', height: '100%', background: '#0b0b0b', overflow: 'hidden', ...style }}>
+    <div ref={contenedor} style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
       {pozo.map((f) => {
         const clave = claveEjercicio(f)
         const media = exerciseMedia(f, 'tv')
@@ -103,8 +104,8 @@ export default function VideoCruzado({ fila, proximas = [], style }) {
         // sin video propio: placeholder, listo de inmediato
         return (
           <div key={clave} style={{ ...capa(clave), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 120, height: 120, borderRadius: 60, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="52" height="52" viewBox="0 0 24 24" fill="#ffffff"><path d="M8 5.5 19 12 8 18.5z" /></svg>
+            <div style={{ width: 120, height: 120, borderRadius: RADIO.pildora, background: COLOR.superficie, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="52" height="52" viewBox="0 0 24 24" fill={COLOR.texto}><path d="M8 5.5 19 12 8 18.5z" /></svg>
             </div>
           </div>
         )

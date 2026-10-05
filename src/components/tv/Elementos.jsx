@@ -1,3 +1,4 @@
+import { COLOR, RADIO, etiqueta, superficie } from './tokens'
 // Materiales (elementos) de una estación como chips ícono + nombre, para el "hola" y la
 // explicación de la TV: que el socio junte lo que va a usar antes de que arranque el reloj.
 // Los nombres vienen de `elementos.nombre` (catálogo del admin, pestaña Equipamiento).
@@ -73,29 +74,31 @@ export function IconoElemento({ nombre, size = 36 }) {
   )
 }
 
-export function ChipsElementos({ elementos = [], titulo = 'Vas a necesitar', size = 'grande', color = '#ffffff' }) {
+export function ChipsElementos({ elementos = [], titulo = 'Vas a necesitar', size = 'grande', color = COLOR.texto }) {
   if (!elementos.length) return null
   const g = size === 'grande'
   return (
     <div data-testid="chips-elementos" style={{ display: 'flex', flexDirection: 'column', alignItems: g ? 'center' : 'flex-start', gap: g ? 18 : 12 }}>
-      {titulo && (
-        <span style={{ fontSize: g ? 28 : 22, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>{titulo}</span>
-      )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: g ? 'center' : 'flex-start', gap: g ? 18 : 14 }}>
-        {elementos.map((nombre) => (
-          <span
-            key={nombre}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: g ? 14 : 10, padding: g ? '14px 28px 14px 20px' : '10px 22px 10px 16px',
-              borderRadius: 60, background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.22)', color,
-              fontSize: g ? 38 : 28, fontWeight: 600, lineHeight: 1,
-            }}
-          >
-            <IconoElemento nombre={nombre} size={g ? 44 : 32} />
-            {infoElemento(nombre).label}
-          </span>
-        ))}
+      {titulo && <span style={etiqueta(COLOR.texto66, g ? 28 : 24, 6)}>{titulo}</span>}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: g ? 'center' : 'flex-start', gap: g ? 18 : 12 }}>
+        {elementos.map((nombre) => <ChipElemento key={nombre} nombre={nombre} size={size} color={color} />)}
       </div>
     </div>
+  )
+}
+
+// Un material: píldora de vidrio con ícono + nombre.
+export function ChipElemento({ nombre, size = 'chico', color = COLOR.texto }) {
+  const g = size === 'grande'
+  return (
+    <span
+      style={{
+        ...superficie(RADIO.pildora), display: 'inline-flex', alignItems: 'center', gap: g ? 14 : 12,
+        padding: g ? '14px 28px' : '10px 24px', color, fontSize: g ? 38 : 28, fontWeight: 600, lineHeight: 1,
+      }}
+    >
+      <IconoElemento nombre={nombre} size={g ? 44 : 28} />
+      {infoElemento(nombre).label}
+    </span>
   )
 }
