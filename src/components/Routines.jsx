@@ -17,6 +17,7 @@ import {
   ArrowPathIcon,
   Bars2Icon,
   DevicePhoneMobileIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 import * as Sentry from '@sentry/react'
 import routinesService from '../services/routinesService'
@@ -218,11 +219,16 @@ export default function Routines() {
   })
   const [arquetipos, setArquetipos] = useState([])
 
+  // Las 4 categorías ya existen en el catálogo (exercises.segmento) — mismas opciones que usa
+  // la migración 20261007160000_foco_del_dia.sql para el CHECK de routine_sessions.foco.
+  const FOCOS_DEL_DIA = ['Tren inferior', 'Tren superior', 'Core', 'Full body']
+
   const [sessionForm, setSessionForm] = useState({
     routineId: null,
     sessionNumber: 1,
     title: '',
-    description: ''
+    description: '',
+    foco: ''
   })
 
   const [exerciseForm, setExerciseForm] = useState({
@@ -514,7 +520,8 @@ export default function Routines() {
         routineId: routineId,
         sessionNumber: session.sessionNumber,
         title: session.title || '',
-        description: session.description || ''
+        description: session.description || '',
+        foco: session.foco || ''
       })
     } else {
       setEditingItem(null)
@@ -522,7 +529,8 @@ export default function Routines() {
         routineId: routineId,
         sessionNumber: currentSessions + 1,
         title: `Sesión ${currentSessions + 1}`,
-        description: ''
+        description: '',
+        foco: ''
       })
     }
     setShowSessionModal(true)
@@ -532,11 +540,14 @@ export default function Routines() {
     e.preventDefault()
     try {
       setSaving(true)
+      // '' → null: el CHECK de routine_sessions.foco sólo acepta NULL o una de las 4 categorías,
+      // no string vacío (eso es justamente "sin foco, opcional").
+      const payload = { ...sessionForm, foco: sessionForm.foco || null }
       if (editingItem) {
-        await routinesService.updateSession(editingItem.id, sessionForm)
+        await routinesService.updateSession(editingItem.id, payload)
         toast.success('Sesión actualizada', toastOptions)
       } else {
-        await routinesService.createSession(sessionForm)
+        await routinesService.createSession(payload)
         toast.success('Sesión creada', toastOptions)
       }
       setShowSessionModal(false)
@@ -1249,7 +1260,17 @@ export default function Routines() {
                               <span className="text-brand font-bold text-sm">{session.sessionNumber}</span>
                             </div>
                             <div>
-                              <p className="font-medium text-text-primary text-sm">{session.title}</p>
+                              <p className="font-medium text-text-primary text-sm flex items-center gap-2">
+                                {session.title}
+                                {session.foco && (
+                                  <span
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand"
+                                    title="Foco del día — cada estación elige de este grupo"
+                                  >
+                                    {session.foco}
+                                  </span>
+                                )}
+                              </p>
                               {/* Qué estaciones están completas y con qué modalidad, en vez de
                                   "N ejercicios" — eso no decía si la sesión estaba armada. */}
                               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -1400,6 +1421,19 @@ export default function Routines() {
                                             {se.setsReps}
                                             {se.weightKg && ` • ${se.weightKg}kg`}
                                           </p>
+                                          {/* Aviso suave: notes trae tanto "sin peso de
+                                              referencia" como, cuando el día tiene foco y esta
+                                              estación no tuvo ningún candidato de ese grupo, el
+                                              motor avisa que usó la regla general en su lugar. */}
+                                          {se.notes && (
+                                            <p
+                                              className="mt-0.5 flex items-start gap-1 text-amber-600"
+                                              title={se.notes}
+                                            >
+                                              <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0 mt-px" />
+                                              <span className="line-clamp-2">{se.notes}</span>
+                                            </p>
+                                          )}
                                         </div>
                                       ))}
 
@@ -1760,6 +1794,25 @@ export default function Routines() {
                     rows={2}
                     placeholder="Notas para esta sesión..."
                   />
+                </div>
+
+                <div>
+                  <label className="form-label">Foco del día (opcional)</label>
+                  <select
+                    value={sessionForm.foco}
+                    onChange={(e) => setSessionForm({ ...sessionForm, foco: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">Sin foco — como hoy, mezcla libre</option>
+                    {FOCOS_DEL_DIA.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-text-tertiary">
+                    Con foco, cada estación de este día elige ejercicios de ese grupo. Si alguna
+                    estación no tiene ninguno disponible, usa la regla general y queda marcada en
+                    esa estación.
+                  </p>
                 </div>
         </form>
       </Sidecart>
