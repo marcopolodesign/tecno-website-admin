@@ -399,17 +399,34 @@ function VistaPreparate({ segundos, pos, line, acento }) {
   )
 }
 
+// "Cómo se juega" de la explicación: qué es la modalidad y la regla de ESTA estación. En la estación
+// corriendo ya no se muestra (Mateo, 2026-10-07): ahí manda el reloj.
+function comoSeJuega(primero, exercises) {
+  const formato = primero?.formato
+  const n = exercises.length
+  const base = explicacionDeFormato(formato, {
+    rondas: primero?.rondas,
+    trabajoSeg: primero?.trabajo_seg,
+    descansoSeg: primero?.descanso_seg,
+    ejerciciosPorMinuto: primero?.ejercicios_por_minuto,
+  }).texto
+  if (formato === 'AMRAP') {
+    return `${base} ${n > 1 ? `Hacé los ${n} ejercicios en orden y volvé a empezar.` : 'Repetí el ejercicio todas las veces que puedas.'}`
+  }
+  if (formato === 'Tabata' && n > 1) return `${base} Cada ronda tiene su ejercicio: en cada tarjeta dice en qué rondas te toca.`
+  if (formato === 'Series' || !formato) {
+    const s = n === 1 ? seriesDe(primero) : null
+    return s ? `${s.series} series de ${s.reps}. Descansá entre series lo que necesites, sin pasarte del tiempo de la estación.` : base
+  }
+  return base
+}
+
 // Explicación (Explicacion.dc): HOLA + modalidad + "ARRANCÁS EN", los ejercicios en tarjetas
 // grandes con su número y a qué rondas/minutos les toca, y los materiales abajo.
 function VistaExplicacion({ box, estado, pos, line, acento }) {
   const exercises = ejerciciosDe(box)
   const primero = box.ejercicio || exercises[0]
-  const { texto } = explicacionDeFormato(primero?.formato, {
-    rondas: primero?.rondas,
-    trabajoSeg: primero?.trabajo_seg,
-    descansoSeg: primero?.descanso_seg,
-    ejerciciosPorMinuto: primero?.ejercicios_por_minuto,
-  })
+  const texto = comoSeJuega(primero, exercises)
   const ctx = { formato: primero?.formato, ejercicios: exercises, rondas: primero?.rondas, porMinuto: primero?.ejercicios_por_minuto || 1 }
   const cols = exercises.length <= 3 ? Math.max(1, exercises.length) : exercises.length === 4 ? 2 : 3
   const chico = cols >= 3
@@ -420,7 +437,6 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
         numero={pos}
         eyebrow={`Hola, ${nombreDeSaludo(box)}`}
         titulo={tituloModalidad(primero)}
-        linea3={texto}
         derecha={
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
             <span style={etiqueta(COLOR.texto66, 24, 6)}>Arrancás en</span>
@@ -457,12 +473,17 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
           )
         })}
       </div>
-      {elementos.length > 0 && (
-        <div data-testid="franja-materiales" style={{ display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0, flexWrap: 'wrap' }}>
-          <span style={etiqueta(COLOR.texto66, 24, 6)}>Juntá</span>
-          {elementos.map((nombre) => <ChipElemento key={nombre} nombre={nombre} />)}
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 24, alignItems: 'stretch', flexShrink: 0 }}>
+        <TarjetaComoSeJuega texto={texto} estilo={{ flex: 1, marginTop: 0 }} />
+        {elementos.length > 0 && (
+          <div data-testid="franja-materiales" style={{ ...superficie(RADIO.tarjeta), display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 16, padding: 28, flexShrink: 0, maxWidth: 760 }}>
+            <span style={etiqueta(COLOR.texto45, 22, 5)}>Juntá</span>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {elementos.map((nombre) => <ChipElemento key={nombre} nombre={nombre} />)}
+            </div>
+          </div>
+        )}
+      </div>
     </Marco>
   )
 }
@@ -558,13 +579,6 @@ function VistaEstacion({ box, fase, pos, line }) {
     valorReloj = mmss(f.restanteSeg)
     medio = <GrillaCards filas={exercises} acento={acento} />
     debajoDelReloj = <span style={{ fontSize: 30, color: COLOR.texto66 }}>{`de ${mmss(formato.trabajoSeg)}`}</span>
-    const texto =
-      tipo === 'AMRAP'
-        ? exercises.length > 1
-          ? `Hacé las ${exercises.length} en orden y volvé a empezar. Todas las vueltas que entren.`
-          : 'Repetí el ejercicio y volvé a empezar. Todas las vueltas que entren.'
-        : explicacionDeFormato(tipo, { trabajoSeg: formato.trabajoSeg }).texto
-    tarjeta = <TarjetaComoSeJuega texto={texto} />
     progreso = f.transcurridoSeg / (duracionSeg(formato) || 1)
   } else {
     // Series: a tu ritmo; el reloj es lo que queda de la estación
@@ -586,11 +600,6 @@ function VistaEstacion({ box, fase, pos, line }) {
         <div style={{ ...superficie(RADIO.panel), display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLOR.texto66, fontSize: 28 }}>Entrenando</div>
       )
     debajoDelReloj = <span style={{ fontSize: 30, color: COLOR.texto66 }}>quedan en la estación</span>
-    tarjeta = (
-      <TarjetaComoSeJuega
-        texto={s ? `${s.series} series de ${s.reps}. Descansá entre series lo que necesites, sin pasarte del tiempo.` : explicacionDeFormato('Series').texto}
-      />
-    )
     const S = estacionSegDeLinea(line) || 1
     progreso = restanteEstacion == null ? 0 : 1 - restanteEstacion / S
   }

@@ -159,9 +159,9 @@ export function TarjetaSigue({ etiquetaTexto, fila, texto }) {
 }
 
 // Tarjeta "CÓMO SE JUEGA".
-export function TarjetaComoSeJuega({ texto }) {
+export function TarjetaComoSeJuega({ texto, estilo }) {
   return (
-    <div data-testid="tv-tarjeta" style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: 28, flexShrink: 0 }}>
+    <div data-testid="tv-tarjeta" style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: 28, flexShrink: 0, ...estilo }}>
       <span style={etiqueta(COLOR.texto45, 22, 5)}>Cómo se juega</span>
       <span style={{ fontSize: 34, fontWeight: 600, lineHeight: 1.2 }}>{texto}</span>
     </div>
