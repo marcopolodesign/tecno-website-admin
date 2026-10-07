@@ -1,4 +1,5 @@
 // Piezas visuales compartidas por las TVs (estación y sede), todas hechas con tokens.js.
+import { useState } from 'react'
 import { exerciseMedia } from '../../lib/exerciseMedia'
 import { BORDE, COLOR, GEIST, KEYFRAMES, MONO, RADIO, etiqueta, superficie } from './tokens'
 
@@ -164,6 +165,28 @@ export function TarjetaComoSeJuega({ texto, estilo }) {
     <div data-testid="tv-tarjeta" style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: 28, flexShrink: 0, ...estilo }}>
       <span style={etiqueta(COLOR.texto45, 22, 5)}>Cómo se juega</span>
       <span style={{ fontSize: 34, fontWeight: 600, lineHeight: 1.2 }}>{texto}</span>
+    </div>
+  )
+}
+
+// Foto del socio en un círculo (avatar_url, URL pública del bucket 'avatars'); sin foto, o si no
+// carga, sus iniciales. Para las TVs, que son anon y reciben ambas cosas dentro del payload.
+export function Avatar({ url, iniciales, size = 64, fontSize, estilo }) {
+  const [falla, setFalla] = useState(false)
+  const base = {
+    width: size, height: size, borderRadius: RADIO.pildora, flexShrink: 0, boxSizing: 'border-box', border: BORDE,
+    overflow: 'hidden', background: COLOR.pista, display: 'flex', alignItems: 'center', justifyContent: 'center', ...estilo,
+  }
+  if (url && !falla) {
+    return (
+      <div style={base}>
+        <img src={url} alt="" onError={() => setFalla(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </div>
+    )
+  }
+  return (
+    <div style={{ ...base, fontSize: fontSize ?? Math.round(size * 0.4), fontWeight: 800, color: COLOR.texto, letterSpacing: 1 }}>
+      {iniciales || '?'}
     </div>
   )
 }

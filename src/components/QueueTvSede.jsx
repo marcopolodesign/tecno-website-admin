@@ -10,15 +10,20 @@
 // #050505 con manchas, superficies de vidrio, acento naranja sólo en texto y bordes.
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 import { queueService } from '../services/queueService'
 import { serverNow } from '../lib/serverClock'
 import { LienzoTv } from './tv/TvChrome'
 import { useCountdown, formatMMSS, duracionBoxSegDeLinea } from '../lib/tvClock'
 import { BORDE, BORDE_ACENTO_PX, COLOR, GEIST, MONO, RADIO, etiqueta, superficie } from './tv/tokens'
-import { FondoManchas, KEYFRAMES, TFMarca, nombreLineaTv } from './tv/Piezas'
+import { Avatar, FondoManchas, KEYFRAMES, TFMarca, nombreLineaTv } from './tv/Piezas'
 
 const POLL_MS = 3000
+// Link universal de la app (associatedDomains / AASA de tecno-admin.vercel.app). Sin parámetros cae en
+// runDefaultFlow de confirmar-turno.tsx: si el socio está "confirming" confirma su turno; si no,
+// lo anota en la fila (o le muestra dónde está si ya está anotado). Con ?paso=ingreso NO confirmaría.
+export const QR_URL = 'https://tecno-admin.vercel.app/confirmar-turno'
 const BOXES_POR_LINEA = 5 // tv_sede no manda cuántos boxes tiene cada línea; las de Palermo son de 5
 
 function nombreCorto(u) {
@@ -45,7 +50,7 @@ export function esperasEstimadas(fila = [], lineas = [], ahoraMs = serverNow()) 
   return { porPersona, nuevo: tomar() }
 }
 
-const minutosTexto = (seg) => `~${Math.max(1, Math.round(seg / 60))} min`
+const minutosTexto = (seg) => (seg <= 0 ? '0 min' : `~${Math.max(1, Math.round(seg / 60))} min`)
 
 function useAhora() {
   const [ahora, setAhora] = useState(() => serverNow())
@@ -62,6 +67,15 @@ function Reloj() {
     <span style={{ fontFamily: MONO, color: COLOR.texto }}>
       {new Date(ahora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })}
     </span>
+  )
+}
+
+// QR sobre una baldosa clara (módulos oscuros: es lo que leen todos los teléfonos a distancia).
+function CodigoQr({ size }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: RADIO.tarjeta, background: COLOR.texto, padding: Math.round(size * 0.06), boxSizing: 'border-box', flexShrink: 0 }}>
+      <QRCodeSVG value={QR_URL} size={Math.round(size * 0.88)} level="M" bgColor={COLOR.texto} fgColor={COLOR.fondo} marginSize={0} style={{ display: 'block' }} />
+    </div>
   )
 }
 
@@ -83,6 +97,7 @@ function FilaEspera({ entry, i, nombreLinea, espera }) {
       >
         {i + 1}
       </span>
+      <Avatar url={entry.avatar_url} iniciales={entry.iniciales} size={84} />
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span style={{ fontSize: 60, fontWeight: 800, lineHeight: 1.05 }}>{nombreCorto(entry.socio)}</span>
         {confirmando && (
@@ -100,7 +115,7 @@ function FilaEspera({ entry, i, nombreLinea, espera }) {
         </div>
       ) : (
         <span style={{ fontFamily: MONO, fontSize: 38, color: COLOR.texto66, flexShrink: 0 }}>
-          {espera == null ? '' : espera <= 0 ? 'Ahora' : minutosTexto(espera)}
+          {espera == null ? '' : minutosTexto(espera)}
         </span>
       )}
     </div>
@@ -114,21 +129,19 @@ function PanelLinea({ linea }) {
   const total = Math.max(BOXES_POR_LINEA, linea.ocupados || 0)
   // box 1 con su estado real; del resto sólo se sabe cuántos están en uso en total
   let restantesOcupados = Math.max(0, (linea.ocupados || 0) - (ocupadoBox1 ? 1 : 0))
+  const porPos = new Map((linea.boxes || []).map((b) => [b.line_position, b]))
   const slots = Array.from({ length: total }, (_, i) => {
-    if (i === 0) return ocupadoBox1 ? 'ocupado' : 'libre'
-    if (restantesOcupados > 0) {
-      restantesOcupados -= 1
-      return 'ocupado'
-    }
-    return 'vacio'
+    const quien = porPos.get(i + 1)
+    const base = i === 0 ? (ocupadoBox1 ? 'ocupado' : 'libre') : restantesOcupados > 0 ? (restantesOcupados -= 1, 'ocupado') : 'vacio'
+    return { estado: base, avatar_url: quien?.avatar_url, iniciales: quien?.iniciales }
   })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span style={{ fontSize: 40, fontWeight: 800 }}>{nombreLineaTv(linea.name)}</span>
         <span style={{ fontSize: 26, color: COLOR.texto66 }}>
-          {ocupadoBox1 ? 'libre en ' : 'libre '}
-          <span style={{ fontFamily: MONO, fontSize: 36, color: ocupadoBox1 ? COLOR.texto : COLOR.trabajo }}>{ocupadoBox1 ? restante : 'ahora'}</span>
+          {'libre en '}
+          <span style={{ fontFamily: MONO, fontSize: 36, color: ocupadoBox1 ? COLOR.texto : COLOR.trabajo }}>{ocupadoBox1 ? restante : '0:00'}</span>
         </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))`, gap: 10 }}>
@@ -136,10 +149,12 @@ function PanelLinea({ linea }) {
           <div
             key={i}
             style={{
-              height: 56, borderRadius: RADIO.mini, boxSizing: 'border-box',
-              ...(e === 'ocupado' ? { background: 'rgba(245,245,244,0.8)' } : e === 'libre' ? { border: `2px dashed ${COLOR.trabajo}` } : { border: BORDE }),
+              height: 68, borderRadius: RADIO.mini, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              ...(e.estado === 'ocupado' ? { background: COLOR.superficie, border: BORDE } : e.estado === 'libre' ? { border: `2px dashed ${COLOR.trabajo}` } : { border: BORDE }),
             }}
-          />
+          >
+            {e.estado === 'ocupado' && <Avatar url={e.avatar_url} iniciales={e.iniciales} size={50} />}
+          </div>
         ))}
       </div>
     </div>
@@ -202,16 +217,25 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
             Reconectando…
           </div>
         )}
-        <div style={{ position: 'relative', height: '100%', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 640px', gap: 48, padding: 56, boxSizing: 'border-box' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 36, minHeight: 0 }}>
+        <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', gap: 36, padding: 56, boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
               <TFMarca width={96} />
-              <span style={{ fontSize: 72, fontWeight: 900, letterSpacing: -2 }}>Lista de espera</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 72, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>Lista de espera</span>
+                {sede?.name && <span style={{ fontSize: 34, fontWeight: 600, color: COLOR.texto66 }}>{sede.name}</span>}
+              </div>
             </div>
+            <span style={{ fontSize: 64, fontWeight: 500 }}><Reloj /></span>
+          </div>
 
+          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 640px', gap: 48 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
               {fila.length === 0 ? (
-                <span style={{ marginTop: 40, color: COLOR.texto45, fontSize: 36 }}>No hay nadie esperando.</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
+                  <CodigoQr size={520} />
+                  <span style={{ fontSize: 60, fontWeight: 800 }}>Escaneá para anotarte</span>
+                </div>
               ) : (
                 fila.slice(0, visibles).map((entry, i) => (
                   <FilaEspera key={entry.id} entry={entry} i={i} nombreLinea={nombreDeLinea(entry.line_number)} espera={porPersona[i]} />
@@ -220,37 +244,23 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
               {fila.length > visibles && <span style={{ fontSize: 30, color: COLOR.texto66, paddingLeft: 28 }}>y {fila.length - visibles} personas más</span>}
             </div>
 
-            <div style={{ ...superficie(RADIO.tarjeta), marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 24, padding: '24px 32px', flexShrink: 0 }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="6" y="2" width="12" height="20" rx="2" />
-                <path d="M2 8a6 6 0 0 1 0 8" />
-                <path d="M22 8a6 6 0 0 1 0 8" />
-              </svg>
-              <span style={{ fontSize: 36, fontWeight: 700 }}>Anotate: apoyá el teléfono en el sticker de la entrada</span>
-            </div>
-          </div>
-
-          <div style={{ ...superficie(RADIO.panel), display: 'flex', flexDirection: 'column', gap: 32, padding: 40 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={etiqueta(COLOR.texto66, 24, 6)}>Espera estimada</span>
-              {nuevo == null ? null : nuevo <= 0 ? (
-                <span style={{ fontFamily: MONO, fontSize: 120, fontWeight: 600, lineHeight: 1, letterSpacing: -6 }}>Ahora</span>
-              ) : (
-                <span style={{ fontFamily: MONO, fontSize: 180, fontWeight: 600, lineHeight: 0.9, letterSpacing: -9 }}>
-                  {Math.max(1, Math.round(nuevo / 60))}
-                  <span style={{ fontSize: 64, letterSpacing: 0, color: COLOR.texto66 }}> min</span>
-                </span>
+            <div style={{ ...superficie(RADIO.panel), display: 'flex', flexDirection: 'column', gap: 20, padding: 36, minHeight: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={etiqueta(COLOR.texto66, 24, 6)}>Espera estimada</span>
+                {nuevo == null ? null : (
+                  <span style={{ fontFamily: MONO, fontSize: 124, fontWeight: 600, lineHeight: 0.95, letterSpacing: -6 }}>
+                    {Math.max(0, Math.round(nuevo / 60))}
+                    <span style={{ fontSize: 48, letterSpacing: 0, color: COLOR.texto66 }}> min</span>
+                  </span>
+                )}
+              </div>
+              {lineas.map((linea) => <PanelLinea key={linea.id} linea={linea} />)}
+              {fila.length > 0 && (
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 28, borderTop: BORDE, paddingTop: 20 }}>
+                  <CodigoQr size={184} />
+                  <span style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.15 }}>Escaneá para anotarte o confirmar tu turno</span>
+                </div>
               )}
-            </div>
-            {lineas.map((linea) => <PanelLinea key={linea.id} linea={linea} />)}
-            <div
-              style={{
-                marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: 26, color: COLOR.texto66,
-                borderTop: BORDE, paddingTop: 20,
-              }}
-            >
-              <span style={{ fontWeight: 700, letterSpacing: 4 }}>{(sede?.name || '').toUpperCase()}</span>
-              <Reloj />
             </div>
           </div>
         </div>
