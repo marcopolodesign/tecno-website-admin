@@ -53,6 +53,7 @@ export const routinesService = {
             id,
             session_number,
             title,
+            foco,
             status,
             completed_at
           )
@@ -98,6 +99,7 @@ export const routinesService = {
             session_number,
             title,
             description,
+            foco,
             status,
             completed_at,
             session_exercises (
@@ -279,6 +281,7 @@ export const routinesService = {
           session_number,
           title,
           description,
+          foco,
           status,
           completed_at,
           session_exercises (
@@ -374,6 +377,7 @@ export const routinesService = {
         session_number: sessionData.sessionNumber,
         title: sessionData.title || `Sesión ${sessionData.sessionNumber}`,
         description: sessionData.description || null,
+        foco: sessionData.foco || null,
         status: sessionData.sessionNumber === 1 ? 'available' : 'locked'
       }
 
