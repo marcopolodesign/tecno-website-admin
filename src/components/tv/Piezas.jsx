@@ -72,10 +72,11 @@ export function NumeroEstacion({ n, size = 112, fontSize = 80, letterSpacing = -
 }
 
 // Encabezado de las pantallas con estación: número + dos o tres líneas + algo a la derecha.
-export function Encabezado({ numero, eyebrow, titulo, subtitulo, linea3, derecha, eyebrowColor = COLOR.texto }) {
+export function Encabezado({ numero, eyebrow, titulo, subtitulo, linea3, derecha, eyebrowColor = COLOR.texto, persona }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
       <NumeroEstacion n={numero} />
+      {persona && <Avatar url={persona.avatar_url} iniciales={persona.iniciales} size={112} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
         <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: 6, textTransform: 'uppercase', color: eyebrowColor }}>{eyebrow}</span>
         {titulo && <span style={{ fontSize: 44, fontWeight: 800, letterSpacing: -1, lineHeight: 1.15 }}>{titulo}</span>}

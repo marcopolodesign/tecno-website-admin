@@ -33,7 +33,7 @@ import logoLottie from '../assets/tf-logo.lottie.json'
 import VideoCruzado, { PrecargaVideos } from './tv/VideoCruzado'
 import { BORDE_ACENTO_PX, BORDE, COLOR, GEIST, MONO, RADIO, acentoDe, etiqueta, superficie, velo } from './tv/tokens'
 import {
-  Anima, BarraProgreso, BarrasRondas, Cronometro, Encabezado, FondoManchas, KEYFRAMES, NumeroEstacion, Pildora, TarjetaComoSeJuega, TarjetaSigue, TFMarca, nombreLineaTv,
+  Anima, Avatar, BarraProgreso, BarrasRondas, Cronometro, Encabezado, FondoManchas, KEYFRAMES, NumeroEstacion, Pildora, TarjetaComoSeJuega, TarjetaSigue, TFMarca, nombreLineaTv,
 } from './tv/Piezas'
 
 // ── Reloj de formato (AMRAP/EMOM/Tabata) ─────────────────────────────────────────────────
@@ -75,7 +75,7 @@ function useEstadoEstacion(args) {
   }
   // Firma de lo que se ve: sin cambios de firma no hay re-render (y no hay parpadeo cuando el
   // servidor confirma lo que la TV ya había predicho).
-  const firma = (r) => JSON.stringify([r.estado, r.boxes.map((b) => [b.line_position, b.status, b.socio, b.entered_at, b.advances_at])])
+  const firma = (r) => JSON.stringify([r.estado, r.boxes.map((b) => [b.line_position, b.status, b.socio, b.avatar_url, b.entered_at, b.advances_at])])
   const [res, setRes] = useState(calcular)
   useEffect(() => {
     const tick = () =>
@@ -356,7 +356,10 @@ function VistaLlegando({ estado, box, pos, line, acento }) {
     <>
       <CabeceraBasica pos={pos} line={line} />
       <div style={{ position: 'absolute', left: 0, right: 0, top: 340, bottom: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, textAlign: 'center' }}>
-        <span style={{ fontSize: 170, fontWeight: 800, letterSpacing: -5, lineHeight: 1.05 }}>Hola {estado.nombre}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 40 }}>
+          <Avatar url={estado.avatar_url} iniciales={estado.iniciales} size={180} fontSize={72} />
+          <span style={{ fontSize: 170, fontWeight: 800, letterSpacing: -5, lineHeight: 1.05 }}>Hola {estado.nombre}</span>
+        </div>
         <span style={{ fontSize: 48, color: COLOR.texto66 }}>{hayEjercicios ? 'Te presentamos tus ejercicios' : 'Tu estación arranca en breve'}</span>
         {elementos.length > 0 && (
           <div style={{ marginTop: 14 }}>
@@ -436,6 +439,7 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
       <Encabezado
         numero={pos}
         eyebrow={`Hola, ${nombreDeSaludo(box)}`}
+        persona={box}
         titulo={tituloModalidad(primero)}
         derecha={
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
@@ -610,6 +614,7 @@ function VistaEstacion({ box, fase, pos, line }) {
         numero={pos}
         eyebrow={`ESTACIÓN ${pos}${line?.name ? ` · ${nombreLinea(line)}` : ''}`}
         subtitulo={box.socio}
+        persona={box}
         derecha={pildoraFormato(primero, exercises.length > 1) ? <Pildora mono>{pildoraFormato(primero, exercises.length > 1)}</Pildora> : null}
       />
       <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1180px minmax(0, 1fr)', gap: 48 }}>

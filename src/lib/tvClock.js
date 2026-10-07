@@ -192,7 +192,7 @@ export function predecirBoxes(boxes = [], line, nowMs = serverNow()) {
     const vence = new Date(b.advances_at).getTime()
     if (vence > nowMs) continue
     const sig = por.get(Number(b.line_position) + 1)
-    const libre = (x) => ({ ...x, status: 'free', socio: null, nombre: null, ingreso_at: null, kg: null, entered_at: null, advances_at: null, riesgo: null })
+    const libre = (x) => ({ ...x, status: 'free', socio: null, nombre: null, avatar_url: null, iniciales: null, ingreso_at: null, kg: null, entered_at: null, advances_at: null, riesgo: null })
     if (!sig) {
       por.set(Number(b.line_position), libre(b))
       liberadoEn.set(Number(b.line_position), vence)
@@ -204,6 +204,8 @@ export function predecirBoxes(boxes = [], line, nowMs = serverNow()) {
         status: 'occupied',
         socio: b.socio,
         nombre: b.nombre,
+        avatar_url: b.avatar_url,
+        iniciales: b.iniciales,
         riesgo: b.riesgo,
         entered_at: new Date(entrada).toISOString(),
         advances_at: new Date(entrada + dur * 1000).toISOString(),
@@ -228,7 +230,7 @@ export function calcularEstadoEstacion({ box: boxCrudo, boxes: boxesCrudos = [],
     const transcurrido = Math.floor((nowMs - new Date(box.entered_at).getTime()) / 1000)
     if (c.fase === 'explicacion') {
       if (transcurrido < HOLA_SEG) {
-        return { estado: 'llegando', nombre: nombreDeSaludo(box), sticker: false, restanteHolaSeg: HOLA_SEG - transcurrido }
+        return { estado: 'llegando', nombre: nombreDeSaludo(box), avatar_url: box.avatar_url, iniciales: box.iniciales, sticker: false, restanteHolaSeg: HOLA_SEG - transcurrido }
       }
       const r = c.restanteExplicacionSeg
       if (r > 0 && r <= PREPARATE_SEG) return { estado: 'preparate', restanteExplicacionSeg: r }
@@ -256,12 +258,12 @@ export function calcularEstadoEstacion({ box: boxCrudo, boxes: boxesCrudos = [],
   }
 
   if (pos === 1 && confirmando) {
-    return { estado: 'llegando', nombre: nombreDeSaludo(confirmando), sticker: true, restanteHolaSeg: null }
+    return { estado: 'llegando', nombre: nombreDeSaludo(confirmando), avatar_url: confirmando.avatar_url, iniciales: confirmando.iniciales, sticker: true, restanteHolaSeg: null }
   }
   if (pos > 1) {
     const prev = boxes.find((b) => Number(b.line_position) === pos - 1)
     if (prev?.status === 'occupied' && prev.entered_at && calcular(prev.entered_at, E, S, nowMs).fase === 'transicion') {
-      return { estado: 'llegando', nombre: nombreDeSaludo(prev), sticker: false, restanteHolaSeg: null }
+      return { estado: 'llegando', nombre: nombreDeSaludo(prev), avatar_url: prev.avatar_url, iniciales: prev.iniciales, sticker: false, restanteHolaSeg: null }
     }
   }
   return { estado: 'off' }

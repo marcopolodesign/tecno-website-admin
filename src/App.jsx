@@ -31,6 +31,7 @@ import QueueTv from './components/QueueTv'
 import QueueTvEstacion from './components/QueueTvEstacion'
 import QueueTvSede from './components/QueueTvSede'
 import TvPorSlug from './components/TvPorSlug'
+import Anotarme from './components/Anotarme'
 import TvIndex from './components/TvIndex'
 import Sidebar from './components/Sidebar'
 import ShellGlow from './components/ShellGlow'
@@ -62,6 +63,7 @@ function TvHostApp() {
     <Router>
       <Routes>
         <Route path="/" element={<TvIndex />} />
+        <Route path="/anotarme" element={<Anotarme />} />
         <Route path="/:sede" element={<TvPorSlug modo="sede" />} />
         <Route path="/:sede/:linea" element={<TvPorSlug modo="linea" />} />
         <Route path="/:sede/:linea/:estacion" element={<TvPorSlug modo="estacion" />} />
@@ -184,6 +186,7 @@ function MainApp() {
         {/* Mismas pantallas por slug, bajo /tv/... en cualquier host — para probarlas en el
             preview de Vercel, donde el hostname no empieza con "tv.". En producción esto vive
             en tv.somostecnofit.com sin el prefijo (ver TvHostApp más arriba). */}
+        <Route path="/anotarme" element={<Anotarme />} />
         <Route path="/tv" element={<TvIndex />} />
         <Route path="/tv/:sede" element={<TvPorSlug modo="sede" />} />
         <Route path="/tv/:sede/:linea" element={<TvPorSlug modo="linea" />} />
