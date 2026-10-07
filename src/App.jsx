@@ -14,6 +14,14 @@ import Exercises from './components/Exercises'
 import Routines from './components/Routines'
 import CheckIn from './components/CheckIn'
 import MemberAccess from './components/MemberAccess'
+
+// /confirmar-turno es el Universal Link de la app (AASA): con la app instalada el teléfono la abre
+// directo y esta página nunca carga. Si carga, es que no hay app: se manda a anotarse con el DNI.
+const ANOTARME_URL = 'https://tv.somostecnofit.com/anotarme'
+function ConfirmarTurnoWeb() {
+  window.location.replace(ANOTARME_URL)
+  return null
+}
 import AccessLogs from './components/AccessLogs'
 import QueueMonitor from './components/QueueMonitor'
 import QueueConfig from './components/QueueConfig'
@@ -128,6 +136,7 @@ function App() {
         <Route path="/check-in" element={<CheckIn />} />
         <Route path="/checkin" element={<CheckIn />} />
         <Route path="/acceso" element={<MemberAccess />} />
+        <Route path="/confirmar-turno" element={<ConfirmarTurnoWeb />} />
         <Route path="/lista-espera/tv/:lineaId" element={<QueueTv />} />
 
         {/* ─── All other routes — behind auth wall ─── */}
