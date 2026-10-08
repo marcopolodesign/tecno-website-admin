@@ -635,63 +635,99 @@ function VistaEstacion({ box, fase, pos, line }) {
 
 // Cambio de estación (Cambio.dc): fondo oscuro con manchas; el acento sólo en la flecha, la
 // etiqueta y el contorno del próximo box. El logo (persistente) queda arriba a la derecha.
+// Secuencia de entrada (una sola vez, al montarse; ver @keyframes ca* en tv/tokens.js). El reloj
+// "Arranca en" sigue viniendo de advances_at: la animación sólo mueve opacidad/posición del contenedor.
+// BASE_CA absorbe el fundido de entrada del estado (tvFadeIn, 0.7 s) para que no se coma el arranque.
+const BASE_CA = 0.25
+const ca = (nombre, dur, delay, easing = 'cubic-bezier(0.22,1,0.36,1)') => ({
+  animation: `${nombre} ${dur}s ${easing} ${(BASE_CA + delay).toFixed(2)}s both`,
+})
+const DIGITO = { fontSize: 440, fontWeight: 900, lineHeight: '330px', height: 330, letterSpacing: -22, display: 'block' }
+
 function VistaChau({ box, boxes, posicion, acento }) {
   const segundos = useCountdown(box.advances_at)
   const total = boxes?.length || 0
   const esUltima = posicion >= total
   // Al llegar a 0 el tick todavía puede tardar en mover al socio: no se muestra "0:00" clavado.
   const terminado = segundos != null && segundos <= 0
+  const GAP = 14
+  const ancho = `calc((100% - ${GAP * (Math.max(1, total) - 1)}px) / ${Math.max(1, total)})`
+  const titulo = { fontSize: 112, fontWeight: 900, lineHeight: 0.92, letterSpacing: -3 }
   return (
     <Marco estilo={{ padding: '64px 96px 72px', gap: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: 79 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', gap: 10, ...ca('caIn', 0.4, 0) }}>
           <span style={{ fontSize: 34, fontWeight: 800, letterSpacing: 8, textTransform: 'uppercase', color: acento }}>{`¡Bien, ${nombreDeSaludo(box)}!`}</span>
           <span style={{ fontSize: 30, color: COLOR.texto66 }}>{`Terminaste la estación ${posicion}`}</span>
         </div>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 64 }}>
         {esUltima ? (
-          <span style={{ fontSize: 112, fontWeight: 900, lineHeight: 0.92, letterSpacing: -3 }}>
-            ¡Terminaste<br />el circuito!
-          </span>
+          <>
+            <span className="ca-anim" style={{ ...titulo, ...ca('caTitle', 0.5, 0.4) }}>
+              ¡Terminaste<br />el circuito!
+            </span>
+            <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path className="ca-anim" d="M5 12.5l4.5 4.5L19 7.5" style={{ strokeDasharray: 40, ...ca('caArrow', 0.5, 0.6) }} />
+            </svg>
+          </>
         ) : (
           <>
-            <span style={{ fontSize: 112, fontWeight: 900, lineHeight: 0.92, letterSpacing: -3 }}>
+            <span className="ca-anim" style={{ ...titulo, ...ca('caTitle', 0.5, 0.4) }}>
               Pasá a la<br />estación
             </span>
             <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 12h15" />
-              <path d="M13 6l6 6-6 6" />
+              <path className="ca-anim" d="M4 12h15M13 6l6 6-6 6" style={{ strokeDasharray: 40, ...ca('caArrow', 0.5, 0.5) }} />
             </svg>
-            <span style={{ fontSize: 440, fontWeight: 900, lineHeight: 0.75, letterSpacing: -22 }}>{posicion + 1}</span>
+            {/* Ventana de un dígito: sube el actual (atenuado) y entra el siguiente desde abajo. */}
+            <div data-testid="chau-numero" style={{ height: 330, overflow: 'hidden', paddingRight: 22, marginRight: -22 }}>
+              <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', ...ca('caRoll', 0.4, 1.0, 'cubic-bezier(0.33,0,0.2,1)') }}>
+                <span style={{ ...DIGITO, color: COLOR.texto45 }}>{posicion}</span>
+                <span style={DIGITO}>{posicion + 1}</span>
+              </div>
+            </div>
           </>
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 48 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, total)}, minmax(0, 1fr))`, gap: 14, width: 900 }}>
-          {Array.from({ length: total }, (_, i) => {
-            const n = i + 1
-            const hecho = n <= posicion
-            const siguiente = !esUltima && n === posicion + 1
-            return (
-              <div
-                key={n}
-                style={{
-                  height: 96, borderRadius: RADIO.tarjeta, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, fontWeight: 800,
-                  ...(hecho
-                    ? { background: COLOR.pista, color: COLOR.texto45 }
-                    : siguiente
-                      ? { background: COLOR.superficie, border: `${BORDE_ACENTO_PX}px solid ${acento}` }
+        <div style={{ position: 'relative', width: 900 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, total)}, minmax(0, 1fr))`, gap: GAP }}>
+            {Array.from({ length: total }, (_, i) => {
+              const n = i + 1
+              const hecho = n <= posicion
+              const actual = n === posicion
+              return (
+                <div
+                  key={n}
+                  className={actual ? 'ca-anim' : undefined}
+                  style={{
+                    height: 96, borderRadius: RADIO.tarjeta, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, fontWeight: 800,
+                    ...(hecho
+                      ? { background: COLOR.pista, color: COLOR.texto45 }
                       : { border: BORDE, color: COLOR.texto66 }),
-                }}
-              >
-                {n}
-              </div>
-            )
-          })}
+                    ...(actual ? ca('caBoxOld', 0.5, 1.1, 'ease') : null),
+                  }}
+                >
+                  {n}
+                </div>
+              )
+            })}
+          </div>
+          {/* Contorno de acento: arranca sobre el box que se deja y se desliza al siguiente. */}
+          {!esUltima && total > 0 && (
+            <div
+              className="ca-anim"
+              data-testid="chau-anillo"
+              style={{
+                position: 'absolute', top: 0, height: 96, width: ancho, left: `calc((${ancho} + ${GAP}px) * ${posicion - 1})`,
+                borderRadius: RADIO.tarjeta, boxSizing: 'border-box', border: `${BORDE_ACENTO_PX}px solid ${acento}`, background: COLOR.superficie,
+                zIndex: 0, pointerEvents: 'none', ...ca('caRing', 0.5, 1.1),
+              }}
+            />
+          )}
         </div>
         {!terminado && !esUltima && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', ...ca('caFoot', 0.5, 1.4) }}>
             <span style={etiqueta(COLOR.texto66, 24, 6)}>Arranca en</span>
             <Cronometro valor={formatMMSS(segundos)} size={140} estilo={{ lineHeight: 1 }} />
           </div>

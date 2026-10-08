@@ -61,5 +61,13 @@ export const KEYFRAMES = `
 @keyframes preparateNumIn { 0% { opacity: 0; transform: scale(0.55); filter: blur(22px); } 60% { opacity: 1; transform: scale(1.08); filter: blur(0); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
 @keyframes preparatePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 @keyframes tvTextoIn { 0% { opacity: 0; transform: translateY(22px) scale(0.97); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes caIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes caTitle { from { opacity: 0; transform: translateY(48px); filter: blur(12px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes caArrow { from { stroke-dashoffset: 40; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes caRoll { 0% { transform: translateY(0); } 75% { transform: translateY(-52%); } 100% { transform: translateY(-50%); } }
+@keyframes caBoxOld { from { opacity: 1; color: rgba(245,245,244,0.9); } to { opacity: 1; color: rgba(245,245,244,0.45); } }
+@keyframes caRing { from { transform: translateX(0); } to { transform: translateX(calc(100% + 14px)); } }
+@keyframes caFoot { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ca-anim { animation: none !important; opacity: 1 !important; transform: none !important; filter: none !important; stroke-dashoffset: 0 !important; } }
 @keyframes holaTick { 0% { transform: scale(1.35); opacity: 0.4; } 100% { transform: scale(1); opacity: 1; } }
 `
