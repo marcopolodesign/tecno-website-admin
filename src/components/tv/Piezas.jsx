@@ -5,11 +5,39 @@ import { BORDE, COLOR, GEIST, KEYFRAMES, MONO, RADIO, etiqueta, superficie } fro
 
 export { KEYFRAMES }
 
+// Las teles de la sala (Samsung Tizen, Chrome 63) no llegan a dibujar un `filter: blur(160px)` sobre un
+// círculo de 760 px animado: lo descartan y el fondo queda negro. Ahí la mancha es un degradé radial
+// del mismo tamaño aparente (difuminado incluido), que cualquier navegador pinta sin GPU.
+const TV_VIEJA = (() => {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const chrome = /Chrome\/(\d+)/.exec(ua)
+  return /SMART-TV|Tizen|Web0S/i.test(ua) || (chrome && Number(chrome[1]) < 90)
+})()
+
+const BLUR = 160
+const rgba = (hex, a) => {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
+}
+
 // Fondo #050505 con las tres manchas difuminadas del color del ESTADO (trabajo / descanso).
 export function FondoManchas({ acento = COLOR.trabajo }) {
-  const blob = (estilo) => ({
-    position: 'absolute', borderRadius: '50%', background: acento, filter: 'blur(160px)', transition: 'background 0.8s ease', ...estilo,
-  })
+  const blob = ({ width, height, left, right, top, ...resto }) => {
+    if (!TV_VIEJA) {
+      return { position: 'absolute', borderRadius: '50%', background: acento, filter: `blur(${BLUR}px)`, transition: 'background 0.8s ease', width, height, left, right, top, ...resto }
+    }
+    // El degradé cubre el círculo más lo que se desparrama el blur (~2,5 σ por lado), con la curva de
+    // un círculo difuminado: pleno al centro, la mitad en el borde original, nada al final.
+    const pad = BLUR * 2.5
+    const borde = Math.round((width / 2 / (width / 2 + pad)) * 100)
+    return {
+      position: 'absolute', width: width + pad * 2, height: height + pad * 2,
+      left: left != null ? left - pad : undefined, right: right != null ? right - pad : undefined, top: top - pad,
+      background: `radial-gradient(closest-side, ${rgba(acento, 1)} 0%, ${rgba(acento, 0.92)} ${Math.round(borde * 0.55)}%, ${rgba(acento, 0.5)} ${borde}%, ${rgba(acento, 0.12)} ${Math.round(borde + (100 - borde) * 0.55)}%, ${rgba(acento, 0)} 100%)`,
+      ...resto,
+    }
+  }
   return (
     <div style={{ position: 'absolute', inset: 0, background: COLOR.fondo, overflow: 'hidden' }}>
       <div style={blob({ width: 760, height: 760, left: -160, top: 620, opacity: 0.42, animation: 'libreBlobA 34s ease-in-out infinite' })} />
