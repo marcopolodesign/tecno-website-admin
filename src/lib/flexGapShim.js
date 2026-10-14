@@ -3,7 +3,8 @@
 // márgenes en los hijos. En cualquier navegador actual esto no hace nada.
 //
 // De dónde sale el valor, porque el navegador viejo lo descarta antes de que llegue al DOM:
-// - estilos inline de React (`style={{ gap: 32 }}`): un setter en CSSStyleDeclaration lo guarda;
+// - estilos inline de React (`style={{ gap: 32 }}`): un setter en CSSStyleDeclaration lo copia a
+//   `--shim-gap` en el mismo style (no como propiedad JS: Chrome recicla ese objeto y se pierde);
 // - clases de Tailwind: el build copia `gap` a `--shim-gap` (ver vite.config.js).
 
 function soportaFlexGap() {
@@ -18,7 +19,7 @@ function soportaFlexGap() {
 }
 
 const MARCA = 'data-gap-shim'
-const INLINE = { gap: '__shimGap', rowGap: '__shimRowGap', columnGap: '__shimColGap' }
+const INLINE = { gap: '--shim-gap', rowGap: '--shim-row-gap', columnGap: '--shim-col-gap' }
 
 function capturarInline() {
   const proto = CSSStyleDeclaration.prototype
@@ -26,19 +27,22 @@ function capturarInline() {
     if (prop in proto) return
     Object.defineProperty(proto, prop, {
       configurable: true,
-      get() { return this[INLINE[prop]] || '' },
-      set(v) { this[INLINE[prop]] = v == null ? '' : String(v) },
+      get() { return this.getPropertyValue(INLINE[prop]).trim() },
+      set(v) {
+        if (v == null || v === '') this.removeProperty(INLINE[prop])
+        else this.setProperty(INLINE[prop], typeof v === 'number' ? v + 'px' : String(v))
+      },
     })
   })
 }
 
-function leerGap(el, cs, columna) {
-  const st = el.style
+function leerGaps(cs) {
   const css = (n) => cs.getPropertyValue(n).trim()
-  const partes = (st.__shimGap || css('--shim-gap')).split(/\s+(?![^(]*\))/).filter(Boolean)
-  const fila = st.__shimRowGap || css('--shim-row-gap') || partes[0] || ''
-  const col = st.__shimColGap || css('--shim-col-gap') || partes[1] || partes[0] || ''
-  return columna ? fila : col
+  const partes = css('--shim-gap').split(/\s+(?![^(]*\))/).filter(Boolean)
+  return {
+    fila: css('--shim-row-gap') || partes[0] || '',
+    col: css('--shim-col-gap') || partes[1] || partes[0] || '',
+  }
 }
 
 function aplicar(root) {
@@ -48,16 +52,15 @@ function aplicar(root) {
     const cs = getComputedStyle(el)
     if (cs.display === 'grid' || cs.display === 'inline-grid') {
       // Grid sí tiene gap en Chrome 63, pero con el nombre viejo.
-      const st = el.style
-      const f = st.__shimRowGap || (st.__shimGap || '').split(' ')[0]
-      const c = st.__shimColGap || (st.__shimGap || '').split(' ').pop()
-      if (f && st.gridRowGap !== f) st.gridRowGap = f
-      if (c && st.gridColumnGap !== c) st.gridColumnGap = c
+      const g = leerGaps(cs)
+      if (g.fila && el.style.gridRowGap !== g.fila) el.style.gridRowGap = g.fila
+      if (g.col && el.style.gridColumnGap !== g.col) el.style.gridColumnGap = g.col
       continue
     }
     if (cs.display !== 'flex' && cs.display !== 'inline-flex') continue
     const columna = cs.flexDirection.indexOf('column') === 0
-    const valor = leerGap(el, cs, columna)
+    const g = leerGaps(cs)
+    const valor = columna ? g.fila : g.col
     if (!valor || valor === 'normal' || valor === '0' || valor === '0px') continue
     const lado = columna ? 'marginTop' : 'marginLeft'
     const hijos = el.children
