@@ -1,7 +1,11 @@
+// Teles viejas (Tizen 2–3): sin fetch ni AbortController nativos. En navegadores actuales no hacen nada.
+import 'whatwg-fetch'
+import 'abortcontroller-polyfill/dist/polyfill-patch-fetch'
 import { createRoot } from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import './index.css'
 import App from './App.jsx'
+import { instalarFlexGapShim } from './lib/flexGapShim'
 
 Sentry.init({
   dsn: 'https://7b50329bdaf46ce9ebf4f4e34730c467@o4508958929911808.ingest.us.sentry.io/4511212965330944',
@@ -19,6 +23,8 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
 })
+
+instalarFlexGapShim()
 
 createRoot(document.getElementById('root')).render(
   <Sentry.ErrorBoundary fallback={<p>Algo salió mal — el error fue reportado automáticamente.</p>} showDialog>
