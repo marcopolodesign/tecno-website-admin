@@ -14,10 +14,16 @@ const EMU = `(() => {
   CSS.supports = function (a, b) { const t = String(a) + ' ' + String(b); if (/grid|--|gap|aspect-ratio|inset|clamp/.test(t)) return false; return sup(a, b) }
 })()`
 const browser = await chromium.launch({ executablePath: exe })
-const urls = ['/tv/palermo', '/tv/palermo/a', '/tv/palermo/a/1', '/tv/palermo/b/2']
+const urls = (process.env.URLS || '/tv/palermo,/tv/palermo/a,/tv/palermo/a/1,/tv/palermo/b/2').split(',')
 for (const u of urls) {
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, userAgent: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 3.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.0 Chrome/47.0.2526.69 TV safari/537.36' })
   await ctx.addInitScript(EMU)
+  if (process.env.LIVE) await ctx.route(/^https?:\/\/[^/]+\/[^.]*$/, async (route) => {
+    if (route.request().resourceType() !== 'document') return route.continue()
+    const r = await route.fetch(); let b = await r.text()
+    b = b.replace(/<script type="module"[^>]*>[\s\S]*?<\/script>/g, '').replace(/ nomodule/g, '')
+    await route.fulfill({ response: r, body: b })
+  })
   const page = await ctx.newPage()
   const errs = []
   page.on('pageerror', e => errs.push('pageerror: ' + e.message.split('\n')[0]))
