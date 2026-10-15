@@ -18,6 +18,7 @@
 //   chau        transición: "Pasá a la estación N" (Cambio.dc).
 //   resumen     fin de circuito en la última estación.
 // Sólo CSS (transiciones/keyframes); el reloj es setInterval, sin depender de rAF.
+import Grilla from './tv/Grilla'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import lottie from 'lottie-web/build/player/lottie_light'
@@ -327,7 +328,7 @@ function GrillaCards({ filas, acento, valor = repsDe }) {
   const cols = filas.length <= 3 ? filas.length : Math.ceil(filas.length / 2)
   const nombreSize = cols <= 3 ? 38 : 32
   return (
-    <div style={{ minHeight: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)', gap: 20 }}>
+    <Grilla cols={cols} gap={20} llenar style={{ minHeight: 0 }}>
       {filas.map((f, i) => (
         <div key={f.exercise_order ?? i} style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
           <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
@@ -340,7 +341,7 @@ function GrillaCards({ filas, acento, valor = repsDe }) {
           </div>
         </div>
       ))}
-    </div>
+    </Grilla>
   )
 }
 
@@ -448,7 +449,7 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
           </div>
         }
       />
-      <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)', gap: 24 }}>
+      <Grilla cols={cols} gap={24} llenar style={{ flex: 1, minHeight: 0 }}>
         {exercises.map((f, i) => {
           const turnos = turnosDe(i, ctx)
           const prescripcion = capital(String(prescripcionDe(f)).replace(/^(\d+)\s*[x×]\s*(\d+)$/i, '$1 × $2'))
@@ -476,7 +477,7 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
             </div>
           )
         })}
-      </div>
+      </Grilla>
       <div style={{ display: 'flex', gap: 24, alignItems: 'stretch', flexShrink: 0 }}>
         <TarjetaComoSeJuega texto={texto} estilo={{ flex: 1, marginTop: 0 }} />
         {elementos.length > 0 && (
@@ -617,7 +618,7 @@ function VistaEstacion({ box, fase, pos, line }) {
         persona={box}
         derecha={pildoraFormato(primero, exercises.length > 1) ? <Pildora mono>{pildoraFormato(primero, exercises.length > 1)}</Pildora> : null}
       />
-      <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1180px minmax(0, 1fr)', gap: 48 }}>
+      <Grilla cols={[1180, 'fr']} gap={48} llenar style={{ flex: 1, minHeight: 0 }}>
         {medio}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28, minHeight: 0 }}>
           <Anima k={etiquetaEstado} data-testid="tv-etiqueta" style={{ fontSize: 34, fontWeight: 800, letterSpacing: 8, color: acento, transition: 'color 0.5s ease' }}>
@@ -627,7 +628,7 @@ function VistaEstacion({ box, fase, pos, line }) {
           {debajoDelReloj}
           {tarjeta}
         </div>
-      </div>
+      </Grilla>
       <BarraProgreso fraccion={progreso} acento={acento} />
     </Marco>
   )
@@ -691,7 +692,7 @@ function VistaChau({ box, boxes, posicion, acento }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 48 }}>
         <div style={{ position: 'relative', width: 900 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, total)}, minmax(0, 1fr))`, gap: GAP }}>
+          <Grilla cols={Math.max(1, total)} gap={GAP}>
             {Array.from({ length: total }, (_, i) => {
               const n = i + 1
               const hecho = n <= posicion
@@ -712,7 +713,7 @@ function VistaChau({ box, boxes, posicion, acento }) {
                 </div>
               )
             })}
-          </div>
+          </Grilla>
           {/* Contorno de acento: arranca sobre el box que se deja y se desliza al siguiente. */}
           {!esUltima && total > 0 && (
             <div

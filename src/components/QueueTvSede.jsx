@@ -18,6 +18,7 @@ import { LienzoTv } from './tv/TvChrome'
 import { useCountdown, formatMMSS, duracionBoxSegDeLinea } from '../lib/tvClock'
 import { BORDE, BORDE_ACENTO_PX, COLOR, GEIST, MONO, RADIO, etiqueta, superficie } from './tv/tokens'
 import { Avatar, FondoManchas, KEYFRAMES, TFMarca, nombreLineaTv } from './tv/Piezas'
+import Grilla from './tv/Grilla'
 
 const POLL_MS = 3000
 // Link universal de la app (associatedDomains / AASA de tecno-admin.vercel.app). Sin parámetros cae en
@@ -144,7 +145,7 @@ function PanelLinea({ linea }) {
           <span style={{ fontFamily: MONO, fontSize: 36, color: ocupadoBox1 ? COLOR.texto : COLOR.trabajo }}>{ocupadoBox1 ? restante : '0:00'}</span>
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))`, gap: 10 }}>
+      <Grilla cols={total} gap={10}>
         {slots.map((e, i) => (
           <div
             key={i}
@@ -156,7 +157,7 @@ function PanelLinea({ linea }) {
             {e.estado === 'ocupado' && <Avatar url={e.avatar_url} iniciales={e.iniciales} size={50} />}
           </div>
         ))}
-      </div>
+      </Grilla>
     </div>
   )
 }
@@ -229,7 +230,7 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
             <span style={{ fontSize: 64, fontWeight: 500 }}><Reloj /></span>
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 640px', gap: 48 }}>
+          <Grilla cols={['fr', 640]} gap={48} llenar style={{ flex: 1, minHeight: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
               {fila.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
@@ -262,7 +263,7 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
                 </div>
               )}
             </div>
-          </div>
+          </Grilla>
         </div>
       </div>
     </LienzoTv>

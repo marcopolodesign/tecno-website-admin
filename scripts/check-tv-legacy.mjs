@@ -1,5 +1,8 @@
-// Control de que el build sigue abriendo en las TVs de la sala: Samsung Tizen 5.0, Chrome 63
-// (2026-10-14: tv.somostecnofit.com quedaba en blanco por un SyntaxError del bundle).
+// Control de que el build sigue abriendo en las TVs de la sala: Samsung Tizen 3.0, Chrome 47
+// (la foto de Lucas del 2026-10-15; antes se creía Tizen 5.0 / Chrome 63).
+// 2026-10-14: tv.somostecnofit.com quedaba en blanco por un SyntaxError del bundle.
+// 2026-10-15: en blanco otra vez por "Proxy is not defined" (Sentry) y, sin grid, todo apilado.
+// Prueba completa en un Chromium rebajado a Chrome 47: scripts/tv-chrome47/README.md.
 // Corre después de `vite build`; si falla, el deploy no sale.
 import { readFileSync, readdirSync } from 'node:fs'
 import { parse } from 'acorn'
@@ -36,11 +39,26 @@ for (const f of css) {
   if (!src.includes('--shim-gap')) errores.push(`${f}: falta la copia de gap para flexGapShim`)
 }
 
+// Fuente: lo que en Chrome 47 rompe la TV y no se puede arreglar con un polyfill.
+const src = (p) => readFileSync(new URL('../src/' + p, import.meta.url), 'utf8')
+const main = src('main.jsx')
+if (!/typeof Proxy === 'function'/.test(main) || !/if \(sentryPuedeCorrer\) Sentry\.init/.test(main)) {
+  errores.push('src/main.jsx: Sentry.init sin la guarda de Proxy (Chrome 47 no tiene Proxy y la TV queda en blanco)')
+}
+const tvDir = new URL('../src/components/tv/', import.meta.url)
+const fuentesTv = [
+  ...readdirSync(tvDir).filter((a) => a.endsWith('.jsx') && a !== 'Grilla.jsx').map((a) => 'components/tv/' + a),
+  ...readdirSync(new URL('../src/components/', import.meta.url)).filter((a) => /^(QueueTv|Tv)\w*\.jsx$/.test(a)).map((a) => 'components/' + a),
+]
+for (const f of fuentesTv) {
+  if (/display:\s*'(inline-)?grid'/.test(src(f))) errores.push(`src/${f}: display grid en una pantalla de TV — usar <Grilla> (Chrome 47 no tiene grid)`)
+}
+
 const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')
 if (!html.includes('nomodule')) errores.push('index.html: falta el bundle legacy (nomodule)')
 
 if (errores.length) {
-  console.error('✗ El build no abre en las TVs de la sala (Chrome 63):\n' + errores.join('\n'))
+  console.error('✗ El build no abre en las TVs de la sala (Tizen 3.0, Chrome 47):\n' + errores.join('\n'))
   process.exit(1)
 }
-console.log(`✓ Build compatible con las TVs (Chrome 63): ${archivos.filter((a) => a.endsWith('.js')).length} JS, ${css.length} CSS`)
+console.log(`✓ Build compatible con las TVs (Tizen 3.0, Chrome 47): ${archivos.filter((a) => a.endsWith('.js')).length} JS, ${css.length} CSS`)

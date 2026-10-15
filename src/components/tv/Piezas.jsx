@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { exerciseMedia } from '../../lib/exerciseMedia'
 import { BORDE, COLOR, GEIST, KEYFRAMES, MONO, RADIO, etiqueta, superficie } from './tokens'
+import Grilla from './Grilla'
 
 export { KEYFRAMES }
 
@@ -145,7 +146,7 @@ export function BarraProgreso({ fraccion, acento }) {
 // Rondas / minutos: n barritas. `estado(i)` -> 'hecha' | 'actual' | 'falta'.
 export function BarrasRondas({ n, estado, acento }) {
   return (
-    <div data-testid="tv-barras" style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: 10 }}>
+    <Grilla data-testid="tv-barras" cols={n} gap={10}>
       {Array.from({ length: n }, (_, i) => {
         const e = estado(i)
         return (
@@ -158,7 +159,7 @@ export function BarrasRondas({ n, estado, acento }) {
           />
         )
       })}
-    </div>
+    </Grilla>
   )
 }
 

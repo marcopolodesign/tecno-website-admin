@@ -7,7 +7,12 @@ import './index.css'
 import App from './App.jsx'
 import { instalarFlexGapShim } from './lib/flexGapShim'
 
-Sentry.init({
+// Las TVs de la sala son Samsung Tizen 3.0 (Chrome 47): no tienen Proxy, que no se puede
+// polyfillear, y Sentry lo usa al arrancar (tracing y replay) — sin esta guarda tira
+// "Proxy is not defined" y la pantalla queda en blanco. Ahí la app corre sin Sentry.
+const sentryPuedeCorrer = typeof Proxy === 'function' && typeof Reflect === 'object'
+
+if (sentryPuedeCorrer) Sentry.init({
   dsn: 'https://7b50329bdaf46ce9ebf4f4e34730c467@o4508958929911808.ingest.us.sentry.io/4511212965330944',
   sendDefaultPii: true,
   // Capture all unhandled errors, promise rejections, and console errors
@@ -27,7 +32,11 @@ Sentry.init({
 instalarFlexGapShim()
 
 createRoot(document.getElementById('root')).render(
-  <Sentry.ErrorBoundary fallback={<p>Algo salió mal — el error fue reportado automáticamente.</p>} showDialog>
+  sentryPuedeCorrer ? (
+    <Sentry.ErrorBoundary fallback={<p>Algo salió mal — el error fue reportado automáticamente.</p>} showDialog>
+      <App />
+    </Sentry.ErrorBoundary>
+  ) : (
     <App />
-  </Sentry.ErrorBoundary>
+  )
 )
