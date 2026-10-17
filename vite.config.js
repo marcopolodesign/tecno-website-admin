@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import legacy from '@vitejs/plugin-legacy'
 import postcssPresetEnv from 'postcss-preset-env'
+import { execSync } from 'node:child_process'
 
 // Las TVs de las sedes (Samsung Tizen) traen un Chromium viejo — 69 en las de 2020. Con el
 // target por defecto de Vite 7 (Chrome 107) el bundle tira SyntaxError y la pantalla queda en
@@ -71,9 +72,30 @@ const insetInline = {
   },
 }
 
+// La versión del bundle que el aviso de errores de la TV (script inline de index.html) manda a Sentry.
+function versionDelBuild() {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7)
+  try { return execSync('git rev-parse --short HEAD').toString().trim() } catch { return 'local' }
+}
+// Además lo sube a justo después del <meta charset>: plugin-legacy agrega scripts en el <head> y el
+// aviso tiene que correr antes que cualquier bundle para atrapar lo que rompa al cargar.
+const tvBuildVersion = {
+  name: 'tv-build-version',
+  enforce: 'post',
+  transformIndexHtml: (html) => html.replace(/__TV_BUILD__/g, versionDelBuild()),
+  generateBundle(_, bundle) {
+    const archivo = bundle['index.html']
+    if (!archivo || typeof archivo.source !== 'string') return
+    const aviso = /\s*<script id="tv-reporte">[\s\S]*?<\/script>/.exec(archivo.source)
+    if (!aviso) return
+    archivo.source = archivo.source.replace(aviso[0], '').replace(/<meta charset="UTF-8" \/>/, (m) => m + aviso[0])
+  },
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    tvBuildVersion,
     insetInline,
     tailwindcss(),
     react(),

@@ -2,7 +2,7 @@
 import http from 'node:http'
 import { readFileSync, existsSync, appendFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
-const DIST = process.argv[2], LOG = process.argv[3], PORT = 4747
+const DIST = process.argv[2], LOG = process.argv[3], PORT = +process.env.PORT || 4747
 const TYPES = { '.js': 'application/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.mp4': 'video/mp4' }
 const SONDA = `<script>(function(){function r(t,d){try{var x=new XMLHttpRequest();x.open('POST','/report',true);x.send(t+' '+d)}catch(e){}}
 window.onerror=function(m,s,l,c,e){r('ERROR',m+' @'+s+':'+l+':'+c+' '+(e&&e.stack||''))};

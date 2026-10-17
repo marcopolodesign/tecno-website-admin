@@ -57,6 +57,22 @@ for (const f of fuentesTv) {
 const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')
 if (!html.includes('nomodule')) errores.push('index.html: falta el bundle legacy (nomodule)')
 
+// 2026-10-16: la A1 de Palermo quedaba en blanco sin avisar. El aviso de errores inline tiene que
+// existir, ir antes de cualquier bundle y ser ES5 puro (Chrome 47, sin fetch/Promise/arrow).
+const aviso = /<script id="tv-reporte">([\s\S]*?)<\/script>/.exec(html)
+if (!aviso) {
+  errores.push('index.html: falta el aviso de errores de TV (<script id="tv-reporte">)')
+} else {
+  // Los type="module" corren diferidos (después del aviso); los clásicos y nomodule, en orden.
+  const primerClasico = html.search(/<script(?![^>]*type="module")[^>]*\s(data-)?src=/)
+  if (primerClasico !== -1 && html.indexOf('<script id="tv-reporte">') > primerClasico) errores.push('index.html: el aviso de errores de TV tiene que ir antes de los bundles')
+  try { parse(aviso[1], { ecmaVersion: 5, sourceType: 'script' }) } catch (e) { errores.push(`index.html: el aviso de errores de TV no es ES5 — ${e.message}`) }
+  if (/\bfetch\s*\(|\bnew Promise\b/.test(aviso[1])) errores.push('index.html: el aviso de errores de TV usa fetch/Promise (Chrome 47)')
+  if (aviso[1].includes('__TV_BUILD__')) errores.push('index.html: el aviso de errores de TV quedó sin la versión del build')
+  if (!aviso[1].includes("superficie: 'tv'")) errores.push('index.html: el aviso de errores de TV perdió el tag superficie=tv (la alerta de Sentry filtra por él)')
+}
+if (!/<TvErrorBoundary>/.test(src('App.jsx'))) errores.push('src/App.jsx: TvHostApp sin TvErrorBoundary (la TV queda en blanco sin avisar)')
+
 if (errores.length) {
   console.error('✗ El build no abre en las TVs de la sala (Tizen 3.0, Chrome 47):\n' + errores.join('\n'))
   process.exit(1)
