@@ -42,8 +42,8 @@ for (const f of css) {
 // Fuente: lo que en Chrome 47 rompe la TV y no se puede arreglar con un polyfill.
 const src = (p) => readFileSync(new URL('../src/' + p, import.meta.url), 'utf8')
 const main = src('main.jsx')
-if (!/typeof Proxy === 'function'/.test(main) || !/if \(sentryPuedeCorrer\) Sentry\.init/.test(main)) {
-  errores.push('src/main.jsx: Sentry.init sin la guarda de Proxy (Chrome 47 no tiene Proxy y la TV queda en blanco)')
+if (!/typeof Proxy === 'function'/.test(main) || !/if \(sentryPuedeCorrer\) \{\s*import\('@sentry\/react'\)/.test(main) || /^import .*@sentry/m.test(main)) {
+  errores.push('src/main.jsx: Sentry tiene que ir con import() dinámico detrás de la guarda de Proxy (Chrome 47 no tiene Proxy, y el SDK no debe entrar al bundle de la TV)')
 }
 const tvDir = new URL('../src/components/tv/', import.meta.url)
 const fuentesTv = [
@@ -71,6 +71,18 @@ if (!aviso) {
   if (aviso[1].includes('__TV_BUILD__')) errores.push('index.html: el aviso de errores de TV quedó sin la versión del build')
   if (!aviso[1].includes("superficie: 'tv'")) errores.push('index.html: el aviso de errores de TV perdió el tag superficie=tv (la alerta de Sentry filtra por él)')
 }
+// 2026-10-19: el Chrome 47 real (Tizen 3.0) se colgaba compilando el bundle legacy de 3,4 MB (todo el
+// CRM en un solo chunk) y la A1 quedaba en blanco y "cargando". El chunk de entrada legacy, que es lo
+// que baja y compila la TV, tiene que quedar chico: el CRM va en MainApp (lazy) y Sentry con import().
+const entradaLegacy = /data-src="\/assets\/(index-legacy-[^"]+\.js)"/.exec(html)
+const TOPE_ENTRADA = 1200 * 1024
+if (!entradaLegacy) errores.push('index.html: no encuentro la entrada legacy (data-src)')
+else {
+  const tam = readFileSync(new URL(entradaLegacy[1], dir)).length
+  if (tam > TOPE_ENTRADA) errores.push(`${entradaLegacy[1]}: ${Math.round(tam / 1024)} KB — la entrada legacy de la TV no puede pasar de ${TOPE_ENTRADA / 1024} KB (Chrome 47 se cuelga compilando)`)
+}
+if (!/lazy\(\(\) => import\('\.\/MainApp'\)\)/.test(src('App.jsx'))) errores.push('src/App.jsx: el CRM (MainApp) tiene que cargarse con lazy() para no entrar al bundle de la TV')
+if (/<link[^>]+fonts\.googleapis\.com\/css[^>]*rel="stylesheet"|<link[^>]+rel="stylesheet"[^>]+fonts\.googleapis/.test(html)) errores.push('index.html: Google Fonts como <link> bloquea el render en la TV — se cargan desde el aviso inline sólo fuera de la TV')
 if (!/<TvErrorBoundary>/.test(src('App.jsx'))) errores.push('src/App.jsx: TvHostApp sin TvErrorBoundary (la TV queda en blanco sin avisar)')
 
 if (errores.length) {
