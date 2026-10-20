@@ -17,6 +17,7 @@
 //   DIST=/tmp/tv-dist OUT=/tmp/tv-numeros node scripts/check-tv-numeros.mjs   # + capturas
 //   SIN_FUENTE=1 node scripts/check-tv-numeros.mjs    # bloquea las woff2: prueba el respaldo
 //   CHROME=/ruta/al/chrome node scripts/check-tv-numeros.mjs
+//   BASE=https://tecno-admin-staging-git-…vercel.app node scripts/check-tv-numeros.mjs   # contra un deploy
 import http from 'node:http'
 import { readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { join, extname } from 'node:path'
@@ -48,8 +49,9 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': TYPES[extname(f)] || 'application/octet-stream' })
   res.end(readFileSync(f))
 })
-await new Promise((r) => server.listen(0, r))
-const BASE = `http://localhost:${server.address().port}`
+// BASE=https://<preview>.vercel.app corre lo mismo contra un deploy (los datos siguen siendo fijos).
+if (!process.env.BASE) await new Promise((r) => server.listen(0, r))
+const BASE = process.env.BASE || `http://localhost:${server.address().port}`
 
 // ── Datos fijos ──────────────────────────────────────────────────────────────────────────
 const LOCATION = 'db9a686a-cc72-413e-9c0c-c3058812de60'
@@ -280,6 +282,6 @@ for (const [vw, vh] of VIEWPORTS) for (const esc of ESCENAS) {
   await ctx.close()
 }
 await browser.close()
-server.close()
+if (server.listening) server.close()
 console.log(fallos ? `\n✗ ${fallos} pantalla(s) con números cortados o sin fuente` : '\n✓ ningún número cortado en las TVs')
 process.exit(fallos ? 1 : 0)
