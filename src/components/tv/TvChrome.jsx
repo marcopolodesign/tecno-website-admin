@@ -11,7 +11,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { estadoReloj, suscribirReloj } from '../../lib/serverClock'
 import { ANCHO_DISENO, medidasLienzo } from '../../lib/lienzo'
-import { BORDE, COLOR, RADIO } from './tokens'
+import { BORDE, COLOR, FUENTES_TV, RADIO } from './tokens'
 
 const OCULTAR_MS = 4000
 
@@ -32,6 +32,7 @@ export function LienzoTv({ children, fondo = COLOR.fondo }) {
   }, [])
   return (
     <div style={{ position: 'fixed', inset: 0, background: fondo, overflow: 'hidden' }}>
+      <style>{FUENTES_TV}</style>
       <div style={{ width: m.ancho, height: m.alto, transform: `scale(${m.escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
         <LienzoContext.Provider value={{ ancho: m.ancho, alto: m.alto }}>{children}</LienzoContext.Provider>
       </div>

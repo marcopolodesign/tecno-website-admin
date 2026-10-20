@@ -9,6 +9,7 @@
     "dev:staging": "vite --mode staging",
     "dev:production": "vite --mode production",
     "build": "vite build && node scripts/check-tv-legacy.mjs",
+    "check:tv-numeros": "node scripts/check-tv-numeros.mjs",
     "build:staging": "vite build --mode staging",
     "build:production": "vite build --mode production",
     "lint": "eslint .",

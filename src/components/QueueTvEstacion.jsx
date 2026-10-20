@@ -332,7 +332,7 @@ function GrillaCards({ filas, acento, valor = repsDe }) {
       {filas.map((f, i) => (
         <div key={f.exercise_order ?? i} style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
           <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-            <VideoCruzado fila={f} />
+            <VideoCruzado fila={f} iconoSinVideo={false} />
           </div>
           <div style={{ position: 'absolute', inset: 0, background: velo(45, 0.9), pointerEvents: 'none', zIndex: 1 }} />
           <div style={{ position: 'absolute', zIndex: 2, left: 24, right: 24, bottom: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -433,7 +433,12 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
   const texto = comoSeJuega(primero, exercises)
   const ctx = { formato: primero?.formato, ejercicios: exercises, rondas: primero?.rondas, porMinuto: primero?.ejercicios_por_minuto || 1 }
   const cols = exercises.length <= 3 ? Math.max(1, exercises.length) : exercises.length === 4 ? 2 : 3
-  const chico = cols >= 3
+  // Letra chica con tres columnas, o con dos filas de tarjetas en una TV baja (lienzo de menos de
+  // 1000 de alto): ahí la tarjeta mide ~175 y un nombre de dos líneas a 60 se salía por arriba.
+  const { alto } = useLienzo()
+  const filasTarjetas = Math.ceil(exercises.length / cols)
+  const chico = cols >= 3 || (filasTarjetas > 1 && alto < 1000)
+  const nombrePx = chico ? 44 : 60
   const elementos = box.elementos || []
   return (
     <Marco>
@@ -457,22 +462,28 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
           return (
             <div key={f.exercise_order ?? i} style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
               <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-                <VideoCruzado fila={f} />
+                <VideoCruzado fila={f} iconoSinVideo={false} />
               </div>
               <div style={{ position: 'absolute', inset: 0, background: velo(50, 0.88), pointerEvents: 'none', zIndex: 1 }} />
-              {exercises.length > 1 && (
-                <span
-                  style={{
-                    position: 'absolute', zIndex: 2, top: 28, left: 32, width: 64, height: 64, ...superficie(RADIO.mini, { background: COLOR.vidrio }),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 800,
-                  }}
-                >
-                  {i + 1}
-                </span>
-              )}
+              {/* El número de la tarjeta va en la misma fila que el nombre (no arriba a la izquierda):
+                  en una TV más baja la tarjeta se achica y el nombre de dos líneas lo tapaba. */}
               <div style={{ position: 'absolute', zIndex: 2, left: 32, right: 32, bottom: 32, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <span style={{ fontSize: chico ? 44 : 60, fontWeight: 800, lineHeight: 1, letterSpacing: chico ? -1 : -2 }}>{f.name}</span>
-                {sub && <span style={{ fontSize: 26, color: COLOR.texto66 }}>{sub}</span>}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: HUECO_NUMERO_TARJETA }}>
+                  {exercises.length > 1 && (
+                    <span
+                      data-testid="explicacion-numero"
+                      style={{
+                        width: NUMERO_TARJETA_PX, height: NUMERO_TARJETA_PX, ...superficie(RADIO.mini, { background: COLOR.vidrio }), flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 800,
+                      }}
+                    >
+                      {i + 1}
+                    </span>
+                  )}
+                  {/* Reserva dos líneas: en una misma fila, un nombre de una línea y uno de dos arrancan a la misma altura. */}
+                  <span style={{ fontSize: nombrePx, fontWeight: 800, lineHeight: 1.1, minHeight: Math.ceil(nombrePx * 1.1 * 2), letterSpacing: chico ? -1 : -2, minWidth: 0 }}>{f.name}</span>
+                </div>
+                {sub && <span style={{ fontSize: 26, color: COLOR.texto66, paddingLeft: exercises.length > 1 ? NUMERO_TARJETA_PX + HUECO_NUMERO_TARJETA : 0 }}>{sub}</span>}
               </div>
             </div>
           )
@@ -481,9 +492,9 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
       <div style={{ display: 'flex', gap: 24, alignItems: 'stretch', flexShrink: 0 }}>
         <TarjetaComoSeJuega texto={texto} estilo={{ flex: 1, marginTop: 0 }} />
         {elementos.length > 0 && (
-          <div data-testid="franja-materiales" style={{ ...superficie(RADIO.tarjeta), display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 16, padding: 28, flexShrink: 0, maxWidth: 760 }}>
+          <div data-testid="franja-materiales" style={{ ...superficie(RADIO.tarjeta), display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 16, padding: 28, flexShrink: 0, maxWidth: 880 }}>
             <span style={etiqueta(COLOR.texto45, 22, 5)}>Juntá</span>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {elementos.map((nombre) => <ChipElemento key={nombre} nombre={nombre} />)}
             </div>
           </div>
@@ -497,6 +508,15 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
 // Emom y Series .dc): encabezado, video(s) a la izquierda en 1180, a la derecha etiqueta del estado
 // + cronómetro + (barras | texto) + tarjeta inferior, y la barra de progreso de toda la estación.
 // Trabajo y descanso comparten ESTE árbol: sólo cambian el acento, los textos y el ejercicio.
+// Número de la tarjeta en la explicación (en la fila del nombre) y su hueco.
+const NUMERO_TARJETA_PX = 64
+const HUECO_NUMERO_TARJETA = 20
+
+// Columna del reloj en la estación: lienzo 1920 − márgenes del Marco (2 × 56) − video (1180) − hueco (48).
+const ANCHO_VIDEO = 1180
+const HUECO_ESTACION = 48
+const ANCHO_COLUMNA_RELOJ = 1920 - 2 * 56 - ANCHO_VIDEO - HUECO_ESTACION
+
 function VistaEstacion({ box, fase, pos, line }) {
   const exercises = ejerciciosDe(box)
   const primero = box.ejercicio || exercises[0]
@@ -618,13 +638,13 @@ function VistaEstacion({ box, fase, pos, line }) {
         persona={box}
         derecha={pildoraFormato(primero, exercises.length > 1) ? <Pildora mono>{pildoraFormato(primero, exercises.length > 1)}</Pildora> : null}
       />
-      <Grilla cols={[1180, 'fr']} gap={48} llenar style={{ flex: 1, minHeight: 0 }}>
+      <Grilla cols={[ANCHO_VIDEO, 'fr']} gap={HUECO_ESTACION} llenar style={{ flex: 1, minHeight: 0 }}>
         {medio}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28, minHeight: 0 }}>
           <Anima k={etiquetaEstado} data-testid="tv-etiqueta" style={{ fontSize: 34, fontWeight: 800, letterSpacing: 8, color: acento, transition: 'color 0.5s ease' }}>
             {etiquetaEstado}
           </Anima>
-          <Cronometro valor={valorReloj} data-testid="tv-reloj" />
+          <Cronometro valor={valorReloj} ancho={ANCHO_COLUMNA_RELOJ} muestra={mmss(Math.max(duracionSeg(formato) || 0, estacionSegDeLinea(line) || 0))} data-testid="tv-reloj" />
           {debajoDelReloj}
           {tarjeta}
         </div>
@@ -643,7 +663,11 @@ const BASE_CA = 0.25
 const ca = (nombre, dur, delay, easing = 'cubic-bezier(0.22,1,0.36,1)') => ({
   animation: `${nombre} ${dur}s ${easing} ${(BASE_CA + delay).toFixed(2)}s both`,
 })
-const DIGITO = { fontSize: 440, fontWeight: 900, lineHeight: '330px', height: 330, letterSpacing: -22, display: 'block' }
+// Ventana del número que rueda: una línea de 1 em (440). Con 330 la tinta de Geist 900 entraba con
+// 3 px de margen y cualquier otra fuente (o la Geist sin cargar) cortaba el pie del número y dejaba
+// asomar una franja del anterior arriba. Control: scripts/check-tv-numeros.mjs.
+const DIGITO_PX = 440
+const DIGITO = { fontSize: DIGITO_PX, fontWeight: 900, lineHeight: `${DIGITO_PX}px`, height: DIGITO_PX, letterSpacing: -22, display: 'block' }
 
 function VistaChau({ box, boxes, posicion, acento }) {
   const segundos = useCountdown(box.advances_at)
@@ -681,7 +705,7 @@ function VistaChau({ box, boxes, posicion, acento }) {
               <path className="ca-anim" d="M4 12h15M13 6l6 6-6 6" style={{ strokeDasharray: 40, ...ca('caArrow', 0.5, 0.5) }} />
             </svg>
             {/* Ventana de un dígito: sube el actual (atenuado) y entra el siguiente desde abajo. */}
-            <div data-testid="chau-numero" style={{ height: 330, overflow: 'hidden', paddingRight: 22, marginRight: -22 }}>
+            <div data-testid="chau-numero" style={{ height: DIGITO_PX, overflow: 'hidden', paddingRight: 22, marginRight: -22 }}>
               <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', ...ca('caRoll', 0.4, 1.0, 'cubic-bezier(0.33,0,0.2,1)') }}>
                 <span style={{ ...DIGITO, color: COLOR.texto45 }}>{posicion}</span>
                 <span style={DIGITO}>{posicion + 1}</span>

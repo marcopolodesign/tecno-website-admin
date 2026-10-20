@@ -8,7 +8,7 @@
 //
 // Rediseño 2026-10-05 (Lista.dc): mismo sistema que las TVs de estación (tv/tokens.js) — fondo
 // #050505 con manchas, superficies de vidrio, acento naranja sólo en texto y bordes.
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
@@ -26,6 +26,8 @@ const POLL_MS = 3000
 // lo anota en la fila (o le muestra dónde está si ya está anotado). Con ?paso=ingreso NO confirmaría.
 export const QR_URL = 'https://tecno-admin.vercel.app/confirmar-turno'
 const BOXES_POR_LINEA = 5 // tv_sede no manda cuántos boxes tiene cada línea; las de Palermo son de 5
+const QR_ARRIBA_PX = 150
+const TOPE_FILA = 5 // filas como máximo en la lista (con la fila larga, 4 + "y N personas más")
 
 function nombreCorto(u) {
   return u || 'Socio'
@@ -205,8 +207,28 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
   const nombreDeLinea = (lineNumber) => lineas.find((l) => l.line_number === lineNumber)?.name
 
   const { porPersona, nuevo } = esperasEstimadas(fila, lineas, ahora)
-  // Con la fila larga se muestran 4 y "y N más" para que no se salga de la pantalla.
-  const visibles = fila.length > 5 ? 4 : fila.length
+  // Con la fila larga se muestran las que entran y "y N más". Cuántas entran depende del alto del
+  // lienzo (una TV con la barra del navegador a la vista es más baja) y de la fuente: si algo se
+  // sale de la columna se muestra una menos, así ninguna fila queda cortada al medio (2026-10-20).
+  const listaRef = useRef(null)
+  const clave = `${fila.length}|${typeof window === 'undefined' ? '' : `${window.innerWidth}x${window.innerHeight}`}`
+  const [ajuste, setAjuste] = useState({ clave, tope: TOPE_FILA })
+  const tope = ajuste.clave === clave ? ajuste.tope : TOPE_FILA
+  useLayoutEffect(() => {
+    const el = listaRef.current
+    if (el && tope > 1 && el.scrollHeight > el.clientHeight + 1) setAjuste({ clave, tope: tope - 1 })
+  })
+  const visibles = fila.length > tope ? tope - 1 : fila.length
+  // Mismo criterio en el panel de la derecha, en tres pasos (Felipe, 2026-10-20): QR abajo a 184;
+  // si no entra, abajo a 150; si tampoco, arriba al lado de la espera estimada.
+  const panelRef = useRef(null)
+  const [qrAjuste, setQrAjuste] = useState({ clave, paso: 0 })
+  const pasoQr = fila.length > 0 && qrAjuste.clave === clave ? qrAjuste.paso : 0
+  const qrArriba = pasoQr >= 2
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    if (el && fila.length > 0 && pasoQr < 2 && el.scrollHeight > el.clientHeight + 1) setQrAjuste({ clave, paso: pasoQr + 1 })
+  })
 
   return (
     <LienzoTv>
@@ -231,7 +253,7 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
           </div>
 
           <Grilla cols={['fr', 640]} gap={48} llenar style={{ flex: 1, minHeight: 0 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
+            <div ref={listaRef} data-testid="tv-fila" style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
               {fila.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
                   <CodigoQr size={520} />
@@ -242,23 +264,31 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
                   <FilaEspera key={entry.id} entry={entry} i={i} nombreLinea={nombreDeLinea(entry.line_number)} espera={porPersona[i]} />
                 ))
               )}
-              {fila.length > visibles && <span style={{ fontSize: 30, color: COLOR.texto66, paddingLeft: 28 }}>y {fila.length - visibles} personas más</span>}
+              {fila.length > visibles && <span style={{ fontSize: 30, color: COLOR.texto66 }}>y {fila.length - visibles} personas más</span>}
             </div>
 
-            <div style={{ ...superficie(RADIO.panel), display: 'flex', flexDirection: 'column', gap: 20, padding: 36, minHeight: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={etiqueta(COLOR.texto66, 24, 6)}>Espera estimada</span>
-                {nuevo == null ? null : (
-                  <span style={{ fontFamily: MONO, fontSize: 124, fontWeight: 600, lineHeight: 0.95, letterSpacing: -6 }}>
-                    {Math.max(0, Math.round(nuevo / 60))}
-                    <span style={{ fontSize: 48, letterSpacing: 0, color: COLOR.texto66 }}> min</span>
-                  </span>
-                )}
+            <div ref={panelRef} data-testid="tv-panel-espera" style={{ ...superficie(RADIO.panel), display: 'flex', flexDirection: 'column', gap: 20, padding: 36, minHeight: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={etiqueta(COLOR.texto66, 24, 6)}>Espera estimada</span>
+                  {nuevo == null ? null : (
+                    <span style={{ fontFamily: MONO, fontSize: 124, fontWeight: 600, lineHeight: 1, letterSpacing: -6, whiteSpace: 'nowrap' }}>
+                      {Math.max(0, Math.round(nuevo / 60))}
+                      <span style={{ fontSize: 48, letterSpacing: 0, color: COLOR.texto66 }}> min</span>
+                    </span>
+                  )}
+                </div>
+                {qrArriba && <CodigoQr size={QR_ARRIBA_PX} />}
               </div>
+              {qrArriba && (
+                <span style={{ fontSize: 26, fontWeight: 400, lineHeight: 1.2, color: COLOR.texto66, marginTop: -6, paddingBottom: 20, borderBottom: BORDE }}>
+                  Escaneá para anotarte o confirmar tu turno
+                </span>
+              )}
               {lineas.map((linea) => <PanelLinea key={linea.id} linea={linea} />)}
-              {fila.length > 0 && (
+              {fila.length > 0 && !qrArriba && (
                 <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 28, borderTop: BORDE, paddingTop: 20 }}>
-                  <CodigoQr size={184} />
+                  <CodigoQr size={pasoQr === 1 ? 150 : 184} />
                   <span style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.15 }}>Escaneá para anotarte o confirmar tu turno</span>
                 </div>
               )}

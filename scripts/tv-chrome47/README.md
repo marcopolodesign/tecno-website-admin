@@ -48,3 +48,19 @@ Ojo: el Chromium "rebajado" de arriba NO reproduce los cuelgues del motor real. 
 (Chromium snapshot, perfil `/tmp/c47prof`, CDP en :9247) se colgaba compilando el bundle legacy de 3,4 MB
 (`new Function(bundle)` no volvía nunca); con el CRM en un chunk lazy y Sentry con `import()` la entrada
 legacy bajó a ~900 KB y monta en ~3 s. El tope lo controla `check-tv-legacy.mjs`.
+
+## Números cortados (2026-10-20)
+
+`scripts/check-tv-numeros.mjs` abre cada pantalla (sede con 4 y 7 en la fila; estación en llegando,
+explicación, preparate, Tabata, EMOM, AMRAP, Series, cambio y resumen) con datos fijos — intercepta
+`tv_linea`, `tv_sede`, `tv_resolver` y `ahora`, así no toca staging — a 1920×1080, 1920×990 (TV con
+la barra del navegador) y 1920×900, y mide la tinta de cada carácter contra lo que la recorta.
+Falla si un número (o un texto) queda visible a medias, si un número pisa otro texto o si no
+cargaron Geist / Geist Mono (`public/fonts/tv`).
+
+```bash
+npx vite build && npm i --no-save playwright-core
+npm run check:tv-numeros                                   # sirve ./dist solo
+OUT=/tmp/tv-numeros npm run check:tv-numeros               # + capturas
+SIN_FUENTE=1 npm run check:tv-numeros                      # sin las woff2: prueba el respaldo
+```

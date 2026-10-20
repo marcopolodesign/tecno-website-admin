@@ -10,6 +10,24 @@
 export const GEIST = "'Geist', system-ui, -apple-system, sans-serif"
 export const MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
 
+// Las fuentes viajan con el sitio (public/fonts/tv, OFL). Hasta el 2026-10-20 las TVs nunca
+// cargaron Geist: caían a la fuente del sistema (SF en la Mac, la de Samsung en la sala), con otras
+// medidas, y los números grandes se salían de sus cajas. woff2 estático por peso: Chrome 47 no
+// entiende fuentes variables. Control: scripts/check-tv-numeros.mjs (falla si no cargan).
+const cara = (familia, archivo, peso) =>
+  `@font-face { font-family: '${familia}'; src: url('/fonts/tv/${archivo}.woff2') format('woff2'); font-weight: ${peso}; font-style: normal; }`
+export const FUENTES_TV = [
+  cara('Geist', 'Geist-Regular', 400),
+  cara('Geist', 'Geist-Medium', 500),
+  cara('Geist', 'Geist-SemiBold', 600),
+  cara('Geist', 'Geist-Bold', 700),
+  cara('Geist', 'Geist-UltraBlack', 800), // en Geist "UltraBlack" es el 800 y "Black" el 900
+  cara('Geist', 'Geist-Black', 900),
+  cara('Geist Mono', 'GeistMono-Regular', 400),
+  cara('Geist Mono', 'GeistMono-Medium', 500),
+  cara('Geist Mono', 'GeistMono-SemiBold', 600),
+].join('\n')
+
 export const COLOR = {
   fondo: '#050505',
   trabajo: '#F45F37',

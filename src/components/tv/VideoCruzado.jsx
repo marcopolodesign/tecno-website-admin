@@ -16,7 +16,9 @@ const ESPERA_MAX_MS = 2500 // si un video no carga, se muestra igual pasado este
 
 export const claveEjercicio = (f) => (f ? `${f.exercise_order ?? ''}|${f.code ?? ''}|${f.name ?? ''}` : null)
 
-export default function VideoCruzado({ fila, proximas = [], style }) {
+// iconoSinVideo=false: sin video propio queda la superficie oscura sola, sin el círculo de play
+// (en las tarjetas chicas el círculo quedaba encima del nombre, y en una TV no se toca).
+export default function VideoCruzado({ fila, proximas = [], style, iconoSinVideo = true }) {
   const claveActual = claveEjercicio(fila)
   const proximasKey = proximas.map(claveEjercicio).join('~')
   const contenedor = useRef(null)
@@ -104,9 +106,9 @@ export default function VideoCruzado({ fila, proximas = [], style }) {
         // sin video propio: placeholder, listo de inmediato
         return (
           <div key={clave} style={{ ...capa(clave), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 120, height: 120, borderRadius: RADIO.pildora, background: COLOR.superficie, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {iconoSinVideo && <div style={{ width: 120, height: 120, borderRadius: RADIO.pildora, background: COLOR.superficie, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="52" height="52" viewBox="0 0 24 24" fill={COLOR.texto}><path d="M8 5.5 19 12 8 18.5z" /></svg>
-            </div>
+            </div>}
           </div>
         )
       })}

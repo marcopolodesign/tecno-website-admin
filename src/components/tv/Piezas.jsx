@@ -117,8 +117,20 @@ export function Encabezado({ numero, eyebrow, titulo, subtitulo, linea3, derecha
   )
 }
 
-// Cronómetro grande (Geist Mono 240 / 600).
-export function Cronometro({ valor, size = 240, color = COLOR.texto, estilo, ...resto }) {
+// Cronómetro grande (Geist Mono 240 / 600). `ancho`: el lugar que tiene; si el valor no entra a
+// `size` (un "10:00" de cinco caracteres en la columna de 580 de la estación) se achica la letra
+// hasta que entre. Geist Mono avanza 0,6 em por carácter y el tracking resta 0,05 em.
+const AVANCE_MONO = 0.6
+const TRACKING = -12 / 240
+// En Geist Mono los dos puntos ocupan un carácter entero y dejan un hueco grande ("19 : 55"): se
+// les come 0,06 em de cada lado (Felipe, 2026-10-20).
+const DOS_PUNTOS_EM = 0.06
+// `muestra`: el valor más ancho que va a mostrar este reloj (p. ej. "20:00"), para que la letra no
+// salte de tamaño cuando pasa de 10:00 a 9:59.
+export function Cronometro({ valor, size = 240, ancho, muestra, color = COLOR.texto, estilo, ...resto }) {
+  const n = Math.max(String(valor ?? '').length, String(muestra ?? '').length)
+  const dosPuntos = /:/.test(String(muestra ?? valor ?? '')) ? 1 : 0
+  if (ancho && n) size = Math.min(size, Math.floor(ancho / (n * AVANCE_MONO + (n - 1) * TRACKING - dosPuntos * 2 * DOS_PUNTOS_EM)))
   const k = size / 240
   return (
     <span
@@ -128,7 +140,14 @@ export function Cronometro({ valor, size = 240, color = COLOR.texto, estilo, ...
         fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', ...estilo,
       }}
     >
-      {valor}
+      {typeof valor === 'string' && valor.includes(':')
+        ? valor.split(':').map((parte, idx) => (
+            <span key={idx}>
+              {idx > 0 && <span style={{ margin: `0 ${-DOS_PUNTOS_EM}em` }}>:</span>}
+              {parte}
+            </span>
+          ))
+        : valor}
     </span>
   )
 }
