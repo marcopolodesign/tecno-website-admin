@@ -68,7 +68,11 @@ export default function VideoCruzado({ fila, proximas = [], style, iconoSinVideo
   useEffect(() => {
     if (!visible || !contenedor.current) return
     const v = contenedor.current.querySelector(`video[data-clave="${CSS.escape(visible)}"]`)
-    v?.play?.().catch(() => {})
+    // En el Chrome viejo de las Samsung `play()` devuelve undefined (no una Promise): un
+    // `.play().catch` directo tiraba "Cannot read property 'catch' of undefined" y la TV caía a
+    // la pantalla de error apenas había un video (A1, 2026-10-21). Control: scripts/check-tv-play.mjs.
+    const p = v?.play?.()
+    if (p && p.catch) p.catch(() => {})
   }, [visible])
 
   const marcar = (clave) => setListos((p) => (p[clave] ? p : { ...p, [clave]: true }))
