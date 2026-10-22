@@ -1,5 +1,6 @@
 // Control (2026-10-22): una TV en el cartel de error a pantalla completa se recarga sola
 // (1 min, y si vuelve a caer 2, 4… hasta 10 min). Falla si no avisa, si no recarga o si la espera no crece.
+// Tarda ~80 s (tiempo real: el reloj simulado de Playwright también dispara el error forzado).
 // Uso: npx vite build && npm i --no-save playwright-core && node scripts/check-tv-recarga.mjs [base]
 //   base por defecto: sirve ./dist en un puerto local con scripts/tv-chrome47/server.mjs.
 import { chromium } from 'playwright-core'
@@ -20,19 +21,17 @@ const browser = await chromium.launch({ executablePath: exe })
 try {
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
   const page = await ctx.newPage()
-  await page.clock.install()
   let cargas = 0
   page.on('load', () => { cargas++ })
   const url = `${base}/tv/palermo/a/1?tv-error-prueba=render`
   await page.goto(url, { waitUntil: 'load' })
-  await page.clock.runFor(5000)
+  await page.waitForTimeout(8000)
   const txt = await page.evaluate(() => (document.getElementById('tv-reporte-cartel') || {}).innerText || '')
   if (!/Se vuelve a cargar sola en 1 min/.test(txt)) fallas.push('el cartel no avisa "Se vuelve a cargar sola en 1 min": ' + JSON.stringify(txt.slice(0, 200)))
   const antes = cargas
-  await page.clock.runFor(61000)
-  await page.waitForTimeout(1500)
+  await page.waitForTimeout(62000)
   if (cargas <= antes) fallas.push('no se recargó sola al minuto')
-  await page.clock.runFor(5000)
+  await page.waitForTimeout(8000)
   const segunda = await page.evaluate(() => (window.__tvRecargaEn ? window.__tvRecargaEn() : 0))
   if (segunda !== 120) fallas.push(`después de una recarga la espera tendría que ser 120 s y es ${segunda}`)
 } finally {
