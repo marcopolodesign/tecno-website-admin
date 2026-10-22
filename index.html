@@ -144,8 +144,35 @@
           if (!cargando) texto(cartel, 'Archivo: ' + (info.archivo || '?') + ' · línea ' + (info.linea || '?') + ':' + (info.columna || '?'), 'font-size:' + (medio - 4) + 'px;margin-bottom:16px;');
           texto(cartel, 'Versión ' + VERSION + ' · ' + bundle() + ' · ' + new Date().toLocaleString() + (extras ? ' · +' + extras + ' errores más' : ''),
             'font-size:' + (medio - 8) + 'px;color:#fecaca;');
+          if (completo && !cargando) {
+            var seg = recargaProgramada();
+            texto(cartel, 'Se vuelve a cargar sola en ' + (seg >= 60 ? Math.round(seg / 60) + ' min' : seg + ' s') + '.',
+              'font-size:' + (medio - 8) + 'px;color:#fecaca;margin-top:24px;');
+          }
           d.body.appendChild(cartel);
         }
+
+        // Una TV de la sala no tiene que quedar trabada en el cartel hasta que alguien la toque
+        // (A1, 2026-10-21: quedó en error con la versión vieja aunque el arreglo ya estaba publicado).
+        // Con el error a pantalla completa se recarga sola: 1 min, y si vuelve a caer 2, 4, 8… hasta
+        // 10 min. La cuenta vive en sessionStorage y se reinicia si pasaron 30 min sin recargas.
+        // Control: scripts/check-tv-recarga.mjs.
+        var recargaEn = 0;
+        function recargaProgramada() {
+          if (recargaEn) return recargaEn;
+          var n = 0, ahora = new Date().getTime();
+          try {
+            var guardado = JSON.parse(w.sessionStorage.getItem('tvRecargas') || 'null');
+            if (guardado && ahora - guardado.t < 30 * 60 * 1000) n = guardado.n;
+          } catch (e) {}
+          recargaEn = Math.min(60 * Math.pow(2, n), 600);
+          setTimeout(function () {
+            try { w.sessionStorage.setItem('tvRecargas', JSON.stringify({ n: n + 1, t: new Date().getTime() })); } catch (e) {}
+            loc.reload();
+          }, recargaEn * 1000);
+          return recargaEn;
+        }
+        w.__tvRecargaEn = function () { return recargaEn; };
 
         function vacia() {
           var r = d.getElementById('root');
