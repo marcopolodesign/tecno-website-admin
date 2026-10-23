@@ -49,6 +49,22 @@ export const BORDE = `${BORDE_PX}px solid ${COLOR.borde}`
 
 export const acentoDe = (descanso) => (descanso ? COLOR.descanso : COLOR.trabajo)
 
+// Modo "un video a la vez" (2026-10-23): las Samsung Tizen 3.0 de la sala decodifican un solo
+// <video> de HTML5 por vez — con la estación de 4 ejercicios mostrando 4 <video> a la vez
+// (VideoCruzado por tarjeta), ninguno dibuja y las 4 quedan en negro. Se detecta por user-agent
+// (Tizen / SMART-TV, o Chrome viejo) con override de prueba ?unvideo=1 / ?unvideo=0. Constante de
+// módulo (no reactiva): igual que TV_VIEJA de tv/Piezas.jsx, se calcula una sola vez al cargar.
+export const UN_VIDEO = (() => {
+  if (typeof window !== 'undefined' && window.location && window.location.search) {
+    const q = /[?&]unvideo=([01])\b/.exec(window.location.search)
+    if (q) return q[1] === '1'
+  }
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const chrome = /Chrome\/(\d+)/.exec(ua)
+  return /SMART-TV|Tizen/i.test(ua) || Boolean(chrome && Number(chrome[1]) < 64)
+})()
+
 // Superficie de vidrio: tarjetas, paneles, chips.
 export const superficie = (radio = RADIO.tarjeta, extra) => ({
   background: COLOR.superficie,

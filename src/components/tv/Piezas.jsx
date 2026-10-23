@@ -1,7 +1,7 @@
 // Piezas visuales compartidas por las TVs (estación y sede), todas hechas con tokens.js.
 import { useState } from 'react'
 import { exerciseMedia } from '../../lib/exerciseMedia'
-import { BORDE, COLOR, GEIST, KEYFRAMES, MONO, RADIO, etiqueta, superficie } from './tokens'
+import { BORDE, COLOR, GEIST, KEYFRAMES, MONO, RADIO, UN_VIDEO, etiqueta, superficie } from './tokens'
 import Grilla from './Grilla'
 
 export { KEYFRAMES }
@@ -189,7 +189,9 @@ export function Miniatura({ fila, ancho = 176, alto = 100 }) {
   const base = { width: ancho, height: alto, borderRadius: RADIO.mini, objectFit: 'cover', display: 'block', flexShrink: 0, background: COLOR.superficie }
   if (media.kind === 'hosted' && media.poster) return <img src={media.poster} alt={fila.name} style={base} />
   if (media.kind === 'image') return <img src={media.src} alt={fila.name} style={base} />
-  if (media.kind === 'hosted') {
+  // Modo un video a la vez (TVs viejas, tv/turnoVideo.js): nunca un <video> más, ni de miniatura —
+  // sin póster propio queda la superficie oscura, igual que cualquier ejercicio sin media.
+  if (media.kind === 'hosted' && !UN_VIDEO) {
     return <video src={`${media.src}#t=0.4`} preload="metadata" muted playsInline style={{ ...base, ...media.style, width: ancho, height: alto }} />
   }
   return <div style={base} />

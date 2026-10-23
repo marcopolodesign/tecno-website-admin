@@ -9,16 +9,59 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { exerciseMedia } from '../../lib/exerciseMedia'
 import VideoEjercicio from '../VideoEjercicio'
-import { COLOR, RADIO } from './tokens'
+import { COLOR, RADIO, UN_VIDEO } from './tokens'
+import { useTurnoVideo } from './turnoVideo'
 
 const FADE_MS = 450
 const ESPERA_MAX_MS = 2500 // si un video no carga, se muestra igual pasado este tiempo
 
 export const claveEjercicio = (f) => (f ? `${f.exercise_order ?? ''}|${f.code ?? ''}|${f.name ?? ''}` : null)
 
+const sinVideoIcono = (iconoSinVideo) => (
+  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    {iconoSinVideo && (
+      <div style={{ width: 120, height: 120, borderRadius: RADIO.pildora, background: COLOR.superficie, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width="52" height="52" viewBox="0 0 24 24" fill={COLOR.texto}><path d="M8 5.5 19 12 8 18.5z" /></svg>
+      </div>
+    )}
+  </div>
+)
+
+// Modo "un video a la vez" (TVs viejas, ver tv/turnoVideo.js): el póster queda SIEMPRE puesto
+// (nunca una tarjeta en negro) y el <video> real sólo se monta para la tarjeta a la que le toca
+// el turno — así nunca hay más de un <video> vivo en toda la pantalla.
+function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
+  const clave = claveEjercicio(fila)
+  const esDueño = useTurnoVideo(clave)
+  const media = exerciseMedia(fila, 'tv')
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
+      {media.kind === 'hosted' && media.poster && (
+        <img src={media.poster} alt={fila?.name || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+      )}
+      {media.kind === 'image' && (
+        <img src={media.src} alt={fila?.name || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+      )}
+      {media.kind !== 'hosted' && media.kind !== 'image' && sinVideoIcono(iconoSinVideo)}
+      {esDueño && media.kind === 'hosted' && media.src && (
+        <VideoEjercicio
+          key={clave}
+          data-clave={clave}
+          src={media.src}
+          poster={media.poster}
+          recorte={media.recorte}
+          preload="auto"
+          style={{ position: 'absolute', inset: 0, zIndex: 1, ...media.style }}
+        />
+      )}
+    </div>
+  )
+}
+
 // iconoSinVideo=false: sin video propio queda la superficie oscura sola, sin el círculo de play
 // (en las tarjetas chicas el círculo quedaba encima del nombre, y en una TV no se toca).
 export default function VideoCruzado({ fila, proximas = [], style, iconoSinVideo = true }) {
+  if (UN_VIDEO) return <TarjetaUnVideo fila={fila} style={style} iconoSinVideo={iconoSinVideo} />
   const claveActual = claveEjercicio(fila)
   const proximasKey = proximas.map(claveEjercicio).join('~')
   const contenedor = useRef(null)
@@ -132,6 +175,9 @@ export function PrecargaVideos({ filas = [] }) {
     }
     return out
   }, [filas])
+  // Modo un video a la vez (TVs viejas): ni un <video> oculto más — cada uno pedía su propio
+  // decodificador de hardware. Ver tv/turnoVideo.js.
+  if (UN_VIDEO) return null
   return (
     <div aria-hidden="true" style={{ position: 'absolute', width: 2, height: 2, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
       {srcs.map((s) => <video key={s} src={s} preload="auto" muted playsInline />)}
