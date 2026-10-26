@@ -191,6 +191,14 @@ export const queueService = {
 
   async freeBox(lineBoxStatusId) {
     try {
+      // 2026-10-26: "Liberar" soltaba el box pero dejaba la entrada del socio en 'in_box' sin box
+      // (Claudia en Palermo): no se podía volver a anotar. Ahora se cierra también su entrada,
+      // como "Abandonar" de la app (no suma circuito).
+      const { data: antes } = await supabase
+        .from('line_box_status')
+        .select('current_user_id')
+        .eq('id', lineBoxStatusId)
+        .single()
       const { data, error } = await supabase
         .from('line_box_status')
         .update({ status: 'free', current_user_id: null, entered_at: null, advances_at: null })
@@ -199,6 +207,14 @@ export const queueService = {
         .single()
 
       if (error) throw error
+      if (antes?.current_user_id) {
+        const { error: errEntrada } = await supabase
+          .from('queue_entries')
+          .update({ status: 'abandoned', updated_at: new Date().toISOString() })
+          .eq('user_id', antes.current_user_id)
+          .eq('status', 'in_box')
+        if (errEntrada) throw errEntrada
+      }
       return { data }
     } catch (error) {
       console.error('Error freeing box:', error)
