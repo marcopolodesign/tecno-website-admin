@@ -18,7 +18,7 @@
 // Control: scripts/check-tv-un-video.mjs.
 import { useEffect, useState } from 'react'
 
-export const TURNO_MS = 6000
+export const TURNO_MS = 10000
 const TICK_MS = 500
 
 let claves = [] // orden de registro — estable mientras no cambian las tarjetas en pantalla
