@@ -350,6 +350,12 @@ function VistaOff({ pos, line }) {
   return <CabeceraBasica pos={pos} line={line} />
 }
 
+
+// 2026-10-26: "Hola Lucas Ezequiel" se salía de la TV. Sólo el primer nombre, y la letra se achica
+// si igual es largo (el ancho útil al lado del avatar es ~1500 px a 1920).
+const primerNombre = (n) => String(n || '').trim().split(/\s+/)[0]
+const tamañoSaludo = (n) => Math.max(96, Math.min(170, Math.floor(1500 / (('Hola '.length + n.length) * 0.58))))
+
 function VistaLlegando({ estado, box, pos, line, acento }) {
   const elementos = box?.elementos || []
   const hayEjercicios = Boolean(box?.ejercicios?.length || box?.ejercicio)
@@ -359,7 +365,7 @@ function VistaLlegando({ estado, box, pos, line, acento }) {
       <div style={{ position: 'absolute', left: 0, right: 0, top: 340, bottom: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, textAlign: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 40 }}>
           <Avatar url={estado.avatar_url} iniciales={estado.iniciales} size={180} fontSize={72} />
-          <span style={{ fontSize: 170, fontWeight: 800, letterSpacing: -5, lineHeight: 1.05 }}>Hola {estado.nombre}</span>
+          <span style={{ fontSize: tamañoSaludo(primerNombre(estado.nombre)), fontWeight: 800, letterSpacing: -5, lineHeight: 1.05, whiteSpace: 'nowrap' }}>Hola {primerNombre(estado.nombre)}</span>
         </div>
         <span style={{ fontSize: 48, color: COLOR.texto66 }}>{hayEjercicios ? 'Te presentamos tus ejercicios' : 'Tu estación arranca en breve'}</span>
         {elementos.length > 0 && (

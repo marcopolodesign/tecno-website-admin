@@ -3,7 +3,8 @@
 // alguien parado a dos metros de la TV mientras se acomoda.
 import { esPorTiempo } from './formatos'
 
-export function explicacionDeFormato(formato, { rondas, trabajoSeg, descansoSeg, ejerciciosPorMinuto } = {}) {
+export function explicacionDeFormato(formato, f) {
+  const { rondas, trabajoSeg, descansoSeg, ejerciciosPorMinuto } = f || {}
   const minutos = trabajoSeg ? Math.round(trabajoSeg / 60) : null
 
   switch (formato) {
