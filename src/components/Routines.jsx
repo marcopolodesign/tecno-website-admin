@@ -1272,11 +1272,15 @@ export default function Routines() {
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${
                               session.status === 'completed' ? 'bg-green-100 text-green-700' :
-                              session.status === 'unlocked' ? 'bg-blue-100 text-blue-700' :
+                              // 'available' / 'in_progress' son las que la TV y la app toman para
+                              // la sala. Antes se comparaba con 'unlocked' (no existe) y todas
+                              // decían "Bloqueada": no se veía una rutina sin sesión jugable.
+                              session.status === 'available' || session.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
                               'bg-gray-100 text-gray-600'
                             }`}>
                               {session.status === 'completed' ? 'Completada' :
-                               session.status === 'unlocked' ? 'Desbloqueada' : 'Bloqueada'}
+                               session.status === 'in_progress' ? 'En curso' :
+                               session.status === 'available' ? 'Próxima' : 'Bloqueada'}
                             </span>
                             <button
                               onClick={() => setRegistrandoResultados(session)}
