@@ -31,7 +31,7 @@ export function LienzoTv({ children, fondo = COLOR.fondo }) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
   return (
-    <div style={{ position: 'fixed', inset: 0, background: fondo, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, background: fondo, overflow: 'hidden' }}>
       <style>{FUENTES_TV}</style>
       <div style={{ width: m.ancho, height: m.alto, transform: `scale(${m.escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
         <LienzoContext.Provider value={{ ancho: m.ancho, alto: m.alto }}>{children}</LienzoContext.Provider>

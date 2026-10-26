@@ -18,7 +18,7 @@ const ESPERA_MAX_MS = 2500 // si un video no carga, se muestra igual pasado este
 export const claveEjercicio = (f) => (f ? `${f.exercise_order ?? ''}|${f.code ?? ''}|${f.name ?? ''}` : null)
 
 const sinVideoIcono = (iconoSinVideo) => (
-  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
     {iconoSinVideo && (
       <div style={{ width: 120, height: 120, borderRadius: RADIO.pildora, background: COLOR.superficie, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <svg width="52" height="52" viewBox="0 0 24 24" fill={COLOR.texto}><path d="M8 5.5 19 12 8 18.5z" /></svg>
@@ -37,10 +37,10 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
       {media.kind === 'hosted' && media.poster && (
-        <img src={media.poster} alt={fila?.name || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+        <img src={media.poster} alt={fila?.name || ''} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
       )}
       {media.kind === 'image' && (
-        <img src={media.src} alt={fila?.name || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+        <img src={media.src} alt={fila?.name || ''} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
       )}
       {media.kind !== 'hosted' && media.kind !== 'image' && sinVideoIcono(iconoSinVideo)}
       {esDueño && media.kind === 'hosted' && media.src && (
@@ -52,7 +52,7 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
           recorte={media.recorte}
           preload="auto"
           alProgreso={(t) => avisarAvance(clave, t)}
-          style={{ position: 'absolute', inset: 0, zIndex: 1, ...media.style }}
+          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1, ...media.style }}
         />
       )}
     </div>
@@ -125,10 +125,10 @@ export default function VideoCruzado({ fila, proximas = [], style, iconoSinVideo
   // uno estaría al 50% y se vería un bajón de brillo (un "negro" de medio cuadro).
   const capa = (clave) =>
     clave === visible
-      ? { position: 'absolute', inset: 0, opacity: 1, zIndex: 2, transition: `opacity ${FADE_MS}ms ease` }
+      ? { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 1, zIndex: 2, transition: `opacity ${FADE_MS}ms ease` }
       : clave === previo
-        ? { position: 'absolute', inset: 0, opacity: 1, zIndex: 1 }
-        : { position: 'absolute', inset: 0, opacity: 0, zIndex: 1 }
+        ? { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 1, zIndex: 1 }
+        : { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0, zIndex: 1 }
 
   return (
     <div ref={contenedor} style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>

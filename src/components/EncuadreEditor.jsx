@@ -274,7 +274,7 @@ const estilos = {
     background: '#000', cursor: 'grab', userSelect: 'none',
   },
   guias: {
-    position: 'absolute', inset: 0, pointerEvents: 'none',
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, pointerEvents: 'none',
     backgroundImage:
       'linear-gradient(to right, rgba(255,255,255,.25) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.25) 1px, transparent 1px)',
     backgroundSize: '33.333% 33.333%',
