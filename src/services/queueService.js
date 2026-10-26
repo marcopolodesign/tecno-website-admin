@@ -228,6 +228,8 @@ export const queueService = {
   // Ver tecnofit-supabase/supabase/migrations/20261026170000_sala_mover_socio.sql.
   async moverSocio(userId, boxId) {
     const { data, error } = await supabase.rpc('sala_mover_socio', { p_user_id: userId, p_box_id: boxId })
+    // Base sin la migración todavía: un aviso claro en vez del error de PostgREST.
+    if (error?.code === 'PGRST202') return { ok: false, motivo: 'no_rpc', mensaje: 'Mover todavía no está habilitado en esta base.' }
     if (error) throw error
     return data || { ok: false, mensaje: 'No se pudo mover.' }
   },
