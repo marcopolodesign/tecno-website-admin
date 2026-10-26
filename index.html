@@ -197,7 +197,9 @@
           // Navegadores con <script type="module"> pero sin import.meta (Chrome 61–63, Samsung
           // Tizen 4/5): el guard de @vitejs/plugin-legacy en polyfills-*.js tira SyntaxError A
           // PROPÓSITO y la página sigue con el bundle legacy. No es un error real (TV de Mateo, 26/10).
-          if (archivo && /\/assets\/(polyfills|index)-(?!legacy)[^\/]*\.js/.test(archivo) && /SyntaxError|Unexpected token/.test(String((error && error.name) || '') + ' ' + mensaje)) return false;
+          // También los <script type="module"> inline de detección (archivo = la página misma). Un
+          // SyntaxError en un chunk *-legacy-* sí es real y se reporta.
+          if (!/-legacy-[^\/]*\.js/.test(archivo || '') && /SyntaxError|Unexpected (token|identifier)/.test(String((error && error.name) || '') + ' ' + mensaje)) return false;
           reportar({
             origen: 'onerror',
             tipo: (error && error.name) || 'Error',
