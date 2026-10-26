@@ -179,7 +179,7 @@ function BoxCard({ box, line, confirming, onFree, riesgo, onVerSocio, arrastre, 
       ) : disp === 'reservado' ? (
         <span className="text-xs text-text-tertiary py-2">Reservado</span>
       ) : (
-        <div className="flex items-center justify-between py-1">
+        <div className="flex flex-col items-start gap-1.5 py-1">
           <span className="text-xs text-text-tertiary">Libre</span>
           {onAnotar && (
             <button type="button" onClick={onAnotar} aria-label="Anotar socio" title="Anotar socio" className="w-7 h-7 rounded-full border border-border text-text-secondary hover:text-brand hover:border-brand flex items-center justify-center text-base leading-none">
