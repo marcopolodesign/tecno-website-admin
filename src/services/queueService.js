@@ -222,6 +222,16 @@ export const queueService = {
     }
   },
 
+  // Mover a un socio a otro box (2026-10-26). RPC transaccional sala_mover_socio (sólo staff):
+  // suelta el origen sin terminar nada y lo hace arrancar el destino de cero. Rechaza destino
+  // ocupado o reservado. Devuelve { ok, motivo, mensaje, desde, hacia }.
+  // Ver tecnofit-supabase/supabase/migrations/20261026170000_sala_mover_socio.sql.
+  async moverSocio(userId, boxId) {
+    const { data, error } = await supabase.rpc('sala_mover_socio', { p_user_id: userId, p_box_id: boxId })
+    if (error) throw error
+    return data || { ok: false, mensaje: 'No se pudo mover.' }
+  },
+
   // ── Per-box routine display (TV) ────────────────────────────────────────
   // session_exercises.box_number is "station 1-5 within the circuit" (CHECK
   // 1..5 in the original fitness schema) — it means the SAME thing on both
