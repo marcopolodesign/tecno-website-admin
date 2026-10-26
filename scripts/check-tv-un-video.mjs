@@ -33,7 +33,7 @@ const DIST = process.env.DIST || new URL('../dist/', import.meta.url).pathname
 const OUT = process.env.OUT || ''
 const SAMSUNG_UA = 'Mozilla/5.0 (SMART-TV; Linux; Tizen 3.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.0 Chrome/47.0.2526.69 TV safari/537.36'
 const DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
-const TURNO_MS = 6000 // tiene que matchear src/components/tv/turnoVideo.js
+const TURNO_MS = 10000 // tiene que matchear src/components/tv/turnoVideo.js
 const CLIP = readFileSync(new URL('./fixtures/tv-clip.mp4', import.meta.url)) // H.264 Main, 3 s
 // La Samsung no hace caso del atributo autoplay (peor caso): sin play() explícito no arranca nunca.
 const SIN_AUTOPLAY = `(() => {
