@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Prueba de video</title>
+<style>body{background:#111;color:#fff;font:28px/1.35 sans-serif;margin:30px}video{width:640px;height:373px;background:#333;display:block;margin:10px 0}#log{font-size:24px;white-space:pre-wrap}</style></head>
+<body>
+<div>Prueba de video TecnoFit — sacale una foto a esta pantalla a los 20 segundos</div>
+<video id="v" muted autoplay playsinline loop preload="auto" poster="https://buntxbgjixlksffbscle.supabase.co/storage/v1/object/public/exercise-media/EJ0247/v1/poster.jpg"></video>
+<div id="log"></div>
+<script>
+// ES5 a propósito (Chrome 47).
+var v = document.getElementById('v'), L = document.getElementById('log'), t0 = Date.now();
+function log(s){ L.textContent += ((Date.now()-t0)/1000).toFixed(1) + 's ' + s + '\n'; }
+log('UA: ' + navigator.userAgent);
+log('canPlayType mp4 h264 main: "' + v.canPlayType('video/mp4; codecs="avc1.4D401E"') + '" · baseline: "' + v.canPlayType('video/mp4; codecs="avc1.42E01E"') + '" · mp4: "' + v.canPlayType('video/mp4') + '"');
+['loadstart','loadedmetadata','loadeddata','canplay','canplaythrough','playing','waiting','stalled','suspend','error','pause'].forEach(function(e){
+  v.addEventListener(e, function(){ log(e + ' · readyState ' + v.readyState + ' · network ' + v.networkState + (v.error ? ' · error.code ' + v.error.code : '') + ' · t ' + v.currentTime.toFixed(1) + ' · ' + v.videoWidth + 'x' + v.videoHeight); });
+});
+v.muted = true;
+v.src = 'https://buntxbgjixlksffbscle.supabase.co/storage/v1/object/public/exercise-media/EJ0247/v1/tv.mp4';
+try { var p = v.play(); if (p && p.then) p.then(function(){ log('play() ok'); }, function(e){ log('play() rechazado: ' + e.name + ' ' + e.message); }); else log('play() sin promesa'); } catch (e) { log('play() tiró: ' + e.message); }
+setTimeout(function(){ log('a los 10 s: readyState ' + v.readyState + ' · paused ' + v.paused + ' · t ' + v.currentTime.toFixed(1) + (v.error ? ' · error.code ' + v.error.code : '')); }, 10000);
+</script>
+</body></html>
