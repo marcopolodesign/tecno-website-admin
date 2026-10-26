@@ -80,7 +80,9 @@ export const REPS_POR_FORMATO = { Tabata: 'máx por ronda', AMRAP: '10 por vuelt
 
 export const esPorTiempo = (formato) => Boolean(formato) && formato !== 'Series'
 
-export function duracionSeg({ rondas, trabajoSeg, descansoSeg }) {
+export function duracionSeg(f) {
+  // La TV pasa null cuando la estación no tiene prescripción por tiempo (2026-10-26, A1 en prod).
+  const { rondas, trabajoSeg, descansoSeg } = f || {}
   if (!rondas || !trabajoSeg) return 0
   return rondas * (trabajoSeg + (descansoSeg || 0))
 }
@@ -103,7 +105,8 @@ export function duracionEstacionSeg(filas) {
   return duracionSeg(primera)
 }
 
-export function comoTexto(formato, { rondas, trabajoSeg, descansoSeg } = {}) {
+export function comoTexto(formato, f) {
+  const { rondas, trabajoSeg, descansoSeg } = f || {}
   if (!esPorTiempo(formato)) return null
   if (formato === 'AMRAP') return `AMRAP ${Math.round(trabajoSeg / 60)}′`
   if (formato === 'A completar') return `A completar ${Math.round(trabajoSeg / 60)}′`
