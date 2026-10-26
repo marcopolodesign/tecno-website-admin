@@ -66,7 +66,7 @@ function disponibilidad(box, confirming) {
 
 const primerNombre = (u) => u?.first_name?.trim().split(/\s+/)[0] || 'Socio'
 
-function BoxCard({ box, line, confirming, onFree, riesgo, onVerSocio, arrastre, onArrastrar, onSoltar, pendiente, onConfirmar, onCancelar, moviendo, onMover }) {
+function BoxCard({ box, line, confirming, onFree, riesgo, onVerSocio, arrastre, onArrastrar, onSoltar, pendiente, onConfirmar, onCancelar, moviendo, onMover, onAnotar }) {
   const countdown = useCountdown(box.status === 'occupied' ? box.advances_at : null)
   const isOccupied = box.status === 'occupied'
   const phase = useBoxPhase(isOccupied ? box.entered_at : null, explicacionSegDeLinea(line))
@@ -179,7 +179,14 @@ function BoxCard({ box, line, confirming, onFree, riesgo, onVerSocio, arrastre, 
       ) : disp === 'reservado' ? (
         <span className="text-xs text-text-tertiary py-2">Reservado</span>
       ) : (
-        <span className="text-xs text-text-tertiary py-2">Libre</span>
+        <div className="flex items-center justify-between py-1">
+          <span className="text-xs text-text-tertiary">Libre</span>
+          {onAnotar && (
+            <button type="button" onClick={onAnotar} aria-label="Anotar socio" title="Anotar socio" className="w-7 h-7 rounded-full border border-border text-text-secondary hover:text-brand hover:border-brand flex items-center justify-center text-base leading-none">
+              +
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -370,12 +377,16 @@ function AnotarSocioSidecart({ isOpen, onClose, sedeId, onAnotado }) {
     }
     setBuscando(true)
     const t = setTimeout(async () => {
-      const { data, error: err } = await supabase
+      // 2026-10-26: "Mateo Ald" no traía nada porque se buscaba la frase entera en cada campo.
+      // Ahora cada palabra tiene que estar en algún campo (nombre, apellido, DNI o mail).
+      let consulta = supabase
         .from('users')
         .select('id, first_name, last_name, email, dni, membership_status, membership_end_date')
         .eq('location_id', sedeId)
-        .or(`first_name.ilike.%${termino}%,last_name.ilike.%${termino}%,dni.ilike.%${termino}%,email.ilike.%${termino}%`)
-        .limit(8)
+      for (const palabra of termino.split(/\s+/).map((p) => p.replace(/[,()*%]/g, '')).filter(Boolean)) {
+        consulta = consulta.or(`first_name.ilike.%${palabra}%,last_name.ilike.%${palabra}%,dni.ilike.%${palabra}%,email.ilike.%${palabra}%`)
+      }
+      const { data, error: err } = await consulta.limit(8)
       if (!err) setResultados(data || [])
       setBuscando(false)
     }, 250)
@@ -819,6 +830,7 @@ export default function QueueMonitor() {
   }
 
   const mover = {
+    onAnotar: () => setAnotarAbierto(true),
     arrastre,
     onArrastrar: (a) => {
       setArrastre(a)
