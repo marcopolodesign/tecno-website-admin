@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { exerciseMedia } from '../../lib/exerciseMedia'
 import VideoEjercicio from '../VideoEjercicio'
 import { COLOR, RADIO, UN_VIDEO } from './tokens'
-import { useTurnoVideo } from './turnoVideo'
+import { avisarAvance, useTurnoVideo } from './turnoVideo'
 
 const FADE_MS = 450
 const ESPERA_MAX_MS = 2500 // si un video no carga, se muestra igual pasado este tiempo
@@ -51,6 +51,7 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
           poster={media.poster}
           recorte={media.recorte}
           preload="auto"
+          alProgreso={(t) => avisarAvance(clave, t)}
           style={{ position: 'absolute', inset: 0, zIndex: 1, ...media.style }}
         />
       )}

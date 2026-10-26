@@ -64,3 +64,24 @@ npm run check:tv-numeros                                   # sirve ./dist solo
 OUT=/tmp/tv-numeros npm run check:tv-numeros               # + capturas
 SIN_FUENTE=1 npm run check:tv-numeros                      # sin las woff2: prueba el respaldo
 ```
+
+## Videos en el Chrome 47 real (2026-10-26)
+
+El snapshot real (`~/.cache/chrome47/chrome-mac/Chromium.app`, 47.0.2526.0, x86_64) **arranca bajo
+Rosetta** y la red sí anda (también HTTPS contra tv.somostecnofit.com):
+
+```bash
+arch -x86_64 ~/.cache/chrome47/chrome-mac/Chromium.app/Contents/MacOS/Chromium \
+  --user-data-dir=/tmp/c47vid --no-first-run --remote-debugging-port=9247 about:blank &
+```
+
+- `innerWidth` da 0 (la ventana no toma tamaño): forzar 1920×1080 con CDP
+  `Emulation.setDeviceMetricsOverride` y recargar. `Page.captureScreenshot` se cuelga: medir por DOM.
+- Una sola conexión CDP por pestaña (si otro script quedó enganchado, no hay `webSocketDebuggerUrl`).
+- **Chromium no trae H.264**: todo `.mp4` da `error.code = 4`. Para probar el recorrido de los videos
+  hay que servirlos como VP9/webm: build con `VITE_SUPABASE_URL=http://localhost:<proxy>` y un proxy
+  que reenvía a Supabase y cambia los `exercise-media/*.mp4` por un webm transcodeado con ffmpeg.
+  El decodificador de hardware de la TV no se puede imitar acá — para eso está el aviso de video
+  (`VideoNoArranca` en Sentry y `/__etapa/video-ok|video-no-arranca` en el log de CDN).
+- `server.mjs` con `LEGACY=1` saca los `<script type="module">` sólo al inicio de línea: el aviso
+  inline los nombra en un comentario y el regex viejo se comía medio script.
