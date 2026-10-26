@@ -108,6 +108,12 @@
               request: { url: loc.href, headers: { 'User-Agent': navigator.userAgent } },
               extra: { stack: corto(info.stack, 4000), archivo: info.archivo, linea: info.linea, columna: info.columna, componentStack: corto(info.componentStack, 4000) }
             };
+            if (info.datos) {
+              evento.extra.video = info.datos;
+              evento.tags.video_ready_state = String(info.datos.readyState);
+              evento.tags.video_error = String(info.datos.errorCode);
+              evento.fingerprint = ['tv-video', String(info.datos.readyState), String(info.datos.errorCode)];
+            }
             var cuerpo = JSON.stringify({ event_id: id, sent_at: ahora, dsn: DSN }) + '\n' +
               JSON.stringify({ type: 'event' }) + '\n' + JSON.stringify(evento) + '\n';
             var x = new XMLHttpRequest();
@@ -234,6 +240,75 @@
             completo: true
           });
         };
+
+        // Videos que no arrancan (2026-10-26, TV de Palermo: se veía el póster y el video nunca
+        // corría). Cada 2 s mira los <video> de la pantalla: si uno no avanzó en VIDEO_SEG segundos
+        // desde que apareció (o desde que cambió su src), o tiró 'error', lo manda a Sentry
+        // (warning, sin cartel: la pantalla sigue útil con el póster) con readyState, networkState,
+        // error.code, src y qué dice canPlayType; y deja la marca /__etapa/video-no-arranca. El
+        // primero que sí avanza deja /__etapa/video-ok. Control: scripts/check-tv-un-video.mjs.
+        var VIDEO_SEG = 10, videosReportados = 0, videoOk = false;
+        function estadoVideo(v) {
+          var b = '';
+          try { if (v.buffered && v.buffered.length) b = v.buffered.start(0).toFixed(1) + '-' + v.buffered.end(v.buffered.length - 1).toFixed(1); } catch (e) {}
+          var tipo = '';
+          try { tipo = v.canPlayType('video/mp4; codecs="avc1.4D4028"'); } catch (e) {}
+          return {
+            src: v.currentSrc || v.src || '',
+            readyState: v.readyState,
+            networkState: v.networkState,
+            errorCode: v.error ? v.error.code : null,
+            paused: v.paused,
+            currentTime: Math.round(v.currentTime * 100) / 100,
+            buffered: b,
+            videoWidth: v.videoWidth,
+            ancho: v.clientWidth,
+            alto: v.clientHeight,
+            autoplay: v.autoplay,
+            muted: v.muted,
+            canPlayH264Main40: tipo,
+            visibleDoc: d.hidden === undefined ? 'n/a' : !d.hidden
+          };
+        }
+        function reportarVideo(v, motivo) {
+          if (videosReportados >= 3) return;
+          videosReportados++;
+          var e = estadoVideo(v);
+          etapa('video-no-arranca');
+          enviar({
+            origen: 'video',
+            tipo: 'VideoNoArranca',
+            nivel: 'warning',
+            mensaje: 'Video no arranca (' + motivo + '): readyState=' + e.readyState + ' networkState=' + e.networkState +
+              ' error=' + e.errorCode + ' paused=' + e.paused + ' t=' + e.currentTime + ' src=' + e.src,
+            datos: e
+          });
+        }
+        function revisarVideos() {
+          var vs = d.getElementsByTagName('video'), ahora = new Date().getTime();
+          for (var k = 0; k < vs.length; k++) {
+            var v = vs[k], src = v.currentSrc || v.src || '';
+            if (!v.__tv || v.__tv.src !== src) v.__tv = { desde: ahora, t0: v.currentTime, src: src };
+            var s = v.__tv;
+            if (s.listo || s.reportado || !src) continue;
+            if (v.currentTime > s.t0 + 0.3 && !v.paused) {
+              s.listo = 1;
+              if (!videoOk) { videoOk = true; etapa('video-ok'); }
+              continue;
+            }
+            if (ahora - s.desde >= VIDEO_SEG * 1000) { s.reportado = 1; reportarVideo(v, 'no avanzó en ' + VIDEO_SEG + ' s'); }
+          }
+        }
+        setInterval(revisarVideos, 2000);
+        w.__tvRevisarVideos = revisarVideos;
+        if (d.addEventListener) d.addEventListener('error', function (ev) {
+          var v = ev && ev.target;
+          if (!v || v.tagName !== 'VIDEO' || !v.error) return;
+          if (!v.__tv) v.__tv = { desde: new Date().getTime(), t0: 0, src: v.currentSrc || v.src || '' };
+          if (v.__tv.reportado) return;
+          v.__tv.reportado = 1;
+          reportarVideo(v, 'evento error');
+        }, true);
 
         // Watchdog: si a los 15 s (y a los 45 s) la app no dibujó nada y no hubo error, lo dice en la
         // pantalla con qué cargó y qué falta. Si el hilo principal está colgado esto no llega a correr:

@@ -19,7 +19,7 @@ http.createServer((req, res) => {
   if (f.endsWith('index.html')) {
     body = body.toString().replace('<head>', '<head>' + SONDA)
     // Modo TV vieja: sin ES modules, como Chrome 47 — sólo corre el bundle nomodule.
-    if (process.env.LEGACY) body = body.replace(/<script type="module"[^>]*>[\s\S]*?<\/script>/g, '').replace(/ nomodule/g, '')
+    if (process.env.LEGACY) body = body.replace(/^\s*<script type="module"[^>]*>[\s\S]*?<\/script>/gm, '') // al inicio de línea: el aviso inline lo nombra en un comentario.replace(/ nomodule/g, '')
   }
   res.writeHead(200, { 'Content-Type': TYPES[extname(f)] || 'application/octet-stream', 'Access-Control-Allow-Origin': '*' })
   res.end(body)
