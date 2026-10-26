@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ArrowPathIcon, ClockIcon } from '@heroicons/react/24/outline'
 import toast, { Toaster } from 'react-hot-toast'
 import { queueService, boxLabel } from '../services/queueService'
@@ -56,31 +56,95 @@ function Avatar({ user, size = 'md', riesgo }) {
   )
 }
 
-function BoxCard({ box, line, onFree, riesgo, onVerSocio }) {
+// Quién está libre para recibir a un socio que se mueve: el box libre, salvo el box 1 de una línea
+// donde alguien está confirmando su turno (ese lugar ya es suyo — ver sala_mover_socio).
+function disponibilidad(box, confirming) {
+  if (box.status !== 'free') return 'ocupado'
+  if (box.boxes?.line_position === 1 && confirming) return 'reservado'
+  return 'libre'
+}
+
+const primerNombre = (u) => u?.first_name?.trim().split(/\s+/)[0] || 'Socio'
+
+function BoxCard({ box, line, confirming, onFree, riesgo, onVerSocio, arrastre, onArrastrar, onSoltar, pendiente, onConfirmar, onCancelar, moviendo, onMover }) {
   const countdown = useCountdown(box.status === 'occupied' ? box.advances_at : null)
   const isOccupied = box.status === 'occupied'
   const phase = useBoxPhase(isOccupied ? box.entered_at : null, explicacionSegDeLinea(line))
+  const [encima, setEncima] = useState(false)
+  const label = boxLabel(line?.line_number, box.boxes?.line_position)
+  const disp = disponibilidad(box, confirming)
+  const esOrigen = arrastre && arrastre.lbsId === box.id
+  const esPendiente = pendiente && pendiente.destino.id === box.id
+  // Mientras se arrastra: libres = destino válido; el resto se atenúa. Con una confirmación
+  // abierta, todo vuelve a la normalidad salvo el destino elegido.
+  const destinoValido = arrastre && !esOrigen && disp === 'libre'
+  const invalido = arrastre && !esOrigen && disp !== 'libre'
+
+  const marco = esPendiente
+    ? 'border-brand bg-brand/10'
+    : destinoValido
+      ? encima
+        ? 'border-brand bg-brand/10'
+        : 'border-dashed border-brand bg-bg-surface'
+      : isOccupied
+        ? 'border-brand bg-brand/5'
+        : 'border-border-default bg-bg-surface'
 
   return (
     <div
-      className={`rounded-lg border p-3 flex flex-col items-center gap-1.5 flex-1 min-w-[150px] ${
-        isOccupied ? 'border-brand bg-brand/5' : 'border-border-default bg-bg-surface'
+      onDragOver={(e) => {
+        if (!destinoValido) return // sin preventDefault el navegador no deja soltar
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        if (!encima) setEncima(true)
+      }}
+      onDragLeave={() => setEncima(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setEncima(false)
+        if (destinoValido) onSoltar(box, line)
+      }}
+      className={`rounded-lg border p-3 flex flex-col items-center gap-1.5 flex-1 min-w-[150px] transition-colors ${marco} ${
+        invalido ? 'opacity-40 cursor-not-allowed' : ''
       }`}
     >
-      <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wide">
-        Box {boxLabel(line?.line_number, box.boxes?.line_position)}
-      </span>
-      {isOccupied ? (
+      <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wide">Box {label}</span>
+      {esPendiente ? (
+        <div className="w-full flex flex-col items-center gap-2 py-1 text-center">
+          <span className="text-sm font-medium text-text-primary">¿Mover a {pendiente.nombre} acá?</span>
+          <span className="text-xs text-text-tertiary">Desde {pendiente.desde} · arranca de cero</span>
+          <button type="button" onClick={onConfirmar} disabled={moviendo} className="btn-primary text-xs w-full py-1.5">
+            {moviendo ? 'Moviendo…' : 'Mover'}
+          </button>
+          <button type="button" onClick={onCancelar} disabled={moviendo} className="text-xs text-text-tertiary hover:text-text-primary">
+            Cancelar
+          </button>
+        </div>
+      ) : isOccupied ? (
         <>
           {/* Toda la ficha del socio es el botón, no un ícono chiquito al costado: en una
-              tablet de mostrador lo que se toca es la persona. */}
+              tablet de mostrador lo que se toca es la persona. En desktop además se arrastra
+              a otro box (2026-10-26). */}
           <button
             type="button"
+            draggable={!!box.users}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', box.users?.id ?? '')
+              const avatar = e.currentTarget.querySelector('[data-avatar]')
+              if (avatar) e.dataTransfer.setDragImage(avatar, 18, 18)
+              onArrastrar({ lbsId: box.id, userId: box.users.id, nombre: primerNombre(box.users), desde: label })
+            }}
+            onDragEnd={() => onArrastrar(null)}
             onClick={() => box.users && onVerSocio(box.users.id)}
             disabled={!box.users}
-            className="flex flex-col items-center gap-1 w-full rounded-md p-1 transition-colors enabled:hover:bg-brand/10"
+            className={`flex flex-col items-center gap-1 w-full rounded-md p-1 transition-colors enabled:hover:bg-brand/10 ${
+              box.users ? 'cursor-grab active:cursor-grabbing' : ''
+            } ${esOrigen ? 'opacity-40' : ''}`}
           >
-            <Avatar user={box.users} riesgo={riesgo?.risk_bucket} />
+            <span data-avatar>
+              <Avatar user={box.users} riesgo={riesgo?.risk_bucket} />
+            </span>
             <span className="text-text-primary font-medium text-sm text-center leading-tight">
               {box.users ? nombreDe(box.users) : 'Ocupado'}
             </span>
@@ -95,13 +159,25 @@ function BoxCard({ box, line, onFree, riesgo, onVerSocio }) {
             <ClockIcon className="h-3.5 w-3.5" />
             {countdown}
           </div>
-          <button
-            onClick={() => onFree(box.id)}
-            className="text-xs text-text-tertiary hover:text-red-500"
-          >
-            Liberar
-          </button>
+          <div className="flex items-center gap-3 text-xs">
+            {box.users && (
+              <button
+                type="button"
+                onClick={() => onMover({ lbsId: box.id, userId: box.users.id, nombre: primerNombre(box.users), desde: label })}
+                className="text-text-tertiary hover:text-brand"
+              >
+                Mover
+              </button>
+            )}
+            <button onClick={() => onFree(box.id)} className="text-text-tertiary hover:text-red-500">
+              Liberar
+            </button>
+          </div>
         </>
+      ) : destinoValido ? (
+        <span className="text-xs text-brand py-2">Soltar acá</span>
+      ) : disp === 'reservado' ? (
+        <span className="text-xs text-text-tertiary py-2">Reservado</span>
       ) : (
         <span className="text-xs text-text-tertiary py-2">Libre</span>
       )}
@@ -109,36 +185,9 @@ function BoxCard({ box, line, onFree, riesgo, onVerSocio }) {
   )
 }
 
-function LinePipeline({ line, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSocio }) {
-  const [boxes, setBoxes] = useState([])
-  const [queue, setQueue] = useState([])
-  const unsubRef = useRef(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      const [{ data: boxData }, { data: queueData }] = await Promise.all([
-        queueService.getLineBoxStatus(line.id),
-        queueService.getQueueForLine(line.id),
-      ])
-      setBoxes(boxData || [])
-      setQueue(queueData || [])
-    } catch (err) {
-      console.error('Error refreshing line', line.id, err)
-    }
-  }, [line.id])
-
-  // `getQueueForLine` sigue trayendo waiting + confirming, pero con la cola única por sede
-  // los que esperan ya no tienen línea: en la práctica acá sólo cae el que está
-  // confirmando su turno para entrar a ESTA línea. La lista de espera se dibuja una sola
-  // vez, abajo de todas las líneas.
-
-  useEffect(() => {
-    refresh()
-    unsubRef.current = queueService.subscribeToLine(line.id, refresh)
-    return () => unsubRef.current?.()
-  }, [line.id, refresh])
-
-  const confirming = queue.find((q) => q.status === 'confirming')
+// Una línea. Los datos (boxes + quién confirma) los trae QueueMonitor para todas las líneas a la
+// vez: mover cruza líneas (A3 → B2) y el aviso en vivo es uno solo por sede.
+function LinePipeline({ line, boxes, confirming, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSocio, mover }) {
   const ocupados = boxes.filter((b) => b.status === 'occupied').length
 
   return (
@@ -169,9 +218,11 @@ function LinePipeline({ line, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSoc
             key={box.id}
             box={box}
             line={line}
+            confirming={confirming}
             onFree={onFreeBox}
             riesgo={box.users ? riesgoPorUsuario.get(box.users.id) : null}
             onVerSocio={onVerSocio}
+            {...mover}
           />
         ))}
         {boxes.length === 0 && (
@@ -208,6 +259,76 @@ function LinePipeline({ line, onFreeBox, onSkipEntry, riesgoPorUsuario, onVerSoc
       )}
 
     </div>
+  )
+}
+
+// "Mover" sin arrastrar (táctil, teclado, o el que prefiera tocar): elegir el box en una grilla.
+// Spec de Felipe (2026-10-26).
+function MoverSidecart({ origen, lines, boxesPorLinea, confirmingPorLinea, onClose, onMover, moviendo }) {
+  const [elegido, setElegido] = useState(null)
+  useEffect(() => {
+    if (!origen) setElegido(null)
+  }, [origen])
+
+  return (
+    <Sidecart isOpen={!!origen} onClose={onClose} title={origen ? `Mover a ${origen.nombre}` : 'Mover'} size="sm">
+      {origen && (
+        <div className="space-y-5">
+          {lines.map((line) => {
+            const boxes = boxesPorLinea[line.id] || []
+            if (!boxes.length) return null
+            return (
+              <div key={line.id} className="space-y-2">
+                <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wide">{line.name}</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {boxes.map((box) => {
+                    const pos = box.boxes?.line_position
+                    const etiqueta = boxLabel(line.line_number, pos)
+                    const actual = box.id === origen.lbsId
+                    const disp = disponibilidad(box, confirmingPorLinea[line.id])
+                    const sel = elegido?.box.id === box.id
+                    const deshabilitado = actual || disp !== 'libre'
+                    const nota = actual ? 'Está acá' : disp === 'ocupado' ? primerNombre(box.users) : disp === 'reservado' ? 'Reservado' : null
+                    return (
+                      <button
+                        key={box.id}
+                        type="button"
+                        disabled={deshabilitado}
+                        onClick={() => setElegido({ box, line, etiqueta })}
+                        className={`min-h-[44px] rounded-md border px-1 py-1.5 flex flex-col items-center justify-center transition-colors ${
+                          actual
+                            ? 'bg-brand/5 border-brand'
+                            : sel
+                              ? 'bg-brand/10 border-brand'
+                              : deshabilitado
+                                ? 'opacity-40 border-border-default cursor-not-allowed'
+                                : 'border-border-default bg-bg-surface hover:border-brand'
+                        }`}
+                      >
+                        <span className="text-sm font-semibold text-text-primary">{pos}</span>
+                        {nota && <span className="text-xs text-text-tertiary truncate max-w-full">{nota}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+
+          <div className="space-y-1.5 pt-1">
+            {elegido && <p className="text-xs text-text-tertiary text-center">Arranca {elegido.etiqueta} de cero</p>}
+            <button
+              type="button"
+              disabled={!elegido || moviendo}
+              onClick={() => onMover(origen, elegido.box, elegido.line)}
+              className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {moviendo ? 'Moviendo…' : elegido ? `Mover a ${elegido.etiqueta}` : 'Elegí un box'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Sidecart>
   )
 }
 
@@ -598,6 +719,15 @@ export default function QueueMonitor() {
     }
   }, [])
 
+  const [boxesPorLinea, setBoxesPorLinea] = useState({})
+  const [confirmingPorLinea, setConfirmingPorLinea] = useState({})
+  // Mover un socio de box (2026-10-26): arrastre en curso, destino soltado esperando confirmación,
+  // y el origen elegido con "Mover" (abre la grilla).
+  const [arrastre, setArrastre] = useState(null)
+  const [pendiente, setPendiente] = useState(null)
+  const [moverDesde, setMoverDesde] = useState(null)
+  const [moviendo, setMoviendo] = useState(false)
+
   const fetchEspera = useCallback(async () => {
     try {
       const { data } = await queueService.getWaitingForLocation(sedeId)
@@ -607,17 +737,110 @@ export default function QueueMonitor() {
     }
   }, [sedeId])
 
+  // Boxes + quién confirma, de todas las líneas a la vez (mover cruza líneas).
+  const fetchBoxes = useCallback(async () => {
+    if (!lines.length) return
+    try {
+      const filas = await Promise.all(
+        lines.map((l) => Promise.all([queueService.getLineBoxStatus(l.id), queueService.getQueueForLine(l.id)]))
+      )
+      const bx = {}
+      const cf = {}
+      lines.forEach((l, i) => {
+        bx[l.id] = filas[i][0].data || []
+        cf[l.id] = (filas[i][1].data || []).find((q) => q.status === 'confirming') || null
+      })
+      setBoxesPorLinea(bx)
+      setConfirmingPorLinea(cf)
+    } catch (err) {
+      console.error('Error refreshing lines:', err)
+    }
+  }, [lines])
+
+  const refreshSala = useCallback(() => {
+    fetchBoxes()
+    fetchEspera()
+  }, [fetchBoxes, fetchEspera])
+
   useEffect(() => {
     fetchLines()
   }, [fetchLines])
 
-  // La lista de espera se mantiene sola por Realtime — recepción no aprieta nada. El botón
-  // Actualizar queda como red de seguridad para el caso de una TV que perdió el socket.
+  // En vivo, como la TV (2026-10-26): el mismo broadcast `sala:<sede>` que mandan los triggers de
+  // line_box_status y queue_entries (tv_avisar_cambio) — un aviso por fila que cambia, que ya se
+  // emite igual para las TVs. Antes eran postgres_changes por línea y por sede (3 canales, cada
+  // cambio evaluado contra la RLS de cada admin conectado). Respaldo: cada 20 s por REST, por si
+  // el socket se cayó (no cuenta como mensaje de Realtime).
+  const sedesDeLineas = useMemo(
+    () => [...new Set((sedeId ? [sedeId] : lines.map((l) => l.location_id)).filter(Boolean))],
+    [sedeId, lines]
+  )
   useEffect(() => {
-    fetchEspera()
-    const unsub = queueService.subscribeToLocationQueue(sedeId, fetchEspera)
-    return () => unsub?.()
-  }, [sedeId, fetchEspera])
+    refreshSala()
+    const bajas = sedesDeLineas.map((loc) => queueService.subscribeToSala(loc, refreshSala))
+    const id = setInterval(refreshSala, 20000)
+    return () => {
+      clearInterval(id)
+      bajas.forEach((b) => b())
+    }
+  }, [sedesDeLineas, refreshSala])
+
+  // Escape cancela el arrastre o la confirmación.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      setArrastre(null)
+      if (!moviendo) setPendiente(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moviendo])
+
+  const ejecutarMover = async (origen, destinoBox, destinoLinea) => {
+    const etiqueta = boxLabel(destinoLinea.line_number, destinoBox.boxes?.line_position)
+    setMoviendo(true)
+    try {
+      const r = await queueService.moverSocio(origen.userId, destinoBox.boxes?.id ?? destinoBox.box_id)
+      if (r.ok) {
+        toast.success(`${origen.nombre} pasó a ${etiqueta}.`, toastOptions)
+        setMoverDesde(null)
+      } else if (r.motivo === 'destino_ocupado' || r.motivo === 'destino_reservado') {
+        toast.error(`${etiqueta} se ocupó recién. Elegí otro box.`, toastOptions)
+      } else {
+        toast.error(r.mensaje || 'No se pudo mover.', toastOptions)
+      }
+    } catch (err) {
+      toast.error(err.message || String(err), toastOptions)
+    } finally {
+      setMoviendo(false)
+      setPendiente(null)
+      refreshSala()
+    }
+  }
+
+  const mover = {
+    arrastre,
+    onArrastrar: (a) => {
+      setArrastre(a)
+      if (a) setPendiente(null)
+    },
+    onSoltar: (destino, line) => {
+      if (!arrastre) return
+      setPendiente({ ...arrastre, destino, line })
+      setArrastre(null)
+    },
+    pendiente,
+    onConfirmar: () => pendiente && ejecutarMover(pendiente, pendiente.destino, pendiente.line),
+    onCancelar: () => setPendiente(null),
+    moviendo,
+    onMover: (origen) => {
+      setPendiente(null)
+      setMoverDesde(origen)
+    },
+  }
+
+  // La lista de espera se mantiene sola (aviso en vivo de arriba) — recepción no aprieta nada.
+  // El botón Actualizar queda como red de seguridad.
 
   // El riesgo de cada uno cambia por día, pero QUIÉN está en la sala cambia a cada rato: se
   // vuelve a pedir cuando cambia la lista de espera y cada 30 s (los que rotan de box no
@@ -641,6 +864,7 @@ export default function QueueMonitor() {
   const handleFreeBox = async (lineBoxStatusId) => {
     try {
       await queueService.freeBox(lineBoxStatusId)
+      refreshSala()
     } catch (err) {
       console.error('Error freeing box:', err)
     }
@@ -649,6 +873,7 @@ export default function QueueMonitor() {
   const handleSkipEntry = async (queueEntryId) => {
     try {
       await queueService.skipQueueEntry(queueEntryId)
+      refreshSala()
     } catch (err) {
       console.error('Error skipping entry:', err)
     }
@@ -680,7 +905,7 @@ export default function QueueMonitor() {
               )}
             </a>
           )}
-          <button onClick={fetchLines} className="btn-secondary flex items-center gap-2 text-sm">
+          <button onClick={() => { fetchLines(); refreshSala() }} className="btn-secondary flex items-center gap-2 text-sm">
             <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Actualizar
           </button>
@@ -709,6 +934,9 @@ export default function QueueMonitor() {
               <LinePipeline
                 key={line.id}
                 line={line}
+                boxes={boxesPorLinea[line.id] || []}
+                confirming={confirmingPorLinea[line.id] || null}
+                mover={mover}
                 onFreeBox={handleFreeBox}
                 onSkipEntry={handleSkipEntry}
                 riesgoPorUsuario={riesgoPorUsuario}
@@ -730,6 +958,16 @@ export default function QueueMonitor() {
         userId={socioAbierto}
         onClose={() => setSocioAbierto(null)}
         riesgo={socioAbierto ? riesgoPorUsuario.get(socioAbierto) : null}
+      />
+
+      <MoverSidecart
+        origen={moverDesde}
+        lines={lines}
+        boxesPorLinea={boxesPorLinea}
+        confirmingPorLinea={confirmingPorLinea}
+        onClose={() => setMoverDesde(null)}
+        onMover={ejecutarMover}
+        moviendo={moviendo}
       />
 
       <AnotarSocioSidecart
