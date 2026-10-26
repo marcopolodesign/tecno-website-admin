@@ -461,7 +461,7 @@ const e = {
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
   nota: { fontSize: 12, color: '#9ca3af', margin: 0 },
   fondo: {
-    position: 'fixed', inset: 0, background: 'rgba(17,24,39,.5)', display: 'flex',
+    position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, background: 'rgba(17,24,39,.5)', display: 'flex',
     alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50,
   },
   panel: {

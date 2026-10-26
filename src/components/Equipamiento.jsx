@@ -915,7 +915,7 @@ const e = {
     color: '#B91C1C', fontSize: 13,
   },
   fondo: {
-    position: 'fixed', inset: 0, background: 'rgba(17,24,39,.5)', display: 'flex',
+    position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, background: 'rgba(17,24,39,.5)', display: 'flex',
     alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50,
   },
   panel: {

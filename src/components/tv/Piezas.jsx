@@ -40,7 +40,7 @@ export function FondoManchas({ acento = COLOR.trabajo }) {
     }
   }
   return (
-    <div style={{ position: 'absolute', inset: 0, background: COLOR.fondo, overflow: 'hidden' }}>
+    <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: COLOR.fondo, overflow: 'hidden' }}>
       <div style={blob({ width: 760, height: 760, left: -160, top: 620, opacity: 0.42, animation: 'libreBlobA 34s ease-in-out infinite' })} />
       <div style={blob({ width: 640, height: 640, right: -120, top: -140, opacity: 0.3, animation: 'libreBlobB 28s ease-in-out infinite' })} />
       <div style={blob({ width: 520, height: 520, left: 900, top: 520, opacity: 0.18, animation: 'libreBlobC 38s ease-in-out infinite' })} />

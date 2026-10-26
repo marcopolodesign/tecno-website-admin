@@ -8,6 +8,19 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { parse } from 'acorn'
 import { simple } from 'acorn-walk'
 
+// 2026-10-26: los estilos INLINE de React con `inset` no pasan por la reescritura de CSS y Chrome <87
+// los ignora: en la Samsung el <video> quedaba sin tamaño (se veía sólo el póster). Ningún componente
+// de TV puede usar `inset:` en un style={{}}.
+import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
+{
+  const dirs = ['src/components/tv', 'src/components']
+  const tvFiles = []
+  for (const d of dirs) for (const f of __rd(d)) if (/\.(jsx|js)$/.test(f) && (d.endsWith('/tv') || /^(QueueTv|Tv|Anotarme)/.test(f))) tvFiles.push(`${d}/${f}`)
+  const malos = tvFiles.filter((f) => /\binset\s*:/.test(__rf(f, 'utf8')))
+  if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }
+}
+
+
 const dir = new URL('../dist/assets/', import.meta.url)
 const archivos = readdirSync(dir)
 const errores = []

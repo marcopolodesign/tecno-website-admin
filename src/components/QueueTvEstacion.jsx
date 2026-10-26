@@ -171,10 +171,10 @@ function LogoTF({ grupo }) {
         opacity: grupo === 'oculto' ? 0 : 1, transition: `left ${ease}, top ${ease}, width ${ease}, height ${ease}, opacity 0.5s ease`, pointerEvents: 'none',
       }}
     >
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: reproduciendo ? 0 : 1 }}>
+      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: reproduciendo ? 0 : 1 }}>
         <TFMarca width={S * MARCA_RATIO} />
       </div>
-      <div ref={cont} style={{ position: 'absolute', inset: 0, opacity: reproduciendo ? 1 : 0 }} />
+      <div ref={cont} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: reproduciendo ? 1 : 0 }} />
     </div>
   )
 }
@@ -198,11 +198,11 @@ function Crossfade({ stateKey, children }) {
   return (
     <>
       {saliente && (
-        <div key={`out-${saliente.key}`} style={{ position: 'absolute', inset: 0, zIndex: 9, pointerEvents: 'none', animation: 'tvFadeOut 0.6s ease forwards' }}>
+        <div key={`out-${saliente.key}`} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 9, pointerEvents: 'none', animation: 'tvFadeOut 0.6s ease forwards' }}>
           {saliente.node}
         </div>
       )}
-      <div key={stateKey} style={{ position: 'absolute', inset: 0, zIndex: 10, animation: 'tvFadeIn 0.7s ease both' }}>
+      <div key={stateKey} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10, animation: 'tvFadeIn 0.7s ease both' }}>
         {children}
       </div>
     </>
@@ -269,7 +269,7 @@ const nombreLinea = (line) => nombreLineaTv(line?.name)
 // ── Marcos de pantalla ───────────────────────────────────────────────────────────────────
 function Marco({ children, estilo }) {
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '48px 56px', boxSizing: 'border-box', gap: 32, ...estilo }}>
+    <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, display: 'flex', flexDirection: 'column', padding: '48px 56px', boxSizing: 'border-box', gap: 32, ...estilo }}>
       {children}
     </div>
   )
@@ -293,10 +293,10 @@ function CabeceraBasica({ pos, line }) {
 function MediaGrande({ fila, proximas, chips = [], numero, nombreSize = 92, pillSigue, acento }) {
   return (
     <div data-testid="tv-media" style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
-      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 0 }}>
         <VideoCruzado fila={fila} proximas={proximas} />
       </div>
-      <div style={{ position: 'absolute', inset: 0, background: velo(55, 0.88), pointerEvents: 'none', zIndex: 1 }} />
+      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: velo(55, 0.88), pointerEvents: 'none', zIndex: 1 }} />
       <span
         style={{
           position: 'absolute', zIndex: 2, top: 32, left: 40, ...superficie(RADIO.pildora, { background: COLOR.vidrio, border: `${BORDE_ACENTO_PX}px solid ${acento}` }),
@@ -331,10 +331,10 @@ function GrillaCards({ filas, acento, valor = repsDe }) {
     <Grilla cols={cols} gap={20} llenar style={{ minHeight: 0 }}>
       {filas.map((f, i) => (
         <div key={f.exercise_order ?? i} style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
-          <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 0 }}>
             <VideoCruzado fila={f} iconoSinVideo={false} />
           </div>
-          <div style={{ position: 'absolute', inset: 0, background: velo(45, 0.9), pointerEvents: 'none', zIndex: 1 }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: velo(45, 0.9), pointerEvents: 'none', zIndex: 1 }} />
           <div style={{ position: 'absolute', zIndex: 2, left: 24, right: 24, bottom: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span style={{ fontFamily: MONO, fontSize: 72, fontWeight: 600, lineHeight: 1, color: acento }}>{valor(f)}</span>
             <span style={{ fontSize: nombreSize, fontWeight: 800, lineHeight: 1.05 }}>{f.name}</span>
@@ -396,7 +396,7 @@ function VistaPreparate({ segundos, pos, line, acento }) {
   return (
     <>
       <CabeceraBasica pos={pos} line={line} />
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 30 }}>
+      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 30 }}>
         <span style={{ ...etiqueta(acento, 46, 8) }}>Preparate para empezar</span>
         <span
           key={segundos}
@@ -467,10 +467,10 @@ function VistaExplicacion({ box, estado, pos, line, acento }) {
           const sub = [turnos.length ? `${ctx.formato === 'EMOM' ? 'Minutos' : 'Rondas'} ${listaTexto(turnos)}` : null, prescripcion].filter(Boolean).join(' · ')
           return (
             <div key={f.exercise_order ?? i} style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
-              <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+              <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 0 }}>
                 <VideoCruzado fila={f} iconoSinVideo={false} />
               </div>
-              <div style={{ position: 'absolute', inset: 0, background: velo(50, 0.88), pointerEvents: 'none', zIndex: 1 }} />
+              <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: velo(50, 0.88), pointerEvents: 'none', zIndex: 1 }} />
               {/* El número de la tarjeta va en la misma fila que el nombre (no arriba a la izquierda):
                   en una TV más baja la tarjeta se achica y el nombre de dos líneas lo tapaba. */}
               <div style={{ position: 'absolute', zIndex: 2, left: 32, right: 32, bottom: 32, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -890,7 +890,7 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
           </div>
         )}
         {boxes.length > 0 && !box && (
-          <div style={{ position: 'absolute', inset: 0, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLOR.texto66, fontSize: 32 }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLOR.texto66, fontSize: 32 }}>
             {`Esta línea no tiene box en la posición ${posicion}.`}
           </div>
         )}
