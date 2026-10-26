@@ -5,12 +5,50 @@ import logsService from './logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
 
 export const usersService = {
-  async getUsers() {
+  // Ficha corta de un socio, para el sidecart del monitor de sala. No trae el historial
+  // completo (pagos, membresías anteriores) a propósito: ahí recepción sólo necesita saber
+  // quién es y si hay algo que atender ahora.
+  async getUserDetalle(userId) {
+    const { data, error } = await supabase
+      .from('users')
+      .select(
+        'id, first_name, last_name, email, phone, avatar_url, dni, membership_type, membership_status, membership_start_date, membership_end_date, notes, medical_notes, contraindicaciones, assigned_coach_id, created_at'
+      )
+      .eq('id', userId)
+      .maybeSingle()
+    if (error) throw error
+    return data
+  },
+
+  // Riesgo de abandono de un socio puntual — riesgo_socios() devuelve una fila por cada uno
+  // que SÍ tiene una visita previa; sin fila (nunca vino) esto devuelve null y quien llama
+  // muestra "Sin visitas previas" en vez de inventar un bucket.
+  async getRiesgo(userId) {
+    if (!userId) return null
+    const { data, error } = await supabase.rpc('riesgo_socios', { p_user_ids: [userId] })
+    if (error) throw error
+    return data?.[0] || null
+  },
+
+  // Mismo RPC en lote, para no pedir uno por fila en una lista (ej. la grilla de Socios).
+  async getRiesgoEnLote(userIds) {
+    const ids = [...new Set((userIds || []).filter(Boolean))]
+    if (ids.length === 0) return []
+    const { data, error } = await supabase.rpc('riesgo_socios', { p_user_ids: ids })
+    if (error) throw error
+    return data || []
+  },
+
+  async getUsers(sedeId) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false })
+
+      if (sedeId) query = query.eq('location_id', sedeId)
+
+      const { data, error } = await query
 
       if (error) throw error
       return { data: toCamelCase(data) }
@@ -69,7 +107,8 @@ export const usersService = {
         utm_campaign: data.utmCampaign || null,
         utm_term: data.utmTerm || null,
         utm_content: data.utmContent || null,
-        converted_at: new Date().toISOString()
+        converted_at: new Date().toISOString(),
+        location_id: data.locationId || null
       }
 
       const { data: result, error } = await supabase
@@ -145,7 +184,13 @@ export const usersService = {
 
       if (fetchError) throw fetchError
 
-      const snakeData = toSnakeCase(data)
+      // Un campo vacío del formulario llega como '' y Postgres no lo acepta en una columna de
+      // fecha ni numérica: "invalid input syntax for type date". Eso hacía fallar el guardado
+      // de cualquier socio sin fecha de nacimiento — con un toast genérico que no lo decía.
+      // Vacío significa "no hay dato", y eso en la base es NULL.
+      const snakeData = Object.fromEntries(
+        Object.entries(toSnakeCase(data)).map(([k, v]) => [k, v === '' ? null : v])
+      )
       const { data: result, error } = await supabase
         .from('users')
         .update(snakeData)

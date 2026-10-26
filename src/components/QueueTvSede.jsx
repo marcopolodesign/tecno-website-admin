@@ -1,0 +1,301 @@
+// TV de sede — la lista de espera única, para toda la ubicación (no una por línea).
+// Pública, como QueueTv.jsx/QueueTvEstacion.jsx: lee todo por tv_sede(), un RPC
+// SECURITY DEFINER granted a anon (mismo patrón que tv_linea) — nada de esto pasa por RLS,
+// así que no hace falta sesión de staff ni chrome del CRM alrededor.
+//
+// Sin Realtime: postgres_changes está sujeto a RLS igual que las tablas, así que anon no
+// recibiría nada — se refresca por polling cada 3s, que alcanza para una lista de espera.
+//
+// Rediseño 2026-10-05 (Lista.dc): mismo sistema que las TVs de estación (tv/tokens.js) — fondo
+// #050505 con manchas, superficies de vidrio, acento naranja sólo en texto y bordes.
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react'
+import { useParams } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
+import { supabase } from '../lib/supabase'
+import { queueService } from '../services/queueService'
+import { serverNow } from '../lib/serverClock'
+import { LienzoTv } from './tv/TvChrome'
+import { useCountdown, formatMMSS, duracionBoxSegDeLinea } from '../lib/tvClock'
+import { BORDE, BORDE_ACENTO_PX, COLOR, GEIST, MONO, RADIO, etiqueta, superficie } from './tv/tokens'
+import { Avatar, FondoManchas, KEYFRAMES, TFMarca, nombreLineaTv } from './tv/Piezas'
+import Grilla from './tv/Grilla'
+
+const POLL_MS = 3000
+// Link universal de la app (associatedDomains / AASA de tecno-admin.vercel.app). Sin parámetros cae en
+// runDefaultFlow de confirmar-turno.tsx: si el socio está "confirming" confirma su turno; si no,
+// lo anota en la fila (o le muestra dónde está si ya está anotado). Con ?paso=ingreso NO confirmaría.
+export const QR_URL = 'https://tecno-admin.vercel.app/confirmar-turno'
+const BOXES_POR_LINEA = 5 // tv_sede no manda cuántos boxes tiene cada línea; las de Palermo son de 5
+const QR_ARRIBA_PX = 150
+const TOPE_FILA = 5 // filas como máximo en la lista (con la fila larga, 4 + "y N personas más")
+
+function nombreCorto(u) {
+  return u || 'Socio'
+}
+
+// Segundos de espera estimados para cada persona de la fila, y para quien se sume ahora. Se
+// reparte la fila entre las líneas: cada una libera su box 1 en `advances_at` (o ya está libre) y
+// después cada persona lo ocupa una duración de box completa. Es una estimación: no ve los
+// cuellos de botella de adelante (por eso se muestra con "~").
+export function esperasEstimadas(fila = [], lineas = [], ahoraMs = serverNow()) {
+  const slots = lineas.map((l) => ({
+    t: l.box1?.status === 'occupied' && l.box1.advances_at ? Math.max(0, (new Date(l.box1.advances_at).getTime() - ahoraMs) / 1000) : 0,
+    dur: duracionBoxSegDeLinea(l),
+  }))
+  if (!slots.length) return { porPersona: fila.map(() => null), nuevo: null }
+  const tomar = () => {
+    const s = slots.reduce((a, b) => (b.t < a.t ? b : a))
+    const espera = s.t
+    s.t += s.dur
+    return espera
+  }
+  const porPersona = fila.map(() => tomar())
+  return { porPersona, nuevo: tomar() }
+}
+
+const minutosTexto = (seg) => (seg <= 0 ? '0 min' : `~${Math.max(1, Math.round(seg / 60))} min`)
+
+function useAhora() {
+  const [ahora, setAhora] = useState(() => serverNow())
+  useEffect(() => {
+    const id = setInterval(() => setAhora(serverNow()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return ahora
+}
+
+function Reloj() {
+  const ahora = useAhora()
+  return (
+    <span style={{ fontFamily: MONO, color: COLOR.texto }}>
+      {new Date(ahora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })}
+    </span>
+  )
+}
+
+// QR sobre una baldosa clara (módulos oscuros: es lo que leen todos los teléfonos a distancia).
+function CodigoQr({ size }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: RADIO.tarjeta, background: COLOR.texto, padding: Math.round(size * 0.06), boxSizing: 'border-box', flexShrink: 0 }}>
+      <QRCodeSVG value={QR_URL} size={Math.round(size * 0.88)} level="M" bgColor={COLOR.texto} fgColor={COLOR.fondo} marginSize={0} style={{ display: 'block' }} />
+    </div>
+  )
+}
+
+function FilaEspera({ entry, i, nombreLinea, espera }) {
+  const confirmando = entry.status === 'confirming'
+  const confirmCountdown = formatMMSS(useCountdown(confirmando ? entry.confirm_deadline : null))
+  return (
+    <div
+      style={{
+        ...superficie(RADIO.tarjeta), display: 'flex', alignItems: 'center', gap: 28, padding: '22px 28px',
+        ...(confirmando ? { border: `${BORDE_ACENTO_PX}px solid ${COLOR.trabajo}` } : null),
+      }}
+    >
+      <span
+        style={{
+          width: 84, height: 84, borderRadius: RADIO.mini, background: COLOR.pista, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 48, fontWeight: 800, flexShrink: 0,
+        }}
+      >
+        {i + 1}
+      </span>
+      <Avatar url={entry.avatar_url} iniciales={entry.iniciales} size={84} />
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontSize: 60, fontWeight: 800, lineHeight: 1.05 }}>{nombreCorto(entry.socio)}</span>
+        {confirmando && (
+          <span style={{ fontSize: 26, color: COLOR.texto66 }}>
+            Apoyá el teléfono en el box 1 o confirmá en la app
+          </span>
+        )}
+      </div>
+      {confirmando ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+          <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: 4, color: COLOR.trabajo }}>
+            {`TE TOCA${nombreLinea ? ` · ${nombreLineaTv(nombreLinea)}` : ''}`}
+          </span>
+          <span style={{ fontFamily: MONO, fontSize: 38, color: COLOR.trabajo }}>{confirmCountdown}</span>
+        </div>
+      ) : (
+        <span style={{ fontFamily: MONO, fontSize: 38, color: COLOR.texto66, flexShrink: 0 }}>
+          {espera == null ? '' : minutosTexto(espera)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Una línea en el panel de la derecha: libre ahora / libre en M:SS y sus boxes.
+function PanelLinea({ linea }) {
+  const ocupadoBox1 = linea.box1?.status === 'occupied'
+  const restante = formatMMSS(useCountdown(ocupadoBox1 ? linea.box1.advances_at : null))
+  const total = Math.max(BOXES_POR_LINEA, linea.ocupados || 0)
+  // box 1 con su estado real; del resto sólo se sabe cuántos están en uso en total
+  let restantesOcupados = Math.max(0, (linea.ocupados || 0) - (ocupadoBox1 ? 1 : 0))
+  const porPos = new Map((linea.boxes || []).map((b) => [b.line_position, b]))
+  const slots = Array.from({ length: total }, (_, i) => {
+    const quien = porPos.get(i + 1)
+    const base = i === 0 ? (ocupadoBox1 ? 'ocupado' : 'libre') : restantesOcupados > 0 ? (restantesOcupados -= 1, 'ocupado') : 'vacio'
+    return { estado: base, avatar_url: quien?.avatar_url, iniciales: quien?.iniciales }
+  })
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ fontSize: 40, fontWeight: 800 }}>{nombreLineaTv(linea.name)}</span>
+        <span style={{ fontSize: 26, color: COLOR.texto66 }}>
+          {'libre en '}
+          <span style={{ fontFamily: MONO, fontSize: 36, color: ocupadoBox1 ? COLOR.texto : COLOR.trabajo }}>{ocupadoBox1 ? restante : '0:00'}</span>
+        </span>
+      </div>
+      <Grilla cols={total} gap={10}>
+        {slots.map((e, i) => (
+          <div
+            key={i}
+            style={{
+              height: 68, borderRadius: RADIO.mini, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              ...(e.estado === 'ocupado' ? { background: COLOR.superficie, border: BORDE } : e.estado === 'libre' ? { border: `2px dashed ${COLOR.trabajo}` } : { border: BORDE }),
+            }}
+          >
+            {e.estado === 'ocupado' && <Avatar url={e.avatar_url} iniciales={e.iniciales} size={50} />}
+          </div>
+        ))}
+      </Grilla>
+    </div>
+  )
+}
+
+// overrideLocationId: llega por prop cuando la pantalla se abre por slug (TvPorSlug.jsx) en
+// vez de por /lista-espera/tv/sede/:locationId.
+export default function QueueTvSede({ overrideLocationId } = {}) {
+  const { locationId: locationIdDeUrl } = useParams()
+  const locationId = overrideLocationId ?? locationIdDeUrl
+  const [data, setData] = useState(null)
+  const [connected, setConnected] = useState(true)
+  const pollRef = useRef(null)
+  const ahora = useAhora()
+
+  const refresh = useCallback(async () => {
+    try {
+      const { data: payload, error } = await supabase.rpc('tv_sede', { p_location_id: locationId || null })
+      if (error) throw error
+      setData(payload)
+      setConnected(true)
+    } catch (err) {
+      console.error('Error refreshing sede TV:', err)
+      setConnected(false)
+    }
+  }, [locationId])
+
+  useEffect(() => {
+    refresh()
+    pollRef.current = setInterval(refresh, POLL_MS)
+    return () => clearInterval(pollRef.current)
+  }, [refresh])
+
+  // Aviso en vivo (broadcast por sede) además del poll de 3 s.
+  const sedeId = data?.sede?.id
+  useEffect(() => {
+    if (!sedeId) return undefined
+    return queueService.subscribeToSala(sedeId, refresh)
+  }, [sedeId, refresh])
+
+  const sede = data?.sede
+  const lineas = data?.lineas || []
+  const fila = data?.fila || []
+  // `fila` sólo trae line_number para quien está confirmando — el nombre de la línea sale de
+  // buscarlo en `lineas`, que ya vino en el mismo payload.
+  const nombreDeLinea = (lineNumber) => lineas.find((l) => l.line_number === lineNumber)?.name
+
+  const { porPersona, nuevo } = esperasEstimadas(fila, lineas, ahora)
+  // Con la fila larga se muestran las que entran y "y N más". Cuántas entran depende del alto del
+  // lienzo (una TV con la barra del navegador a la vista es más baja) y de la fuente: si algo se
+  // sale de la columna se muestra una menos, así ninguna fila queda cortada al medio (2026-10-20).
+  const listaRef = useRef(null)
+  const clave = `${fila.length}|${typeof window === 'undefined' ? '' : `${window.innerWidth}x${window.innerHeight}`}`
+  const [ajuste, setAjuste] = useState({ clave, tope: TOPE_FILA })
+  const tope = ajuste.clave === clave ? ajuste.tope : TOPE_FILA
+  useLayoutEffect(() => {
+    const el = listaRef.current
+    if (el && tope > 1 && el.scrollHeight > el.clientHeight + 1) setAjuste({ clave, tope: tope - 1 })
+  })
+  const visibles = fila.length > tope ? tope - 1 : fila.length
+  // Mismo criterio en el panel de la derecha, en tres pasos (Felipe, 2026-10-20): QR abajo a 184;
+  // si no entra, abajo a 150; si tampoco, arriba al lado de la espera estimada.
+  const panelRef = useRef(null)
+  const [qrAjuste, setQrAjuste] = useState({ clave, paso: 0 })
+  const pasoQr = fila.length > 0 && qrAjuste.clave === clave ? qrAjuste.paso : 0
+  const qrArriba = pasoQr >= 2
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    if (el && fila.length > 0 && pasoQr < 2 && el.scrollHeight > el.clientHeight + 1) setQrAjuste({ clave, paso: pasoQr + 1 })
+  })
+
+  return (
+    <LienzoTv>
+      <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: COLOR.fondo, color: COLOR.texto, fontFamily: GEIST }}>
+        <style>{KEYFRAMES}</style>
+        <FondoManchas acento={COLOR.trabajo} />
+        {!connected && (
+          <div style={{ position: 'absolute', top: 16, right: 56, zIndex: 50, ...superficie(RADIO.pildora, { background: COLOR.vidrio }), padding: '8px 20px', fontSize: 26, color: COLOR.texto66 }}>
+            Reconectando…
+          </div>
+        )}
+        <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', gap: 36, padding: 56, boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+              <TFMarca width={96} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 72, fontWeight: 900, letterSpacing: -2, lineHeight: 1 }}>Lista de espera</span>
+                {sede?.name && <span style={{ fontSize: 34, fontWeight: 600, color: COLOR.texto66 }}>{sede.name}</span>}
+              </div>
+            </div>
+            <span style={{ fontSize: 64, fontWeight: 500 }}><Reloj /></span>
+          </div>
+
+          <Grilla cols={['fr', 640]} gap={48} llenar style={{ flex: 1, minHeight: 0 }}>
+            <div ref={listaRef} data-testid="tv-fila" style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
+              {fila.length === 0 ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
+                  <CodigoQr size={520} />
+                  <span style={{ fontSize: 60, fontWeight: 800 }}>Escaneá para anotarte</span>
+                </div>
+              ) : (
+                fila.slice(0, visibles).map((entry, i) => (
+                  <FilaEspera key={entry.id} entry={entry} i={i} nombreLinea={nombreDeLinea(entry.line_number)} espera={porPersona[i]} />
+                ))
+              )}
+              {fila.length > visibles && <span style={{ fontSize: 30, color: COLOR.texto66 }}>y {fila.length - visibles} personas más</span>}
+            </div>
+
+            <div ref={panelRef} data-testid="tv-panel-espera" style={{ ...superficie(RADIO.panel), display: 'flex', flexDirection: 'column', gap: 20, padding: 36, minHeight: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={etiqueta(COLOR.texto66, 24, 6)}>Espera estimada</span>
+                  {nuevo == null ? null : (
+                    <span style={{ fontFamily: MONO, fontSize: 124, fontWeight: 600, lineHeight: 1, letterSpacing: -6, whiteSpace: 'nowrap' }}>
+                      {Math.max(0, Math.round(nuevo / 60))}
+                      <span style={{ fontSize: 48, letterSpacing: 0, color: COLOR.texto66 }}> min</span>
+                    </span>
+                  )}
+                </div>
+                {qrArriba && <CodigoQr size={QR_ARRIBA_PX} />}
+              </div>
+              {qrArriba && (
+                <span style={{ fontSize: 26, fontWeight: 400, lineHeight: 1.2, color: COLOR.texto66, marginTop: -6, paddingBottom: 20, borderBottom: BORDE }}>
+                  Escaneá para anotarte o confirmar tu turno
+                </span>
+              )}
+              {lineas.map((linea) => <PanelLinea key={linea.id} linea={linea} />)}
+              {fila.length > 0 && !qrArriba && (
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 28, borderTop: BORDE, paddingTop: 20 }}>
+                  <CodigoQr size={pasoQr === 1 ? 150 : 184} />
+                  <span style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.15 }}>Escaneá para anotarte o confirmar tu turno</span>
+                </div>
+              )}
+            </div>
+          </Grilla>
+        </div>
+      </div>
+    </LienzoTv>
+  )
+}

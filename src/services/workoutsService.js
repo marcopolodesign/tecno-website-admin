@@ -71,13 +71,13 @@ export const workoutsService = {
             target_reps,
             actual_reps,
             weight_used_kg,
-            difficulty_rating,
-            notes,
+            perceived_effort,
+            exercise_notes,
             completed_at,
             session_exercises (
               id,
               sets_reps,
-              exercises (
+              exercises!session_exercises_exercise_id_fkey (
                 id,
                 name
               )
@@ -172,8 +172,8 @@ export const workoutsService = {
         target_reps: logData.targetReps || null,
         actual_reps: logData.actualReps,
         weight_used_kg: logData.weightUsedKg || null,
-        difficulty_rating: logData.difficultyRating || null,
-        notes: logData.notes || null,
+        perceived_effort: logData.perceivedEffort ?? null,
+        exercise_notes: logData.notes || null,
         completed_at: new Date().toISOString()
       }
 
@@ -217,7 +217,7 @@ export const workoutsService = {
           session_exercises (
             id,
             sets_reps,
-            exercises (
+            exercises!session_exercises_exercise_id_fkey (
               id,
               name
             )
@@ -230,6 +230,94 @@ export const workoutsService = {
       return { data: toCamelCase(data) }
     } catch (error) {
       console.error('Error fetching exercise logs:', error)
+      throw error
+    }
+  },
+
+  // ==================== LOGGING DE RESULTADOS (coach carga lo real) ====================
+
+  /**
+   * La fila de workout_sessions para "el coach está cargando los resultados reales de esta
+   * sesión". No es un tracker en vivo por serie — nada en el admin arranca un cronómetro por
+   * set — así que se crea directamente en 'completed': el evento que representa es "esto ya
+   * pasó y alguien lo está registrando", no "está pasando ahora mismo". Eso también evita la
+   * constraint one_active_session_per_client (sólo excluye status='in_progress'): si esta fila
+   * naciera 'in_progress', abrir la pantalla de resultados para dos sesiones del mismo socio
+   * sin haber cerrado la primera tiraría un error de exclusión que no tiene nada que ver con lo
+   * que el coach está haciendo.
+   *
+   * Reutiliza la fila si ya existe una para esta routine_session_id — volver a abrir la
+   * pantalla para seguir cargando no crea una segunda.
+   */
+  async ensureLoggingSession(clientId, routineSessionId) {
+    try {
+      const { data: existentes, error: errBusqueda } = await supabase
+        .from('workout_sessions')
+        .select('*')
+        .eq('routine_session_id', routineSessionId)
+        .neq('status', 'cancelled')
+        .order('started_at', { ascending: false })
+        .limit(1)
+
+      if (errBusqueda) throw errBusqueda
+      if (existentes && existentes[0]) return { data: toCamelCase(existentes[0]) }
+
+      const user = await getCurrentUser()
+      const ahora = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('workout_sessions')
+        .insert([{
+          client_id: clientId,
+          routine_session_id: routineSessionId,
+          started_at: ahora,
+          completed_at: ahora,
+          status: 'completed',
+          supervised_by: user?.id,
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error ensuring logging session:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Carga o edita el resultado real de un ejercicio de la sesión. set_number fijo en 1: acá se
+   * registra "lo que pasó en esa estación" al mismo grano que session_exercises.weight_kg (un
+   * peso por ejercicio prescripto), no una fila por serie — no hay en esta pantalla de dónde
+   * sacar series individuales.
+   */
+  async upsertExerciseLog(workoutSessionId, sessionExerciseId, logData = {}) {
+    try {
+      const { data: existente, error: errBusqueda } = await supabase
+        .from('exercise_logs')
+        .select('id')
+        .eq('workout_session_id', workoutSessionId)
+        .eq('session_exercise_id', sessionExerciseId)
+        .eq('set_number', 1)
+        .maybeSingle()
+
+      if (errBusqueda) throw errBusqueda
+
+      if (existente) {
+        return await workoutsService.updateExerciseLog(existente.id, {
+          ...logData,
+          completedAt: new Date().toISOString(),
+        })
+      }
+
+      return await workoutsService.logExercise({
+        workoutSessionId,
+        sessionExerciseId,
+        setNumber: 1,
+        ...logData,
+      })
+    } catch (error) {
+      console.error('Error upserting exercise log:', error)
       throw error
     }
   },

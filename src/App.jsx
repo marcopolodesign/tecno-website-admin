@@ -1,279 +1,55 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './components/Login'
-import Dashboard from './components/Dashboard'
-import Prospects from './components/Prospects'
-import Leads from './components/Leads'
-import Users from './components/Users'
-import Sellers from './components/Sellers'
-import Coaches from './components/Coaches'
-import Locations from './components/Locations'
-import ContentManagement from './components/ContentManagement'
-import MembershipPlans from './components/MembershipPlans'
-import Exercises from './components/Exercises'
-import Routines from './components/Routines'
-import CheckIn from './components/CheckIn'
-import MemberAccess from './components/MemberAccess'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import TvPorSlug from './components/TvPorSlug'
+import Anotarme from './components/Anotarme'
+import TvIndex from './components/TvIndex'
+import { TvErrorBoundary, ErrorDePrueba } from './components/TvAviso'
 
-// /confirmar-turno es el Universal Link de la app (AASA): con la app instalada el teléfono la abre
-// directo y esta página nunca carga. Si carga, es que no hay app: se manda a anotarse con el DNI.
-const ANOTARME_URL = 'https://tv.somostecnofit.com/anotarme'
-function ConfirmarTurnoWeb() {
-  window.location.replace(ANOTARME_URL)
-  return null
+// El CRM entero va en un chunk aparte que el host de TV nunca baja. 2026-10-19: con todo en un solo
+// bundle legacy de 3,4 MB, el Chrome 47 real (Tizen 3.0) se colgaba compilándolo y la A1 quedaba en
+// blanco. Control: scripts/check-tv-legacy.mjs (tamaño del chunk de entrada legacy).
+const MainApp = lazy(() => import('./MainApp'))
+
+// tv.somostecnofit.com no es el CRM: es sólo las pantallas de TV, sin login ni sidebar. La
+// decisión se toma acá, antes de cualquier hook, para no meter el chequeo de hostname dentro
+// de un componente que ya llama useState/useEffect (rompería las reglas de hooks si alguna
+// vez dejara de ser constante durante la vida del componente).
+function esHostDeTv() {
+  return typeof window !== 'undefined' && window.location.hostname.startsWith('tv.')
 }
-import AccessLogs from './components/AccessLogs'
-import QueueMonitor from './components/QueueMonitor'
-import QueueConfig from './components/QueueConfig'
-import QueueTv from './components/QueueTv'
-import Sidebar from './components/Sidebar'
-import Header from './components/Header'
-import { authService } from './services/authService'
 
-// Emails allowed to see fitness section (beta feature)
-const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com']
+// Las mismas pantallas bajo /tv/... en cualquier host (preview de Vercel, localhost): van por el
+// mismo router liviano, así se prueban con el bundle que baja la TV de verdad.
+function esRutaDeTv() {
+  return typeof window !== 'undefined' && /^\/tv(\/|$)/.test(window.location.pathname)
+}
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [userRole, setUserRole] = useState(null)
-  const [userEmail, setUserEmail] = useState(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        if (token) {
-          const isValid = await authService.verifyToken(token)
-          setIsAuthenticated(isValid)
-
-          if (isValid) {
-            const profile = await authService.getCurrentUserProfile()
-            setUserRole(profile?.role || 'coach') // Fallback/Default
-            setUserEmail(profile?.email || null)
-          } else {
-            localStorage.removeItem('admin_token')
-          }
-        } else {
-          setIsAuthenticated(false)
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error)
-        const token = localStorage.getItem('admin_token')
-        setIsAuthenticated(!!token)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    checkAuth()
-  }, [])
-
-  const handleLogin = (token) => {
-    localStorage.setItem('admin_token', token)
-    setIsAuthenticated(true)
-    // Update role and email immediately after login
-    authService.getCurrentUserProfile().then(profile => {
-      setUserRole(profile?.role)
-      setUserEmail(profile?.email)
-    })
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token')
-    localStorage.removeItem('userProfile')
-    setIsAuthenticated(false)
-    setUserRole(null)
-  }
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen)
-  }
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false)
-  }
-
-  // Check if user can see fitness features (email-restricted beta)
-  const canSeeFitness = userEmail && FITNESS_ALLOWED_EMAILS.includes(userEmail.toLowerCase())
-
-  // Permission Logic
-  const canAccess = (route) => {
-    if (!userRole) return false
-    const role = userRole // 'super_admin', 'admin', 'front_desk', 'coach'
-
-    // Fitness routes are restricted to specific emails
-    if (['/exercises', '/routines'].includes(route)) {
-      return canSeeFitness
-    }
-
-    // Super Admin & Admin have full access
-    if (role === 'super_admin' || role === 'admin') return true
-
-    // Common restrictions for non-admins
-    if (['/sellers', '/coaches', '/locations', '/membership-plans', '/access-logs', '/lista-espera/config'].includes(route)) return false
-
-    // Seller (Front Desk)
-    if (role === 'front_desk') {
-      if (route === '/dashboard') return false
-      return true // Access to prospects, leads, users, content
-    }
-
-    // Coach - has access to fitness features (but only if email is allowed)
-    if (role === 'coach') {
-      if (['/dashboard', '/leads', '/prospects'].includes(route)) return false
-      return true // Access to users, content
-    }
-
-    return false
-  }
-
+  if (esHostDeTv()) return <TvHostApp />
+  if (esRutaDeTv()) return <TvHostApp basename="/tv" />
   return (
-    <Router>
-      <Routes>
-        {/* ─── Public standalone routes (no auth required) ─── */}
-        <Route path="/check-in" element={<CheckIn />} />
-        <Route path="/checkin" element={<CheckIn />} />
-        <Route path="/acceso" element={<MemberAccess />} />
-        <Route path="/confirmar-turno" element={<ConfirmarTurnoWeb />} />
-        <Route path="/lista-espera/tv/:lineaId" element={<QueueTv />} />
-
-        {/* ─── All other routes — behind auth wall ─── */}
-        <Route
-          path="*"
-          element={
-            loading ? (
-              <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                  <span className="text-text-secondary text-sm">Cargando...</span>
-                </div>
-              </div>
-            ) : !isAuthenticated ? (
-              <Login onLogin={handleLogin} />
-            ) : (
-              <AuthenticatedShell
-                userRole={userRole}
-                userEmail={userEmail}
-                mobileMenuOpen={mobileMenuOpen}
-                onLogout={handleLogout}
-                onMenuToggle={toggleMobileMenu}
-                onCloseMobileMenu={closeMobileMenu}
-                canAccess={canAccess}
-              />
-            )
-          }
-        />
-      </Routes>
-    </Router>
+    <Suspense fallback={null}>
+      <MainApp />
+    </Suspense>
   )
 }
 
-function AuthenticatedShell({
-  userRole,
-  userEmail,
-  mobileMenuOpen,
-  onLogout,
-  onMenuToggle,
-  onCloseMobileMenu,
-  canAccess,
-}) {
-  const canSeeFitness =
-    userEmail && FITNESS_ALLOWED_EMAILS.includes(userEmail.toLowerCase())
-
+// El router completo de tv.somostecnofit.com: nada de auth, nada de sidebar — sólo las tres
+// pantallas de TV resueltas por slug (/palermo, /palermo/A, /palermo/A/1).
+function TvHostApp({ basename }) {
   return (
-    <div className="min-h-screen bg-bg-primary flex">
-      <Sidebar
-        userRole={userRole}
-        userEmail={userEmail}
-        mobileMenuOpen={mobileMenuOpen}
-        onCloseMobileMenu={onCloseMobileMenu}
-      />
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <Header onLogout={onLogout} onMenuToggle={onMenuToggle} />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  <Navigate
-                    to={canAccess('/dashboard') ? '/dashboard' : '/users'}
-                    replace
-                  />
-                }
-              />
-
-              {canAccess('/dashboard') && (
-                <Route path="/dashboard" element={<Dashboard />} />
-              )}
-              {canAccess('/prospects') && (
-                <Route path="/prospects" element={<Prospects />} />
-              )}
-              {canAccess('/leads') && (
-                <Route path="/leads" element={<Leads userRole={userRole} />} />
-              )}
-              {canAccess('/users') && (
-                <Route path="/users" element={<Users />} />
-              )}
-              {canAccess('/membership-plans') && (
-                <Route
-                  path="/membership-plans"
-                  element={<MembershipPlans userRole={userRole} />}
-                />
-              )}
-              {canAccess('/sellers') && (
-                <Route path="/sellers" element={<Sellers />} />
-              )}
-              {canAccess('/coaches') && (
-                <Route path="/coaches" element={<Coaches />} />
-              )}
-              {canAccess('/locations') && (
-                <Route path="/locations" element={<Locations />} />
-              )}
-              {canAccess('/content') && (
-                <Route path="/content" element={<ContentManagement />} />
-              )}
-
-              {/* Fitness Routes */}
-              {canSeeFitness && (
-                <Route path="/exercises" element={<Exercises />} />
-              )}
-              {canSeeFitness && (
-                <Route path="/routines" element={<Routines />} />
-              )}
-
-              {canAccess('/access-logs') && (
-                <Route path="/access-logs" element={<AccessLogs />} />
-              )}
-
-              {/* Lista de Espera Routes */}
-              {canAccess('/lista-espera') && (
-                <Route path="/lista-espera" element={<QueueMonitor />} />
-              )}
-              {canAccess('/lista-espera/config') && (
-                <Route path="/lista-espera/config" element={<QueueConfig />} />
-              )}
-
-              {/* Check-in also accessible while authenticated */}
-              <Route path="/check-in" element={<CheckIn />} />
-
-              {/* Fallback for unauthorized routes */}
-              <Route
-                path="*"
-                element={
-                  <Navigate
-                    to={canAccess('/dashboard') ? '/dashboard' : '/users'}
-                    replace
-                  />
-                }
-              />
-            </Routes>
-          </div>
-        </main>
-      </div>
-    </div>
+    <TvErrorBoundary>
+      <ErrorDePrueba />
+      <Router basename={basename}>
+        <Routes>
+          <Route path="/" element={<TvIndex />} />
+          <Route path="/anotarme" element={<Anotarme />} />
+          <Route path="/:sede" element={<TvPorSlug modo="sede" />} />
+          <Route path="/:sede/:linea" element={<TvPorSlug modo="linea" />} />
+          <Route path="/:sede/:linea/:estacion" element={<TvPorSlug modo="estacion" />} />
+        </Routes>
+      </Router>
+    </TvErrorBoundary>
   )
 }
 

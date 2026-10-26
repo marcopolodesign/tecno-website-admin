@@ -357,21 +357,26 @@ const membershipsService = {
     }
   },
 
-  async getExpiringMemberships(days = 7) {
+  // sedeId opcional: cuando se pasa, usa inner join contra users para filtrar por sede (el
+  // left join normal de PostgREST no descarta filas por un filtro sobre la tabla embebida).
+  async getExpiringMemberships(days = 7, sedeId) {
     try {
       const futureDate = new Date()
       futureDate.setDate(futureDate.getDate() + days)
 
-      const { data, error } = await supabase
+      const usersJoin = sedeId ? 'users:user_id!inner' : 'users:user_id'
+
+      let query = supabase
         .from('memberships')
         .select(`
           *,
-          users:user_id (
+          ${usersJoin} (
             id,
             first_name,
             last_name,
             email,
-            phone
+            phone,
+            location_id
           ),
           membership_plans:membership_plan_id (
             name,
@@ -381,6 +386,10 @@ const membershipsService = {
         .eq('status', 'active')
         .lte('end_date', futureDate.toISOString().split('T')[0])
         .order('end_date')
+
+      if (sedeId) query = query.eq('users.location_id', sedeId)
+
+      const { data, error } = await query
 
       if (error) throw error
       return { data: toCamelCase(data) }

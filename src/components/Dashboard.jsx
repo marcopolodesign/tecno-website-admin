@@ -537,12 +537,12 @@ const Dashboard = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-40 transition-opacity"
             onClick={() => setShowExpiringSidecart(false)}
           />
           
           {/* Sidecart Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-bg-primary shadow-xl z-50 overflow-hidden flex flex-col animate-slide-in-right">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-3xl bg-white sm:rounded-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-default">
               <div>
@@ -679,12 +679,12 @@ const Dashboard = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-40 transition-opacity"
             onClick={() => setShowUncontactedSidecart(false)}
           />
           
           {/* Sidecart Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-bg-primary shadow-xl z-50 overflow-hidden flex flex-col animate-slide-in-right">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-3xl bg-white sm:rounded-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-default">
               <div className="flex items-center gap-3">
@@ -836,12 +836,12 @@ const Dashboard = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-40 transition-opacity"
             onClick={() => setShowMembershipTypeSidecart(false)}
           />
           
           {/* Sidecart Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-bg-primary shadow-xl z-50 overflow-hidden flex flex-col animate-slide-in-right">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-3xl bg-white sm:rounded-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header */}
             <div className={`flex items-center justify-between p-6 border-b border-border-default`}>
               <div className="flex items-center gap-3">

@@ -1,12 +1,18 @@
+import { acotarTiemposTabata } from '../lib/formatos'
 import { supabase, toCamelCase, toSnakeCase, getCurrentUser } from '../lib/supabase'
+
+// Tabata: 6 rondas de 60 s (trabajo 30-40, descanso = 60 - trabajo). Otros formatos pasan igual.
+const tabataAcotado = (d) => acotarTiemposTabata(d.formato, d.trabajoSeg, d.descansoSeg, d.rondas)
 
 export const routinesService = {
   // ==================== BOXES (STATIONS) ====================
   async getBoxes() {
     try {
+      // Con su línea y su sede: una estación se llama "3" en cada línea de cada local, así que
+      // el número solo no alcanza para elegirla ni para preguntarle qué material tiene.
       const { data, error } = await supabase
         .from('boxes')
-        .select('*')
+        .select('*, production_lines (id, name, line_number, location_id, locations (id, name))')
         .eq('is_active', true)
         .order('box_number', { ascending: true })
 
@@ -87,6 +93,10 @@ export const routinesService = {
             last_name,
             email
           ),
+          arquetipos (
+            id,
+            nombre
+          ),
           routine_sessions (
             id,
             session_number,
@@ -106,6 +116,13 @@ export const routinesService = {
               weight_kg,
               micro_pause,
               notes,
+              formato,
+              rondas,
+              trabajo_seg,
+              descanso_seg,
+              ejercicios_por_minuto,
+              segundos_por_ejercicio,
+              is_pinned,
               boxes (
                 id,
                 name,
@@ -250,6 +267,97 @@ export const routinesService = {
     }
   },
 
+  // Igual forma que las routine_sessions anidadas de getRoutine (mismos campos de
+  // session_exercises: formato/rondas/trabajo_seg/... que la lista de Rutinas necesita para
+  // pintar la modalidad de cada estación), pero sin traer toda la fila de training_routines ni
+  // users/arquetipos. La usa el refresco en vivo mientras se está generando una rutina
+  // (Routines.jsx): un fetchRoutineDetail entero pone loadingDetail y tapa el panel con el
+  // spinner grande — esto sólo trae lo que cambia sesión a sesión, para reemplazar
+  // selectedRoutine.routineSessions in place sin taparle la pantalla al coach que está mirando.
+  async getRoutineSessionsLive(routineId) {
+    try {
+      const { data, error } = await supabase
+        .from('routine_sessions')
+        .select(`
+          id,
+          session_number,
+          title,
+          description,
+          status,
+          completed_at,
+          session_exercises (
+            id,
+            exercise_order,
+            box_id,
+            box_number,
+            is_cooldown,
+            sets_reps,
+            rest_time,
+            repetition_time,
+            weight_kg,
+            micro_pause,
+            notes,
+            formato,
+            rondas,
+            trabajo_seg,
+            descanso_seg,
+            ejercicios_por_minuto,
+            segundos_por_ejercicio,
+            is_pinned,
+            boxes (
+              id,
+              name,
+              box_number
+            ),
+            exercises!session_exercises_exercise_id_fkey (
+              id,
+              name,
+              description,
+              instructions,
+              difficulty_level,
+              exercise_categories (
+                id,
+                name,
+                body_zones (
+                  id,
+                  name
+                )
+              )
+            )
+          )
+        `)
+        .eq('routine_id', routineId)
+        .order('session_number', { ascending: true })
+
+      if (error) throw error
+      return { data: toCamelCase(data) }
+    } catch (error) {
+      console.error('Error fetching live routine sessions:', error)
+      throw error
+    }
+  },
+
+  // Realtime de las sesiones de una rutina mientras se está generando — para que la lista se
+  // vaya llenando sola (en la pestaña que la disparó Y en cualquier otra que tenga la misma
+  // rutina abierta) en vez de esperar a que el coach recargue. routine_sessions sí tiene
+  // routine_id para filtrar; session_exercises no (sólo session_id), así que esa tabla no se
+  // puede filtrar por rutina directo — pero como generar_sesion inserta la sesión Y sus
+  // ejercicios en la misma transacción, el INSERT de routine_sessions llega por este canal
+  // recién cuando ambos ya están commiteados: alcanza con reaccionar a esta tabla y volver a
+  // pedir getRoutineSessionsLive.
+  subscribeToRoutineSessions(routineId, onChange) {
+    const channel = supabase
+      .channel(`routine-sessions-${routineId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'routine_sessions', filter: `routine_id=eq.${routineId}` },
+        onChange
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  },
+
   async getSessionExercisesByBox(sessionId) {
     try {
       const { data, error } = await supabase
@@ -334,7 +442,18 @@ export const routinesService = {
         weight_kg: sessionExerciseData.weightKg || null,
         micro_pause: sessionExerciseData.microPause || 0,
         notes: sessionExerciseData.notes || null,
-        is_cooldown: sessionExerciseData.isCooldown || false
+        is_cooldown: sessionExerciseData.isCooldown || false,
+        is_pinned: sessionExerciseData.isPinned || false,
+        // Series leaves these null on purpose — the CHECK on session_exercises rejects a timed
+        // format with no duration, and rejects Series carrying one.
+        formato: sessionExerciseData.formato || 'Series',
+        rondas: tabataAcotado(sessionExerciseData).rondas || null,
+        trabajo_seg: tabataAcotado(sessionExerciseData).trabajoSeg || null,
+        descanso_seg: tabataAcotado(sessionExerciseData).descansoSeg ?? null,
+        // De la ESTACIÓN, como formato/rondas/trabajo_seg — se replica igual en todas sus filas
+        // (ver syncEstacionFormato). segundos_por_ejercicio es de CADA fila: null = va por reps.
+        ejercicios_por_minuto: sessionExerciseData.ejerciciosPorMinuto || null,
+        segundos_por_ejercicio: sessionExerciseData.segundosPorEjercicio || null
       }
 
       const { data, error } = await supabase
@@ -366,9 +485,20 @@ export const routinesService = {
 
   async updateSessionExercise(id, exerciseData) {
     try {
+      // El formulario guarda los campos numéricos vacíos como '' (inputs controlados), y la base
+      // los rechaza: "invalid input syntax for type integer". Pasaba al editar cualquier ejercicio
+      // de una sesión generada (Lucas, 2026-09-24). Vacío = sin valor; micro_pause usa 0, que es
+      // su default al crear (ver addExerciseToSession).
+      const limpio = { ...exerciseData }
+      for (const k of ['repetitionTime', 'weightKg', 'rondas', 'trabajoSeg', 'descansoSeg', 'ejerciciosPorMinuto', 'segundosPorEjercicio']) {
+        if (limpio[k] === '') limpio[k] = null
+      }
+      if (limpio.microPause === '' || limpio.microPause == null) {
+        if ('microPause' in limpio) limpio.microPause = 0
+      }
       const { data, error } = await supabase
         .from('session_exercises')
-        .update(toSnakeCase(exerciseData))
+        .update(toSnakeCase(limpio))
         .eq('id', id)
         .select()
         .single()
@@ -392,6 +522,39 @@ export const routinesService = {
       return { success: true }
     } catch (error) {
       console.error('Error removing exercise from session:', error)
+      throw error
+    }
+  },
+
+  // La modalidad es de la estación entera, no de cada fila — todas las de un mismo
+  // session_id + box_number tienen que compartir formato/rondas/trabajo_seg/descanso_seg. Se
+  // corre después de guardar cualquiera de sus ejercicios, para que el resto de la estación
+  // quede sincronizado con el cambio (excluye la fila recién guardada: esa ya salió con estos
+  // valores en el propio insert/update).
+  async syncEstacionFormato(sessionId, boxNumber, formatoData, exceptoId = null) {
+    try {
+      let query = supabase
+        .from('session_exercises')
+        .update({
+          formato: formatoData.formato || 'Series',
+          rondas: tabataAcotado(formatoData).rondas || null,
+          trabajo_seg: tabataAcotado(formatoData).trabajoSeg || null,
+          descanso_seg: tabataAcotado(formatoData).descansoSeg ?? null,
+          // De la estación, igual que los tres de arriba — no de cada fila (eso es
+          // segundos_por_ejercicio, que cada fila trae y guarda por su cuenta).
+          ejercicios_por_minuto: formatoData.ejerciciosPorMinuto || null
+        })
+        .eq('session_id', sessionId)
+        .eq('box_number', boxNumber)
+        .eq('is_cooldown', false)
+
+      if (exceptoId) query = query.neq('id', exceptoId)
+
+      const { error } = await query
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('Error syncing station modality:', error)
       throw error
     }
   },

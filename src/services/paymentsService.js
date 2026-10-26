@@ -92,14 +92,22 @@ const paymentsService = {
     }
   },
 
-  async getRevenueStats(startDate, endDate) {
+  // startDate/endDate en null = sin filtro de fecha ("todo el historial"). sedeId es
+  // opcional: payments no tiene location_id propio, se filtra vía el user dueño del pago
+  // (join inner — el pago siempre tiene user_id, así que el inner join no descarta filas
+  // legítimas cuando sedeId es null).
+  async getRevenueStats(startDate, endDate, sedeId) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('payments')
-        .select('amount, is_renewal, payment_date, memberships(membership_type)')
+        .select('amount, is_renewal, payment_date, memberships(membership_type), users!inner(location_id)')
         .eq('payment_status', 'completed')
-        .gte('payment_date', startDate)
-        .lte('payment_date', endDate)
+
+      if (startDate) query = query.gte('payment_date', startDate)
+      if (endDate) query = query.lte('payment_date', endDate)
+      if (sedeId) query = query.eq('users.location_id', sedeId)
+
+      const { data, error } = await query
 
       if (error) throw error
 

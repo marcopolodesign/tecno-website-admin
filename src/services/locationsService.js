@@ -78,6 +78,22 @@ export const locationsService = {
       console.error('Error deleting location:', error)
       throw error
     }
+  },
+
+  // Copia única (al crear la sede) y sync manual ("Sincronizar ahora") son la misma llamada —
+  // ver el comentario de la función en la migración: sincronizar es correr la copia de nuevo.
+  async copiarEquipamiento(sedeOrigenId, sedeDestinoId) {
+    try {
+      const { data, error } = await supabase.rpc('copiar_equipamiento_de_sede', {
+        p_sede_origen_id: sedeOrigenId,
+        p_sede_destino_id: sedeDestinoId
+      })
+      if (error) throw error
+      return { data: data?.[0] || null }
+    } catch (error) {
+      console.error('Error copying equipamiento:', error)
+      throw error
+    }
   }
 }
 

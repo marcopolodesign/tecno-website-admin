@@ -1,648 +1,147 @@
 import { supabase } from '../lib/supabase'
 
 /**
- * Service for routine auto-generation and coach overrides
+ * Genera el resto del mes a partir de las sesiones que el coach escribió a mano
+ * (botón "Generar Sesiones"/"Regenerar" en Rutinas).
+ *
+ * Del lado del servidor desde el 2026-09-24 (ver la migración
+ * `20260924140000_generar_sesion_server_side.sql` en tecnofit-supabase): este archivo tenía
+ * ~600 líneas que eran el motor entero — qué ejercicio elegía cada estación, qué formato, qué
+ * peso — corriendo en el navegador del coach, con ~3 ida-y-vuelta a la base POR SESIÓN
+ * (sustitutos en lote por rutina, pesos en lote por sesión, un INSERT por sesión). Con la
+ * conexión del admin (~90ms) eso alcanzaba: un mes de 30 sesiones salía en ~10s. Pero Lucas
+ * entrena con ~1s de latencia real, y 3 viajes secuenciales × 30 sesiones siguen siendo 90
+ * viajes — con 1s cada uno, un minuto y medio de spinner.
+ *
+ * La solución no era optimizar más el número de viajes: era sacarlos del cliente. Todo el
+ * motor (perfilesDeEsfuerzo, techosDelSocio, poolDeSustitutos, generarSesion,
+ * filaDeSessionExercise, seededIndex, CIRCUITO/formatoDelBloque/trabajoDelBloque — quien busque
+ * alguno de estos nombres, están en la función de Postgres `generar_sesion`, traducidos función
+ * por función y verificados con un diff determinístico contra el motor viejo, ver catchup.md)
+ * vive ahora en una función de Postgres. Este archivo quedó como el loop: pide una sesión a la
+ * vez —eso es lo que permite mostrar "Generando sesión N de 30" en vivo y listar las sesiones a
+ * medida que aparecen (Routines.jsx las sondea/suscribe mientras generation_status='generating')—
+ * pero cada sesión ahora cuesta UN viaje a la base, no tres, y ninguno de esos tres viajes
+ * escondía adentro la verdadera multiplicación (ida-y-vuelta por ejercicio de la sesión): eso
+ * quedó como SQL-contra-SQL dentro de la función, no como round-trips de red.
  */
-
-// =====================================================
-// EXERCISE GROUPS
-// =====================================================
-
-export const getExerciseGroups = async () => {
-  const { data, error } = await supabase
-    .from('exercise_groups')
-    .select(`
-      *,
-      body_zones (id, name)
-    `)
-    .order('display_order')
-  
-  if (error) throw error
-  return data
-}
-
-export const createExerciseGroup = async (groupData) => {
-  const { data, error } = await supabase
-    .from('exercise_groups')
-    .insert([groupData])
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-export const updateExerciseGroup = async (id, groupData) => {
-  const { data, error } = await supabase
-    .from('exercise_groups')
-    .update(groupData)
-    .eq('id', id)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// PRODUCTION LINES
-// =====================================================
-
-export const getProductionLines = async (locationId = null) => {
-  let query = supabase
-    .from('production_lines')
-    .select(`
-      *,
-      locations (id, name),
-      boxes (id, name, box_number)
-    `)
-    .order('line_number')
-  
-  if (locationId) {
-    query = query.eq('location_id', locationId)
-  }
-  
-  const { data, error } = await query
-  if (error) throw error
-  return data
-}
-
-export const createProductionLine = async (lineData) => {
-  const { data, error } = await supabase
-    .from('production_lines')
-    .insert([lineData])
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-export const updateProductionLine = async (id, lineData) => {
-  const { data, error } = await supabase
-    .from('production_lines')
-    .update(lineData)
-    .eq('id', id)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// LINE BOX STATUS (Real-time queue management)
-// =====================================================
-
-export const getLineBoxStatus = async (productionLineId = null) => {
-  let query = supabase
-    .from('line_box_status')
-    .select(`
-      *,
-      production_lines (id, name, line_number),
-      boxes (id, name, box_number),
-      users (id, first_name, last_name)
-    `)
-  
-  if (productionLineId) {
-    query = query.eq('production_line_id', productionLineId)
-  }
-  
-  const { data, error } = await query
-  if (error) throw error
-  return data
-}
-
-export const updateLineBoxStatus = async (id, statusData) => {
-  const { data, error } = await supabase
-    .from('line_box_status')
-    .update({
-      ...statusData,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// SIMILAR EXERCISES (for auto-generation)
-// =====================================================
-
-export const getSimilarExercises = async (exerciseId, userId, boxId, excludeIds = []) => {
-  const { data, error } = await supabase
-    .rpc('get_similar_exercises', {
-      p_exercise_id: exerciseId,
-      p_user_id: userId,
-      p_box_id: boxId,
-      p_exclude_ids: excludeIds
-    })
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// COACH OVERRIDES
-// =====================================================
-
-/**
- * Override an auto-generated exercise with a coach-selected one
- * @param {number} sessionExerciseId - The session_exercise to modify
- * @param {number} newExerciseId - The new exercise to use
- * @param {string} coachId - The coach's auth user ID
- * @param {boolean} lockExercise - Whether to lock this from future regeneration
- */
-export const overrideExercise = async (sessionExerciseId, newExerciseId, coachId, lockExercise = true) => {
-  const { data, error } = await supabase
-    .rpc('override_session_exercise', {
-      p_session_exercise_id: sessionExerciseId,
-      p_new_exercise_id: newExerciseId,
-      p_coach_id: coachId,
-      p_lock_exercise: lockExercise
-    })
-  
-  if (error) throw error
-  return data
-}
-
-/**
- * Revert a coach override back to the original auto-generated exercise
- */
-export const revertExerciseOverride = async (sessionExerciseId, coachId) => {
-  const { data, error } = await supabase
-    .rpc('revert_exercise_override', {
-      p_session_exercise_id: sessionExerciseId,
-      p_coach_id: coachId
-    })
-  
-  if (error) throw error
-  return data
-}
-
-/**
- * Lock/unlock an exercise from being regenerated
- */
-export const toggleExerciseLock = async (sessionExerciseId, isLocked) => {
-  const { data, error } = await supabase
-    .from('session_exercises')
-    .update({ 
-      is_locked: isLocked,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', sessionExerciseId)
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// SESSION EXERCISES WITH OVERRIDE INFO
-// =====================================================
-
-export const getSessionExercisesWithOverrides = async (sessionId) => {
-  const { data, error } = await supabase
-    .from('session_exercises')
-    .select(`
-      *,
-      exercises!session_exercises_exercise_id_fkey (
-        id, name, description, difficulty_level,
-        exercise_groups (id, name, body_zones (id, name))
-      ),
-      original_exercise:exercises!session_exercises_original_exercise_id_fkey (
-        id, name
-      ),
-      boxes (id, name, box_number)
-    `)
-    .eq('session_id', sessionId)
-    .order('box_number')
-    .order('exercise_order')
-  
-  if (error) throw error
-  
-  // Add computed fields
-  return data.map(se => ({
-    ...se,
-    sourceDescription: getSourceDescription(se),
-    canRevert: se.is_coach_override && se.original_exercise_id != null
-  }))
-}
-
-function getSourceDescription(sessionExercise) {
-  if (sessionExercise.is_coach_override) return 'Coach Override'
-  if (sessionExercise.is_auto_generated) {
-    switch (sessionExercise.generation_source) {
-      case 'similar': return 'Auto (Similar)'
-      case 'random': return 'Auto (Random)'
-      case 'template': return 'From Template'
-      default: return 'Auto-generated'
-    }
-  }
-  return 'Manual'
-}
-
-// =====================================================
-// ROUTINE GENERATION
-// =====================================================
-
-/**
- * Get exercises suitable for a specific box based on user profile
- */
-export const getExercisesForBox = async (boxId, userId) => {
-  // First get the user's fitness profile
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('fitness_capacity, fitness_intensity, age_category_id')
-    .eq('id', userId)
-    .single()
-  
-  if (userError) throw userError
-  
-  // Get groups available for this box
-  const { data: boxGroups, error: bgError } = await supabase
-    .from('box_groups')
-    .select('group_id')
-    .eq('box_id', boxId)
-  
-  if (bgError) throw bgError
-  
-  const groupIds = boxGroups.map(bg => bg.group_id)
-  
-  // Get exercises from those groups
-  const { data: exercises, error: exError } = await supabase
-    .from('exercises')
-    .select(`
-      *,
-      exercise_groups (id, name, body_zones (id, name))
-    `)
-    .in('group_id', groupIds.length > 0 ? groupIds : [0])
-    .eq('is_active', true)
-    .order('priority', { ascending: false })
-  
-  if (exError) throw exError
-  
-  return exercises
-}
-
-/**
- * Generate remaining sessions based on template (Class 1)
- * This is a simplified version - the full logic would be in a backend function
- */
-export const generateRoutineSessions = async (routineId, templateSessionId) => {
-  // Get the template session exercises
-  const { data: templateExercises, error: teError } = await supabase
-    .from('session_exercises')
-    .select('*')
-    .eq('session_id', templateSessionId)
-    .order('box_number')
-    .order('exercise_order')
-  
-  if (teError) throw teError
-  
-  // Get routine info
+export const generateRoutineSessions = async (routineId) => {
   const { data: routine, error: rError } = await supabase
     .from('training_routines')
-    .select('*, users (id, fitness_capacity, fitness_intensity, age_category_id)')
+    .select('*, users (id)')
     .eq('id', routineId)
     .single()
-  
   if (rError) throw rError
-  
-  // Mark routine as generating
-  await supabase
+
+  const totalSessions = routine.total_sessions || 30
+
+  const { data: plantillas, error: pError } = await supabase
+    .from('routine_sessions')
+    .select('id, session_number, session_exercises (*)')
+    .eq('routine_id', routineId)
+    .order('session_number')
+  if (pError) throw pError
+
+  // What the coach wrote is whatever is not the engine's own work — not the first five sessions.
+  // Five is what the gym happens to write on a good week, and hardcoding it meant a coach who
+  // wrote one day had nothing to generate from, and a coach who wrote six had the sixth ignored
+  // and then overwritten. The base is the hand-written sessions, however many there are.
+  const conEjercicios = (plantillas || []).filter((s) =>
+    (s.session_exercises || []).some((se) => !se.is_auto_generated)
+  )
+  const aMano = conEjercicios.length
+    ? Math.max(...conEjercicios.map((s) => s.session_number))
+    : 0
+  if (conEjercicios.length === 0) {
+    throw new Error(
+      'No hay ninguna sesión cargada a mano para usar de base. Con una alcanza: armá la Sesión 1 y volvé a generar.'
+    )
+  }
+
+  // Candado: sólo se toma la generación si nadie más la tiene, o si la tiene hace más de 10
+  // minutos sin avanzar — eso es "quedó colgada", no "está en curso". La condición vive en el
+  // propio UPDATE (no en el SELECT de `routine`, más arriba) porque es la única forma atómica:
+  // si dos coaches aprietan "Generar" a la vez, Postgres serializa las dos UPDATE contra la
+  // misma fila y sólo la primera encuentra la fila todavía elegible — la segunda vuelve con
+  // `tomado` vacío y no sigue. Sin este candado, las dos corridas generaban session_number
+  // repetidos y chocaban con routine_sessions_routine_id_session_number_key.
+  const DIEZ_MIN_MS = 10 * 60 * 1000
+  const staleDesde = new Date(Date.now() - DIEZ_MIN_MS).toISOString()
+  const { data: tomado, error: lockError } = await supabase
     .from('training_routines')
-    .update({ generation_status: 'generating' })
+    .update({ generation_status: 'generating', generation_progress: 0 })
     .eq('id', routineId)
-  
+    .or(`generation_status.neq.generating,updated_at.lt.${staleDesde}`)
+    .select('id')
+  if (lockError) throw lockError
+  if (!tomado?.length) {
+    if (routine.generation_status === 'generating') {
+      const minutos = routine.updated_at
+        ? Math.max(1, Math.round((Date.now() - new Date(routine.updated_at).getTime()) / 60000))
+        : null
+      throw new Error(
+        minutos != null
+          ? `Se está generando desde hace ${minutos} min. Esperá a que termine.`
+          : 'Se está generando ahora mismo. Esperá a que termine.'
+      )
+    }
+    throw new Error('Otra persona la generó justo ahora. Volvé a intentar en un momento.')
+  }
+
   try {
-    const totalSessions = routine.total_sessions || 30
-    const templateSessions = routine.template_sessions || 6
-    
-    // Generate sessions 2 through templateSessions (similar exercises)
-    for (let sessionNum = 2; sessionNum <= templateSessions; sessionNum++) {
-      await generateSimilarSession(routineId, templateExercises, sessionNum, routine.client_id)
+    // Anything previously generated is replaced. Regenerating after fixing a station should not
+    // leave the old month interleaved with the new one.
+    const { data: viejas } = await supabase
+      .from('routine_sessions')
+      .select('id')
+      .eq('routine_id', routineId)
+      .gt('session_number', aMano)
+    if (viejas?.length) {
+      await supabase.from('routine_sessions').delete().in('id', viejas.map((s) => s.id))
     }
-    
-    // Generate sessions templateSessions+1 through totalSessions (random from first 6)
-    for (let sessionNum = templateSessions + 1; sessionNum <= totalSessions; sessionNum++) {
-      await generateRandomSession(routineId, sessionNum, routine.client_id)
+
+    // What the last hand-written session used. Without this the first generated session is the
+    // only one in the month that does not know what came the day before, and it can repeat it —
+    // which is exactly what it did: session 5 finished with squats and session 6 opened with them.
+    const ultima = conEjercicios[conEjercicios.length - 1]
+    let anterior = (ultima.session_exercises || []).map((se) => se.exercise_id)
+    for (let n = aMano + 1; n <= totalSessions; n++) {
+      // Rotate through the hand-made sessions so the month keeps their variety instead of
+      // orbiting one of them.
+      const base = conEjercicios[(n - aMano - 1) % conEjercicios.length]
+      // Un solo viaje a la base por sesión: generar_sesion hace TODO adentro (insertar la
+      // sesión, elegir cada ejercicio de cada estación, resolver el peso, insertar las filas) y
+      // devuelve los exercise_id usados, para pasarlos como "evitar" a la sesión siguiente —
+      // mismo contrato que devolvía generarSesion() en JS.
+      const { data: usados, error: genError } = await supabase.rpc('generar_sesion', {
+        p_routine_id: routineId,
+        p_client_id: routine.client_id,
+        p_base_session_id: base.id,
+        p_session_number: n,
+        p_evitar: anterior,
+      })
+      if (genError) {
+        throw new Error(`No se pudo generar la sesión ${n}: ${genError.message}`)
+      }
+      anterior = usados || []
+      // Progreso visible para cualquier pestaña/coach que esté mirando esta rutina (Routines.jsx
+      // la sondea/suscribe mientras generation_status = 'generating'). De paso, cada UPDATE
+      // re-toca updated_at (trigger ya existente en training_routines) — es el latido que el
+      // candado de arriba usa para distinguir una generación en curso de una que quedó colgada.
+      await supabase.from('training_routines').update({ generation_progress: n }).eq('id', routineId)
     }
-    
-    // Mark as completed
+
     await supabase
       .from('training_routines')
       .update({ generation_status: 'completed' })
       .eq('id', routineId)
-    
-    return true
+
+    return { generadas: totalSessions - aMano, desde: conEjercicios.length }
   } catch (error) {
-    // Mark as failed
     await supabase
       .from('training_routines')
       .update({ generation_status: 'failed' })
       .eq('id', routineId)
-    
     throw error
   }
-}
-
-// Deterministic string hash (FNV-1a) — same inputs always produce the same
-// pick, so regenerating a routine is reproducible/auditable instead of
-// silently landing on a different exercise every run. Ported concept (not
-// code — his was PHP crc32) from Lucas Barral's RutinaMaterializerService.
-function seededIndex(seed, length) {
-  let hash = 0x811c9dc5
-  for (let i = 0; i < seed.length; i++) {
-    hash ^= seed.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return Math.abs(hash) % length
-}
-
-// Weight carryover — reuse the client's last logged weight for this exact
-// exercise instead of leaving weight_kg null/default on every regeneration.
-// Ports Lucas's pesoPropuesto(): walks completed history, first non-null wins.
-async function getProposedWeight(userId, exerciseId) {
-  try {
-    const { data, error } = await supabase.rpc('get_proposed_weight', {
-      p_user_id: userId,
-      p_exercise_id: exerciseId,
-    })
-    if (error) throw error
-    return data ?? null
-  } catch (err) {
-    console.error('Error fetching proposed weight:', err)
-    return null
-  }
-}
-
-async function generateSimilarSession(routineId, templateExercises, sessionNumber, userId) {
-  // Create the session
-  const { data: session, error: sError } = await supabase
-    .from('routine_sessions')
-    .insert([{
-      routine_id: routineId,
-      title: `Sesión ${sessionNumber}`,
-      session_number: sessionNumber,
-      status: 'locked'
-    }])
-    .select()
-    .single()
-  
-  if (sError) throw sError
-  
-  const usedExerciseIds = []
-  
-  // For each template exercise, find a similar one
-  for (const te of templateExercises) {
-    let exerciseId = te.exercise_id
-    
-    // Try to find a similar exercise — deterministic seed so re-generating
-    // this exact session/box/position always lands on the same candidate
-    // set ordering (mirror rule: box A and box B at the same station share
-    // a seed unless the box number itself differs the pool via equipment).
-    const seed = `${userId}-${routineId}-${sessionNumber}-b${te.box_number}-o${te.exercise_order}`
-    const { data: similar } = await supabase
-      .rpc('get_similar_exercises', {
-        p_exercise_id: te.exercise_id,
-        p_user_id: userId,
-        p_box_id: te.box_id,
-        p_exclude_ids: usedExerciseIds,
-        p_seed: seed
-      })
-
-    if (similar && similar.length > 0) {
-      exerciseId = similar[0].exercise_id
-    }
-
-    usedExerciseIds.push(exerciseId)
-
-    const proposedWeight = await getProposedWeight(userId, exerciseId)
-
-    // Create the session exercise
-    await supabase
-      .from('session_exercises')
-      .insert([{
-        session_id: session.id,
-        exercise_id: exerciseId,
-        box_id: te.box_id,
-        box_number: te.box_number,
-        exercise_order: te.exercise_order,
-        sets_reps: te.sets_reps,
-        rest_time: te.rest_time,
-        repetition_time: te.repetition_time,
-        micro_pause: te.micro_pause,
-        weight_kg: proposedWeight ?? te.weight_kg,
-        is_auto_generated: true,
-        is_cooldown: te.is_cooldown || false,
-        generation_source: exerciseId === te.exercise_id ? 'template' : 'similar'
-      }])
-  }
-  
-  return session
-}
-
-async function generateRandomSession(routineId, sessionNumber, userId) {
-  // Get exercises from first 6 sessions to pick randomly
-  const { data: existingExercises, error } = await supabase
-    .from('session_exercises')
-    .select(`
-      *,
-      routine_sessions!inner (routine_id, session_number)
-    `)
-    .eq('routine_sessions.routine_id', routineId)
-    .lte('routine_sessions.session_number', 6)
-  
-  if (error) throw error
-  
-  // Group by box_number and order
-  const exercisesByBoxAndOrder = {}
-  existingExercises.forEach(ex => {
-    const key = `${ex.box_number}-${ex.exercise_order}`
-    if (!exercisesByBoxAndOrder[key]) {
-      exercisesByBoxAndOrder[key] = []
-    }
-    exercisesByBoxAndOrder[key].push(ex)
-  })
-  
-  // Create the session
-  const { data: session, error: sError } = await supabase
-    .from('routine_sessions')
-    .insert([{
-      routine_id: routineId,
-      title: `Sesión ${sessionNumber}`,
-      session_number: sessionNumber,
-      status: 'locked'
-    }])
-    .select()
-    .single()
-  
-  if (sError) throw sError
-  
-  // For each position, pick a random exercise (avoiding previous session)
-  const previousSessionNum = sessionNumber - 1
-  
-  for (const [key, exercises] of Object.entries(exercisesByBoxAndOrder)) {
-    // Filter out exercises from previous session
-    let candidates = exercises.filter(ex => 
-      ex.routine_sessions.session_number !== previousSessionNum
-    )
-    
-    // If no candidates, use all
-    if (candidates.length === 0) {
-      candidates = exercises
-    }
-    
-    // Deterministic pick — same routine/session/position always selects the
-    // same candidate instead of a fresh Math.random() roll every regenerate.
-    const seed = `${routineId}-${sessionNumber}-${key}`
-    const selected = candidates[seededIndex(seed, candidates.length)]
-
-    const proposedWeight = await getProposedWeight(userId, selected.exercise_id)
-
-    // Create the session exercise
-    await supabase
-      .from('session_exercises')
-      .insert([{
-        session_id: session.id,
-        exercise_id: selected.exercise_id,
-        box_id: selected.box_id,
-        box_number: selected.box_number,
-        exercise_order: selected.exercise_order,
-        sets_reps: selected.sets_reps,
-        rest_time: selected.rest_time,
-        repetition_time: selected.repetition_time,
-        micro_pause: selected.micro_pause,
-        weight_kg: proposedWeight ?? selected.weight_kg,
-        is_auto_generated: true,
-        is_cooldown: selected.is_cooldown || false,
-        generation_source: 'random'
-      }])
-  }
-  
-  return session
-}
-
-// =====================================================
-// GENERATION LOG
-// =====================================================
-
-export const getGenerationLog = async (routineId) => {
-  const { data, error } = await supabase
-    .from('routine_generation_log')
-    .select(`
-      *,
-      routine_sessions (id, title, session_number),
-      original:exercises!routine_generation_log_original_exercise_id_fkey (id, name),
-      new:exercises!routine_generation_log_new_exercise_id_fkey (id, name),
-      sellers!routine_generation_log_performed_by_fkey (id, first_name, last_name)
-    `)
-    .eq('routine_id', routineId)
-    .order('created_at', { ascending: false })
-  
-  if (error) throw error
-  return data
-}
-
-// =====================================================
-// ROUTINE GENERATION SUMMARY
-// =====================================================
-
-export const getRoutineGenerationSummary = async (routineId = null) => {
-  let query = supabase
-    .from('training_routines')
-    .select(`
-      id,
-      title,
-      generation_status,
-      total_sessions,
-      template_sessions,
-      users (id, first_name, last_name),
-      routine_sessions (
-        id,
-        session_exercises (
-          id,
-          is_auto_generated,
-          is_coach_override,
-          is_locked,
-          generation_source
-        )
-      )
-    `)
-  
-  if (routineId) {
-    query = query.eq('id', routineId)
-  }
-  
-  const { data, error } = await query
-  if (error) throw error
-  
-  // Calculate summary stats
-  return data.map(routine => {
-    let totalExercises = 0
-    let autoGenerated = 0
-    let coachOverrides = 0
-    let locked = 0
-    
-    routine.routine_sessions?.forEach(session => {
-      session.session_exercises?.forEach(se => {
-        totalExercises++
-        if (se.is_auto_generated) autoGenerated++
-        if (se.is_coach_override) coachOverrides++
-        if (se.is_locked) locked++
-      })
-    })
-    
-    return {
-      id: routine.id,
-      title: routine.title,
-      generationStatus: routine.generation_status,
-      clientName: routine.users ? `${routine.users.first_name} ${routine.users.last_name}` : 'N/A',
-      totalSessions: routine.routine_sessions?.length || 0,
-      totalExercises,
-      autoGenerated,
-      coachOverrides,
-      locked
-    }
-  })
-}
-
-export default {
-  // Exercise Groups
-  getExerciseGroups,
-  createExerciseGroup,
-  updateExerciseGroup,
-  
-  // Production Lines
-  getProductionLines,
-  createProductionLine,
-  updateProductionLine,
-  
-  // Line Box Status
-  getLineBoxStatus,
-  updateLineBoxStatus,
-  
-  // Similar Exercises
-  getSimilarExercises,
-  
-  // Coach Overrides
-  overrideExercise,
-  revertExerciseOverride,
-  toggleExerciseLock,
-  
-  // Session Exercises with Overrides
-  getSessionExercisesWithOverrides,
-  
-  // Routine Generation
-  getExercisesForBox,
-  generateRoutineSessions,
-  
-  // Generation Log
-  getGenerationLog,
-  getRoutineGenerationSummary
 }

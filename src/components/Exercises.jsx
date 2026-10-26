@@ -15,6 +15,7 @@ import {
 import exercisesService from '../services/exercisesService'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastOptions } from '../lib/themeStyles'
+import Sidecart from './Sidecart'
 
 export default function Exercises() {
   const [bodyZones, setBodyZones] = useState([])
@@ -363,7 +364,13 @@ export default function Exercises() {
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Biblioteca de Ejercicios</h1>
           <p className="text-sm text-text-secondary mt-1">
-            {exercises.length} ejercicios en {categories.length} categorías
+            {/*
+              Count what this screen shows, not what the table holds. Saying "310 ejercicios"
+              above a list of 13 is what made the catalog look like it had lost the gym's
+              exercises — the other 297 are there, they just have no category and this view
+              lists by category.
+            */}
+            {exercises.filter(e => e.categoryId).length} ejercicios en {categories.length} categorías
           </p>
         </div>
         <button
@@ -412,6 +419,23 @@ export default function Exercises() {
       {/* Exercises Tab */}
       {activeTab === 'exercises' && (
         <>
+          {/*
+            This screen lists by zone → category, so it only ever shows exercises that carry a
+            category_id. The gym's own catalog is classified by facets instead and carries
+            none, so it is invisible here — which is exactly what it looked like when the
+            catalog "was missing exercises". Say so, rather than let the list read as the
+            whole truth.
+          */}
+          <div className="card p-4 border-l-4 border-brand bg-bg-surface">
+            <p className="text-sm text-text-secondary">
+              El catálogo completo de TecnoFit —con su clasificación por patrón, rol y
+              material, y con los videos— vive en{' '}
+              <a href="/catalogo" className="text-brand font-semibold hover:underline">Catálogo</a>.
+              Ahí se cargan y se editan los ejercicios. Esta pantalla es la taxonomía vieja por
+              zona y categoría, que todavía usa el generador de rutinas.
+            </p>
+          </div>
+
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -663,23 +687,23 @@ export default function Exercises() {
           </div>
         </div>
       )}
-
-      {/* Exercise Modal */}
-      {showExerciseModal && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowExerciseModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {editingItem ? 'Editar Ejercicio' : 'Nuevo Ejercicio'}
-                </h2>
-                <button onClick={() => setShowExerciseModal(false)} className="p-1 hover:bg-bg-surface rounded">
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
-              </div>
-              
-              <form onSubmit={saveExercise} className="p-4 space-y-4">
+      <Sidecart
+        isOpen={showExerciseModal}
+        onClose={() => setShowExerciseModal(false)}
+        title={editingItem ? 'Editar Ejercicio' : 'Nuevo Ejercicio'}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowExerciseModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" form="form-ejercicio-0" disabled={saving} className="btn-primary disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        }
+      >
+        <form id="form-ejercicio-0" onSubmit={saveExercise} className="space-y-4">
                 <div>
                   <label className="form-label">Nombre *</label>
                   <input
@@ -822,37 +846,25 @@ export default function Exercises() {
                     </div>
                   </div>
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button type="button" onClick={() => setShowExerciseModal(false)} className="btn-secondary">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
-                    {saving ? 'Guardando...' : 'Guardar'}
-                  </button>
-                </div>
-              </form>
-            </div>
+        </form>
+      </Sidecart>
+      <Sidecart
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        title={editingItem ? 'Editar Categoría' : 'Nueva Categoría'}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowCategoryModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" form="form-ejercicio-1" disabled={saving} className="btn-primary disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
           </div>
-        </>
-      )}
-
-      {/* Category Modal */}
-      {showCategoryModal && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowCategoryModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-md w-full animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {editingItem ? 'Editar Categoría' : 'Nueva Categoría'}
-                </h2>
-                <button onClick={() => setShowCategoryModal(false)} className="p-1 hover:bg-bg-surface rounded">
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
-              </div>
-              
-              <form onSubmit={saveCategory} className="p-4 space-y-4">
+        }
+      >
+        <form id="form-ejercicio-1" onSubmit={saveCategory} className="space-y-4">
                 <div>
                   <label className="form-label">Zona Corporal *</label>
                   <select
@@ -888,37 +900,25 @@ export default function Exercises() {
                     rows={2}
                   />
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button type="button" onClick={() => setShowCategoryModal(false)} className="btn-secondary">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
-                    {saving ? 'Guardando...' : 'Guardar'}
-                  </button>
-                </div>
-              </form>
-            </div>
+        </form>
+      </Sidecart>
+      <Sidecart
+        isOpen={showZoneModal}
+        onClose={() => setShowZoneModal(false)}
+        title={editingItem ? 'Editar Zona' : 'Nueva Zona Corporal'}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowZoneModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" form="form-ejercicio-2" disabled={saving} className="btn-primary disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
           </div>
-        </>
-      )}
-
-      {/* Zone Modal */}
-      {showZoneModal && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowZoneModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-bg-secondary rounded-lg shadow-xl max-w-md w-full animate-fade-in">
-              <div className="flex items-center justify-between p-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {editingItem ? 'Editar Zona' : 'Nueva Zona Corporal'}
-                </h2>
-                <button onClick={() => setShowZoneModal(false)} className="p-1 hover:bg-bg-surface rounded">
-                  <XMarkIcon className="h-5 w-5 text-text-secondary" />
-                </button>
-              </div>
-              
-              <form onSubmit={saveZone} className="p-4 space-y-4">
+        }
+      >
+        <form id="form-ejercicio-2" onSubmit={saveZone} className="space-y-4">
                 <div>
                   <label className="form-label">Nombre *</label>
                   <input
@@ -940,20 +940,8 @@ export default function Exercises() {
                     rows={2}
                   />
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-border-default">
-                  <button type="button" onClick={() => setShowZoneModal(false)} className="btn-secondary">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
-                    {saving ? 'Guardando...' : 'Guardar'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </>
-      )}
+        </form>
+      </Sidecart>
     </div>
   )
 }

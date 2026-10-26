@@ -17,6 +17,12 @@ import logsService from '../services/logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
 import LogsTimeline from './LogsTimeline'
 import Modal from './Modal'
+import SelectorContraindicaciones from './SelectorContraindicaciones'
+import { useSede } from '../contexts/SedeContext'
+import { supabase } from '../lib/supabase'
+import cajaService from '../services/cajaService'
+import { formatARS } from '../lib/dinero'
+import RiesgoBadge from './RiesgoBadge'
 
 // Helper to format date without timezone issues
 // Parses YYYY-MM-DD string and formats as DD/MM/YYYY without timezone shift
@@ -30,6 +36,7 @@ const formatDateSafe = (dateString) => {
 }
 
 const Users = () => {
+  const { sedeId } = useSede()
   const [users, setUsers] = useState([])
   const [filteredUsers, setFilteredUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -38,10 +45,17 @@ const Users = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedUser, setSelectedUser] = useState(null)
   const [showSidePanel, setShowSidePanel] = useState(false)
+  // Saldo de caja del socio (ventas fiadas por mostrador que todavía no pagó) — sólo se
+  // pide cuando se abre su ficha, no en el listado entero.
+  const [saldoCaja, setSaldoCaja] = useState(null)
+  // Riesgo de abandono del socio abierto — siempre visible en la ficha, no sólo cuando está
+  // en riesgo/alto riesgo (pedido de Mateo, 2026-09-23).
+  const [riesgoSocio, setRiesgoSocio] = useState(null)
   const [editFormData, setEditFormData] = useState({})
   const [hasChanges, setHasChanges] = useState(false)
   const [sellers, setSellers] = useState([])
   const [membershipPlans, setMembershipPlans] = useState([])
+  const [arquetipos, setArquetipos] = useState([])
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [reasonData, setReasonData] = useState({
     userId: null,
@@ -95,19 +109,58 @@ const Users = () => {
     paymentNotes: ''
   })
 
+
+  // Los arquetipos son filas, no una lista escrita en el código: el gym los renombra.
   useEffect(() => {
-    fetchUsers()
+    supabase
+      .from('arquetipos')
+      .select('id, nombre, descripcion')
+      .eq('is_active', true)
+      .order('orden')
+      .then(({ data }) => setArquetipos(data || []))
+  }, [])
+  useEffect(() => {
     fetchSellers()
     fetchMembershipPlans()
   }, [])
 
   useEffect(() => {
+    fetchUsers()
+  }, [sedeId])
+
+  useEffect(() => {
     filterUsers()
   }, [users, searchTerm, membershipFilter, statusFilter])
 
+  // Saldo de caja — sólo cuando se abre la ficha de un socio puntual.
+  useEffect(() => {
+    if (!selectedUser?.id) {
+      setSaldoCaja(null)
+      return
+    }
+    let cancelado = false
+    cajaService.saldoSocio(selectedUser.id)
+      .then((saldo) => { if (!cancelado) setSaldoCaja(saldo) })
+      .catch((error) => console.error('Error fetching saldo de caja:', error))
+    return () => { cancelado = true }
+  }, [selectedUser?.id])
+
+  // Riesgo de abandono — mismo patrón que el saldo: se pide sólo cuando se abre una ficha.
+  useEffect(() => {
+    if (!selectedUser?.id) {
+      setRiesgoSocio(null)
+      return
+    }
+    let cancelado = false
+    usersService.getRiesgo(selectedUser.id)
+      .then((riesgo) => { if (!cancelado) setRiesgoSocio(riesgo) })
+      .catch((error) => console.error('Error fetching riesgo del socio:', error))
+    return () => { cancelado = true }
+  }, [selectedUser?.id])
+
   const fetchUsers = async () => {
     try {
-      const response = await usersService.getUsers()
+      const response = await usersService.getUsers(sedeId)
       setUsers(response.data || [])
     } catch (error) {
       console.error('Error fetching users:', error)
@@ -255,7 +308,7 @@ const Users = () => {
         notes: createFormData.paymentNotes
       } : null
 
-      const response = await usersService.createUser(createFormData, paymentData)
+      const response = await usersService.createUser({ ...createFormData, locationId: sedeId }, paymentData)
       setUsers([response.data, ...users])
       setShowCreateModal(false)
       // Reset form
@@ -305,6 +358,8 @@ const Users = () => {
             emergencyContact: existingUser.emergencyContact || '',
             emergencyPhone: existingUser.emergencyPhone || '',
             medicalNotes: existingUser.medicalNotes || '',
+            contraindicaciones: existingUser.contraindicaciones || [],
+            arquetipoId: existingUser.arquetipo_id ?? existingUser.arquetipoId ?? null,
             notes: existingUser.notes || '',
             assignedSellerId: existingUser.assignedSellerId || null
           })
@@ -347,7 +402,7 @@ const Users = () => {
       setShowSidePanel(false)
     } catch (error) {
       console.error('Error updating user:', error)
-      toast.error('Error al actualizar usuario.')
+      toast.error(error?.message || 'Error al actualizar usuario.')
     }
   }
 
@@ -405,7 +460,7 @@ const Users = () => {
 
   const handleExport = async () => {
     try {
-      const response = await usersService.getUsers()
+      const response = await usersService.getUsers(sedeId)
       const usersData = response.data || []
       
       const csvContent = [
@@ -841,6 +896,8 @@ const Users = () => {
               emergencyContact: params.row.emergencyContact || '',
               emergencyPhone: params.row.emergencyPhone || '',
               medicalNotes: params.row.medicalNotes || '',
+            contraindicaciones: params.row.contraindicaciones || [],
+            arquetipoId: params.row.arquetipo_id ?? params.row.arquetipoId ?? null,
               notes: params.row.notes || '',
               assignedSellerId: params.row.assignedSellerId || null
             })
@@ -889,12 +946,12 @@ const Users = () => {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/30 z-40 animate-fade-in"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-40 animate-fade-in"
             onClick={() => setShowSidePanel(false)}
           />
           
           {/* Side Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-bg-secondary border-l border-border-default z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-xl bg-white sm:rounded-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header - Fixed */}
             <div className="p-6 border-b border-border-default shrink-0">
               <div className="flex items-center justify-between">
@@ -909,6 +966,16 @@ const Users = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <p className="text-sm text-text-secondary truncate">
+                  {selectedUser.firstName} {selectedUser.lastName}
+                </p>
+                <RiesgoBadge
+                  riesgo={riesgoSocio?.risk_bucket}
+                  dias={riesgoSocio?.days_since_last_visit}
+                  mostrarSinDatos
+                />
               </div>
             </div>
 
@@ -1010,6 +1077,14 @@ const Users = () => {
                   </p>
                 </div>
 
+                {saldoCaja > 0 && (
+                  <div className="border-t border-border-default pt-4">
+                    <label className="text-sm font-medium text-text-tertiary">Deuda de caja</label>
+                    <p className="text-lg font-medium text-warning">{formatARS(saldoCaja)}</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">Ventas de mostrador fiadas, sin cobrar — se cobran desde Deuda</p>
+                  </div>
+                )}
+
                 <div className="border-t border-border-default pt-4">
                   <label className="text-sm font-medium text-text-tertiary">Período de membresía</label>
                   <p className="text-text-primary">
@@ -1050,6 +1125,38 @@ const Users = () => {
                   />
                 </div>
 
+                {/*
+                  Debajo de la nota médica a propósito: es la misma información, una en las
+                  palabras del coach y otra en las que el motor de rutinas puede leer.
+                */}
+                <SelectorContraindicaciones
+                  valor={editFormData.contraindicaciones}
+                  onChange={(v) => handleFormChange('contraindicaciones', v)}
+                />
+
+                {/*
+                  Las contraindicaciones dicen qué no puede hacer; el arquetipo, hasta dónde
+                  llevarlo. Van juntas porque son las dos cosas que el motor lee del socio.
+                */}
+                <div>
+                  <label className="form-label">Arquetipo</label>
+                  <select
+                    className="form-select"
+                    value={editFormData.arquetipoId || ''}
+                    onChange={(e) => handleFormChange('arquetipoId', e.target.value || null)}
+                  >
+                    <option value="">Sin arquetipo</option>
+                    {arquetipos.map((a) => (
+                      <option key={a.id} value={a.id}>{a.nombre}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-text-tertiary mt-1">
+                    {arquetipos.find((a) => String(a.id) === String(editFormData.arquetipoId))
+                      ?.descripcion ||
+                      'A qué se parece este socio. El motor lo usa para no ofrecerle lo que todavía le queda grande.'}
+                  </p>
+                </div>
+
                 <div>
                   <label className="form-label">Notas</label>
                   <textarea
@@ -1063,7 +1170,7 @@ const Users = () => {
                 <div className="border-t border-border-default pt-4">
                   <label className="text-sm font-medium text-text-tertiary">Fecha de conversión</label>
                   <p className="text-text-primary">
-                    {new Date(selectedUser.convertedAt).toLocaleString('es-AR')}
+                    {new Date(selectedUser.convertedAt).toLocaleString('es-AR', { hour12: false })}
                   </p>
                 </div>
 
@@ -1178,10 +1285,10 @@ const Users = () => {
       {showReasonModal && (
         <>
           <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-[70]"
             onClick={() => setShowReasonModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-md">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-md bg-white sm:rounded-2xl z-[70] flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5 p-6">
             <h3 className="text-lg font-bold text-text-primary mb-4">
               ¿Por qué no renueva?
             </h3>
@@ -1217,10 +1324,10 @@ const Users = () => {
       {showCreateModal && (
         <>
           <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-[70]"
             onClick={() => setShowCreateModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] w-full max-w-3xl max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-3xl bg-white sm:rounded-2xl z-[70] flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5">
             {/* Header - Fixed */}
             <div className="p-6 border-b border-border-default shrink-0">
               <h3 className="text-xl font-bold text-text-primary">
@@ -1535,10 +1642,10 @@ const Users = () => {
       {showRenewalModal && (
         <>
           <div 
-            className="fixed inset-0 bg-black/50 z-[70]"
+            className="fixed inset-0 bg-white/70 backdrop-blur-[2px] z-[70]"
             onClick={() => setShowRenewalModal(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-bg-secondary rounded-lg shadow-xl z-[70] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 sm:inset-y-4 sm:right-4 sm:left-auto w-full sm:max-w-2xl bg-white sm:rounded-2xl z-[70] flex flex-col overflow-hidden animate-slide-in-right shadow-[0_10px_40px_-12px_rgba(17,24,39,0.18)] ring-1 ring-black/5 p-6 overflow-y-auto">
             <h3 className="text-xl font-bold text-text-primary mb-6">
               Renovar Membresía
             </h3>

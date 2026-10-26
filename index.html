@@ -5,10 +5,269 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TecnoFit Admin</title>
-    <!-- Fallback fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+    <!--
+      Aviso de errores de las TVs de la sala (Samsung Tizen 3.0, Chrome 47). Va inline y antes de los
+      bundles para atrapar también lo que rompe al cargar. ES5 puro: sin fetch, Promise, arrow
+      functions, let/const ni template strings — lo controla scripts/check-tv-legacy.mjs.
+      Al fallar: pinta el error en la pantalla (para una foto) y lo manda a Sentry sin el SDK, que en
+      Chrome 47 no corre porque necesita Proxy. Sólo se activa en las pantallas de TV (tv.* o /tv/...).
+      Prueba: ?tv-error-prueba=onerror | promesa | render
+    -->
+    <script id="tv-reporte">
+      (function () {
+        var w = window, d = document, loc = w.location;
+        var enHostTv = loc.hostname.indexOf('tv.') === 0;
+        if (!enHostTv && !/^\/tv(\/|$)/.test(loc.pathname)) {
+          // Fuera de la TV, las fuentes de Google (Inter, Source Code Pro) se cargan sin bloquear el
+          // render. En la TV no se piden: son de terceros y la tele no las necesita.
+          var f = d.createElement('link');
+          f.rel = 'stylesheet';
+          f.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Source+Code+Pro:wght@400;500;600&display=swap';
+          d.getElementsByTagName('head')[0].appendChild(f);
+          return;
+        }
+
+        var VERSION = '__TV_BUILD__';
+        var SENTRY = 'https://o4508958929911808.ingest.us.sentry.io/api/4511212965330944/envelope/?sentry_version=7&sentry_key=7b50329bdaf46ce9ebf4f4e34730c467';
+        var DSN = 'https://7b50329bdaf46ce9ebf4f4e34730c467@o4508958929911808.ingest.us.sentry.io/4511212965330944';
+
+        var partes = loc.pathname.split('/');
+        var segs = [];
+        for (var i = 0; i < partes.length; i++) if (partes[i]) segs.push(decodeURIComponent(partes[i]));
+        if (!enHostTv && segs[0] === 'tv') segs.shift();
+        var sede = segs[0] || '(inicio)';
+        var pantalla = segs.length > 1 ? segs.slice(1).join('/') : (segs[0] ? 'sede' : 'indice');
+        var enviados = 0, vistos = {}, cartel = null, primero = null, extras = 0;
+        var inicio = new Date().getTime();
+
+        // Marcas de etapa: un pedido a /__etapa/<etapa>/<sede>/<pantalla> que aparece en el log de CDN
+        // de Vercel (que sí podemos leer) aunque Sentry no llegue. Etapas: html, bundle, montada,
+        // sigue-cargando-15s, sigue-cargando-45s, error.
+        var etapas = {};
+        function etapa(nombre) {
+          if (etapas[nombre]) return;
+          etapas[nombre] = 1;
+          try {
+            var x = new XMLHttpRequest();
+            x.open('GET', '/__etapa/' + nombre + '/' + encodeURIComponent(sede) + '/' + encodeURIComponent(pantalla).replace(/%2F/g, '-') +
+              '?s=' + Math.round((new Date().getTime() - inicio) / 1000) + '&v=' + VERSION, true);
+            x.send();
+          } catch (e) {}
+        }
+        w.__tvEtapa = etapa;
+        etapa('html');
+
+        function hex32() {
+          var s = '';
+          for (var j = 0; j < 32; j++) s += Math.floor(Math.random() * 16).toString(16);
+          return s;
+        }
+        function corto(t, n) { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n) : t; }
+
+        function frames(stack) {
+          var out = [], lineas = String(stack || '').split('\n');
+          for (var k = 0; k < lineas.length; k++) {
+            var m = /^\s*at (?:(.+?) \()?(.+?):(\d+):(\d+)\)?\s*$/.exec(lineas[k]);
+            if (m) out.unshift({ 'function': m[1] || '?', filename: m[2], lineno: +m[3], colno: +m[4], in_app: true });
+          }
+          return out;
+        }
+
+        // SystemJS sólo existe si cargó el bundle legacy (nomodule), que es el de Chrome 47.
+        function bundle() { return w.System ? 'legacy' : 'moderno'; }
+
+        function enviar(info) {
+          if (enviados >= 5) return;
+          enviados++;
+          try {
+            var id = hex32();
+            var ahora = new Date().toISOString();
+            var excepcion = { type: info.tipo, value: corto(info.mensaje, 1000) };
+            var fs = frames(info.stack);
+            if (!fs.length && info.archivo) fs = [{ filename: info.archivo, lineno: info.linea, colno: info.columna, 'function': '?', in_app: true }];
+            if (fs.length) excepcion.stacktrace = { frames: fs };
+            var evento = {
+              event_id: id,
+              timestamp: ahora,
+              platform: 'javascript',
+              level: info.nivel || 'fatal',
+              logger: 'tv-reporte',
+              environment: 'tv',
+              release: 'tecno-admin-tv@' + VERSION,
+              exception: { values: [excepcion] },
+              tags: {
+                superficie: 'tv',
+                sede: corto(sede, 200),
+                pantalla: corto(pantalla, 200),
+                ua: corto(navigator.userAgent, 200),
+                version: VERSION,
+                bundle: bundle(),
+                origen: info.origen
+              },
+              user: { ip_address: '{{auto}}' },
+              request: { url: loc.href, headers: { 'User-Agent': navigator.userAgent } },
+              extra: { stack: corto(info.stack, 4000), archivo: info.archivo, linea: info.linea, columna: info.columna, componentStack: corto(info.componentStack, 4000) }
+            };
+            var cuerpo = JSON.stringify({ event_id: id, sent_at: ahora, dsn: DSN }) + '\n' +
+              JSON.stringify({ type: 'event' }) + '\n' + JSON.stringify(evento) + '\n';
+            var x = new XMLHttpRequest();
+            x.open('POST', SENTRY, true);
+            x.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
+            x.send(cuerpo);
+          } catch (e) {}
+        }
+
+        function texto(el, t, css) {
+          var p = d.createElement('div');
+          p.style.cssText = css;
+          p.appendChild(d.createTextNode(t));
+          el.appendChild(p);
+        }
+
+        // Pantalla completa si la app no llegó a dibujar nada (o si lo pide el ErrorBoundary);
+        // si la pantalla ya estaba andando, una franja abajo para no taparla.
+        function pintar(completo) {
+          if (!d.body) { d.addEventListener('DOMContentLoaded', function () { pintar(completo); }); return; }
+          var info = primero;
+          if (cartel && cartel.parentNode) cartel.parentNode.removeChild(cartel);
+          cartel = d.createElement('div');
+          cartel.id = 'tv-reporte-cartel';
+          cartel.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7f1d1d;color:#fff;' +
+            'font-family:Arial,Helvetica,sans-serif;text-align:left;word-wrap:break-word;box-sizing:border-box;' +
+            (completo ? 'top:0;padding:70px 90px;' : 'padding:24px 48px;border-top:6px solid #fca5a5;');
+          var grande = completo ? 56 : 30, medio = completo ? 38 : 24;
+          var cargando = info.origen === 'watchdog';
+          texto(cartel, cargando ? 'La pantalla sigue cargando' : 'La pantalla tuvo un error', 'font-size:' + grande + 'px;font-weight:bold;margin-bottom:' + (completo ? 30 : 8) + 'px;');
+          if (completo) texto(cartel, 'Sacale una foto a esta pantalla y mandásela a Mateo.', 'font-size:' + medio + 'px;margin-bottom:40px;color:#fecaca;');
+          texto(cartel, 'Sede: ' + sede + '   ·   Pantalla: ' + pantalla, 'font-size:' + medio + 'px;font-weight:bold;margin-bottom:16px;');
+          texto(cartel, (cargando ? '' : 'Error: ') + corto(info.mensaje, 400), 'font-size:' + (cargando ? medio - 8 : medio) + 'px;margin-bottom:16px;');
+          if (!cargando) texto(cartel, 'Archivo: ' + (info.archivo || '?') + ' · línea ' + (info.linea || '?') + ':' + (info.columna || '?'), 'font-size:' + (medio - 4) + 'px;margin-bottom:16px;');
+          texto(cartel, 'Versión ' + VERSION + ' · ' + bundle() + ' · ' + new Date().toLocaleString() + (extras ? ' · +' + extras + ' errores más' : ''),
+            'font-size:' + (medio - 8) + 'px;color:#fecaca;');
+          if (completo && !cargando) {
+            var seg = recargaProgramada();
+            texto(cartel, 'Se vuelve a cargar sola en ' + (seg >= 60 ? Math.round(seg / 60) + ' min' : seg + ' s') + '.',
+              'font-size:' + (medio - 8) + 'px;color:#fecaca;margin-top:24px;');
+          }
+          d.body.appendChild(cartel);
+        }
+
+        // Una TV de la sala no tiene que quedar trabada en el cartel hasta que alguien la toque
+        // (A1, 2026-10-21: quedó en error con la versión vieja aunque el arreglo ya estaba publicado).
+        // Con el error a pantalla completa se recarga sola: 1 min, y si vuelve a caer 2, 4, 8… hasta
+        // 10 min. La cuenta vive en sessionStorage y se reinicia si pasaron 30 min sin recargas.
+        // Control: scripts/check-tv-recarga.mjs.
+        var recargaEn = 0;
+        function recargaProgramada() {
+          if (recargaEn) return recargaEn;
+          var n = 0, ahora = new Date().getTime();
+          try {
+            var guardado = JSON.parse(w.sessionStorage.getItem('tvRecargas') || 'null');
+            if (guardado && ahora - guardado.t < 30 * 60 * 1000) n = guardado.n;
+          } catch (e) {}
+          recargaEn = Math.min(60 * Math.pow(2, n), 600);
+          setTimeout(function () {
+            try { w.sessionStorage.setItem('tvRecargas', JSON.stringify({ n: n + 1, t: new Date().getTime() })); } catch (e) {}
+            loc.reload();
+          }, recargaEn * 1000);
+          return recargaEn;
+        }
+        w.__tvRecargaEn = function () { return recargaEn; };
+
+        function vacia() {
+          var r = d.getElementById('root');
+          return !r || !r.children.length || !(r.innerText || r.textContent || '').replace(/\s+/g, '');
+        }
+
+        function reportar(info) {
+          var clave = info.mensaje + '|' + info.archivo + '|' + info.linea;
+          if (vistos[clave]) return;
+          vistos[clave] = 1;
+          if (info.origen !== 'watchdog') etapa('error');
+          enviar(info);
+          // Un error real reemplaza al cartel de "sigue cargando"; los siguientes sólo suman a la cuenta.
+          if (primero && primero.origen !== 'watchdog') { extras++; if (cartel) pintar(info.completo || vacia()); return; }
+          primero = info;
+          pintar(info.completo || vacia());
+          // Si la app se cae del todo después del error, el cartel pasa a pantalla completa.
+          setTimeout(function () { if (cartel && vacia()) pintar(true); }, 4000);
+        }
+
+        w.onerror = function (mensaje, archivo, linea, columna, error) {
+          reportar({
+            origen: 'onerror',
+            tipo: (error && error.name) || 'Error',
+            mensaje: (error && error.message) || mensaje,
+            archivo: archivo, linea: linea, columna: columna,
+            stack: error && error.stack
+          });
+          return false;
+        };
+
+        function rechazo(ev) {
+          var r = ev && (ev.reason || (ev.detail && ev.detail.reason));
+          reportar({
+            origen: 'unhandledrejection',
+            tipo: (r && r.name) || 'UnhandledRejection',
+            mensaje: (r && r.message) || String(r),
+            stack: r && r.stack
+          });
+        }
+        if (w.addEventListener) w.addEventListener('unhandledrejection', rechazo);
+
+        // El ErrorBoundary de TvHostApp (React no pasa esos errores por window.onerror en producción).
+        w.__tvReportar = function (error, componentStack) {
+          var m = /\(?((?:https?:)?\/\/[^\s)]+?):(\d+):(\d+)\)?/.exec(String(error && error.stack || ''));
+          reportar({
+            origen: 'react',
+            tipo: (error && error.name) || 'Error',
+            mensaje: (error && error.message) || String(error),
+            archivo: m ? m[1] : '', linea: m ? +m[2] : 0, columna: m ? +m[3] : 0,
+            stack: error && error.stack,
+            componentStack: componentStack,
+            completo: true
+          });
+        };
+
+        // Watchdog: si a los 15 s (y a los 45 s) la app no dibujó nada y no hubo error, lo dice en la
+        // pantalla con qué cargó y qué falta. Si el hilo principal está colgado esto no llega a correr:
+        // entonces el log de CDN muestra 'html' sin 'bundle'.
+        function recursos() {
+          var hechos = {}, lista = [], vistosRec = {};
+          try {
+            var es = w.performance && performance.getEntriesByType ? performance.getEntriesByType('resource') : [];
+            for (var k = 0; k < es.length; k++) hechos[es[k].name] = Math.round(es[k].duration);
+          } catch (e) {}
+          var ss = d.getElementsByTagName('script');
+          for (var m = 0; m < ss.length; m++) {
+            var src = ss[m].src || ss[m].getAttribute('data-src');
+            if (!src || ss[m].type === 'module') continue;
+            var abs = src.indexOf('http') === 0 ? src : loc.protocol + '//' + loc.host + src;
+            var nombre = abs.split('/').pop();
+            if (vistosRec[nombre]) continue;
+            vistosRec[nombre] = 1;
+            lista.push(nombre + (hechos[abs] != null ? ' ok ' + hechos[abs] + 'ms' : ' FALTA'));
+          }
+          return lista.join(' · ');
+        }
+        function vigilar(seg) {
+          setTimeout(function () {
+            if (!vacia()) { etapa('montada'); return; }
+            if (primero && primero.origen !== 'watchdog') return;
+            var estado = 'Sigue cargando a los ' + seg + ' s · readyState=' + d.readyState + ' · System=' + typeof w.System + ' · ' + recursos();
+            etapa('sigue-cargando-' + seg + 's');
+            reportar({ origen: 'watchdog', tipo: 'SigueCargando', mensaje: estado, completo: true, nivel: 'warning' });
+          }, seg * 1000);
+        }
+        vigilar(15);
+        vigilar(45);
+        setTimeout(function () { if (!vacia()) etapa('montada'); }, 5000);
+
+        var prueba = /[?&]tv-error-prueba=([a-z]+)/.exec(loc.search);
+        if (prueba && prueba[1] === 'onerror') setTimeout(function () { throw new Error('Prueba TecnoFit: error forzado (onerror)'); }, 1500);
+        if (prueba && prueba[1] === 'promesa' && w.Promise) setTimeout(function () { w.Promise.reject(new Error('Prueba TecnoFit: promesa rechazada')); }, 1500);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

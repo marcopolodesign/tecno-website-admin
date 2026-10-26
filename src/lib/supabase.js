@@ -1,23 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
-// Use service role key for admin operations (creating users, etc.)
-const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabaseKey = serviceRoleKey || anonKey || 'your-key'
+// Browser client MUST only ever hold the anon key. VITE_* env vars are inlined into the
+// public JS bundle at build time — anything with more privilege than anon here (e.g. the
+// service role key) is handed to every visitor of the site. Admin-only operations
+// (auth.admin.* — creating/deleting users, etc.) go through Edge Functions instead,
+// which hold the service role key server-side only. See tecnofit-supabase/supabase/
+// functions/manage-staff-account and kiosk-set-password.
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-key'
 
-// Debug log to check if service key is loaded
-if (import.meta.env.DEV) {
-  console.log('Supabase Init:', {
-    hasServiceKey: !!serviceRoleKey,
-    hasAnonKey: !!anonKey,
-    usingKey: serviceRoleKey ? 'Service Role (Admin)' : 'Anon (Public)'
-  })
-}
-
-export const isServiceRole = !!serviceRoleKey
-
-export const supabase = createClient(supabaseUrl, supabaseKey, {
+export const supabase = createClient(supabaseUrl, anonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,

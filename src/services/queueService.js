@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { EXERCISE_MEDIA_FIELDS } from '../lib/exerciseMedia'
 
 // Líneas + boxes config (production_lines/boxes, reused from the Fitness module's
 // schema — see tecnofit-supabase/supabase/migrations/20260714120000_create_queue_engine.sql)
@@ -222,7 +223,7 @@ export const queueService = {
             session_exercises (
               id, exercise_id, box_number, is_cooldown, sets_reps, rest_time,
               repetition_time, weight_kg, exercise_order,
-              exercises!session_exercises_exercise_id_fkey (id, name, description, video_url, video_thumbnail_url, video_platform, video_embed_id)
+              exercises!session_exercises_exercise_id_fkey (${EXERCISE_MEDIA_FIELDS})
             )
           )`
         )
@@ -254,6 +255,103 @@ export const queueService = {
   },
 
   // ── Realtime subscriptions ─────────────────────────────────────────────
+  // La lista de espera de la sede: una sola, sin línea (la línea se estampa recién al
+  // promover). Ver migración 20260910180000.
+  async getWaitingForLocation(locationId) {
+    try {
+      let query = supabase
+        .from('queue_entries')
+        .select('*, users (id, first_name, last_name)')
+        .eq('status', 'waiting')
+        .order('posicion', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (locationId) query = query.eq('location_id', locationId)
+
+      const { data, error } = await query
+      if (error) throw error
+      return { data }
+    } catch (error) {
+      console.error('Error fetching waiting list for location:', error)
+      throw error
+    }
+  },
+
+  // Lo mismo que getWaitingForLocation pero sin dejar afuera a quien ya está confirmando su
+  // turno — la TV de sede (QueueTvSede.jsx) necesita mostrar a esa persona con su línea
+  // destino, no sólo a los que siguen esperando. Requiere sesión de staff (RLS): la TV se abre
+  // logueada en la máquina del gym, igual que el resto del admin.
+  async getQueueForLocation(locationId) {
+    try {
+      let query = supabase
+        .from('queue_entries')
+        .select('*, users (id, first_name, last_name), production_lines (id, name, line_number)')
+        .in('status', ['waiting', 'confirming'])
+        .order('posicion', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (locationId) query = query.eq('location_id', locationId)
+
+      const { data, error } = await query
+      if (error) throw error
+      return { data }
+    } catch (error) {
+      console.error('Error fetching location queue:', error)
+      throw error
+    }
+  },
+
+  // Realtime de la cola de la sede. NO se puede reusar subscribeToLine: ése filtra por
+  // `production_line_id`, y una fila en espera lo tiene en NULL — no llegaría nunca. Sin
+  // esto recepción tendría que apretar Actualizar para ver quién entró, que es justo lo
+  // que no queremos.
+  subscribeToLocationQueue(locationId, onChange) {
+    const channel = supabase
+      .channel(`queue-location-${locationId ?? 'all'}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'queue_entries',
+          ...(locationId ? { filter: `location_id=eq.${locationId}` } : {}),
+        },
+        onChange
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  },
+
+  // Aviso en vivo para las TVs (2026-09-30). Las TVs son anon y las tablas tienen RLS sólo para
+  // authenticated, así que postgres_changes no les llega: la base publica un broadcast mínimo
+  // (sólo el id de línea) en `sala:<location_id>` desde un trigger (tv_avisar_cambio). Los avisos
+  // en ráfaga (el tick toca varias filas) se juntan: máximo un refresh cada 250 ms.
+  subscribeToSala(locationId, onChange) {
+    if (!locationId) return () => {}
+    let pendiente = null
+    let ultimo = 0
+    const disparar = () => {
+      const espera = 250 - (Date.now() - ultimo)
+      if (espera <= 0) {
+        ultimo = Date.now()
+        onChange()
+      } else if (!pendiente) {
+        pendiente = setTimeout(() => {
+          pendiente = null
+          ultimo = Date.now()
+          onChange()
+        }, espera)
+      }
+    }
+    const channel = supabase
+      .channel(`sala:${locationId}`)
+      .on('broadcast', { event: 'cambio' }, disparar)
+      .subscribe()
+    return () => {
+      clearTimeout(pendiente)
+      supabase.removeChannel(channel)
+    }
+  },
+
   subscribeToLine(productionLineId, onChange) {
     const channel = supabase
       .channel(`queue-line-${productionLineId}`)

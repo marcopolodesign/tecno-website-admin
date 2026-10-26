@@ -3,12 +3,19 @@ import logsService from './logsService'
 import { getCurrentUserForLogging } from '../utils/logHelpers'
 
 export const prospectsService = {
-  async getProspects() {
+  // sedeId opcional: los prospects los manda el sitio público (formulario de contacto), que
+  // todavía no pregunta la sede — hoy quedan sin location_id hasta que se dé de alta una
+  // segunda sede y el sitio pase a pedirla. Filtrar por sede acá no les asigna una.
+  async getProspects(sedeId) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('prospects')
         .select('*')
         .order('created_at', { ascending: false })
+
+      if (sedeId) query = query.eq('location_id', sedeId)
+
+      const { data, error } = await query
 
       if (error) throw error
       return { data: toCamelCase(data) }
