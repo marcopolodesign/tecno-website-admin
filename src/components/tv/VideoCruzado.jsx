@@ -30,14 +30,26 @@ const sinVideoIcono = (iconoSinVideo) => (
 // Modo "un video a la vez" (TVs viejas, ver tv/turnoVideo.js): el póster queda SIEMPRE puesto
 // (nunca una tarjeta en negro) y el <video> real sólo se monta para la tarjeta a la que le toca
 // el turno — así nunca hay más de un <video> vivo en toda la pantalla.
+const FADE_POSTER_MS = 350
+
 function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
   const clave = claveEjercicio(fila)
   const esDueño = useTurnoVideo(clave)
   const media = exerciseMedia(fila, 'tv')
+  // 2026-10-27: el póster va ENCIMA del video y se desvanece recién cuando el video ya dibujó un
+  // cuadro (avanzó el tiempo). Antes el póster se iba y quedaba un hueco hasta el primer cuadro.
+  const [mostrando, setMostrando] = useState(false)
+  useEffect(() => { setMostrando(false) }, [clave, esDueño])
+  const capaPoster = {
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 2,
+    opacity: esDueño && mostrando ? 0 : 1,
+    transition: esDueño && mostrando ? `opacity ${FADE_POSTER_MS}ms ease` : 'none',
+    pointerEvents: 'none',
+  }
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
       {media.kind === 'hosted' && media.poster && (
-        <img src={media.poster} alt={fila?.name || ''} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+        <img src={media.poster} alt={fila?.name || ''} style={capaPoster} />
       )}
       {media.kind === 'image' && (
         <img src={media.src} alt={fila?.name || ''} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
@@ -51,7 +63,7 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
           poster={media.poster}
           recorte={media.recorte}
           preload="auto"
-          alProgreso={(t) => avisarAvance(clave, t)}
+          alProgreso={(t) => { if (t > 0.05 && !mostrando) setMostrando(true); avisarAvance(clave, t) }}
           style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1, ...media.style }}
         />
       )}
