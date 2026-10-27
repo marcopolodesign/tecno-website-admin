@@ -34,8 +34,11 @@ export function LienzoTv({ children, fondo = COLOR.fondo }) {
   // apagan una capa por vez para ver cuál le impide a la TV dibujar el <video> (que sí se reproduce).
   const dbg = (k) => typeof window !== 'undefined' && new RegExp('[?&]' + k + '=1').test(window.location.search)
   return (
-    <div style={{ position: dbg('sinfixed') ? 'absolute' : 'fixed', top: 0, right: 0, bottom: 0, left: 0, background: fondo, overflow: dbg('sinfixed') ? 'visible' : 'hidden' }}>
-      <style>{FUENTES_TV}</style>
+    // 2026-10-27: con el lienzo en `position: fixed` + `overflow: hidden`, las Samsung (Tizen 5 probado
+    // en la tele de Mateo) reproducían el <video> pero no lo dibujaban — sólo se veía el póster. Con
+    // `absolute` y sin recorte en el contenedor anda. El recorte va en html/body.
+    <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: fondo, overflow: 'visible' }}>
+      <style>{FUENTES_TV + 'html,body{margin:0;width:100%;height:100%;overflow:hidden}'}</style>
       {dbg('sinanim') && <style>{'*,*:before,*:after{animation:none!important;transition:none!important}'}</style>}
       {dbg('sinfondo') && <style>{'[data-fondo-manchas]{display:none!important}'}</style>}
       <div style={{ width: m.ancho, height: m.alto, transform: dbg('sinescala') ? 'none' : `scale(${m.escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
