@@ -30,10 +30,18 @@ export function LienzoTv({ children, fondo = COLOR.fondo }) {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+  // Diagnóstico del video en Samsung (2026-10-26): ?sinescala=1 / ?sinfixed=1 / ?sinanim=1 / ?sinfondo=1
+  // apagan una capa por vez para ver cuál le impide a la TV dibujar el <video> (que sí se reproduce).
+  const dbg = (k) => typeof window !== 'undefined' && new RegExp('[?&]' + k + '=1').test(window.location.search)
   return (
-    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, background: fondo, overflow: 'hidden' }}>
-      <style>{FUENTES_TV}</style>
-      <div style={{ width: m.ancho, height: m.alto, transform: `scale(${m.escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+    // 2026-10-27: con el lienzo en `position: fixed` + `overflow: hidden`, las Samsung (Tizen 5 probado
+    // en la tele de Mateo) reproducían el <video> pero no lo dibujaban — sólo se veía el póster. Con
+    // `absolute` y sin recorte en el contenedor anda. El recorte va en html/body.
+    <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: fondo, overflow: 'visible' }}>
+      <style>{FUENTES_TV + 'html,body{margin:0;width:100%;height:100%;overflow:hidden}'}</style>
+      {dbg('sinanim') && <style>{'*,*:before,*:after{animation:none!important;transition:none!important}'}</style>}
+      {dbg('sinfondo') && <style>{'[data-fondo-manchas]{display:none!important}'}</style>}
+      <div style={{ width: m.ancho, height: m.alto, transform: dbg('sinescala') ? 'none' : `scale(${m.escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
         <LienzoContext.Provider value={{ ancho: m.ancho, alto: m.alto }}>{children}</LienzoContext.Provider>
       </div>
       <ControlesTv />

@@ -18,6 +18,9 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   for (const d of dirs) for (const f of __rd(d)) if (/\.(jsx|js)$/.test(f) && (d.endsWith('/tv') || /^(QueueTv|Tv|Anotarme)/.test(f))) tvFiles.push(`${d}/${f}`)
   const malos = tvFiles.filter((f) => /\binset\s*:/.test(__rf(f, 'utf8')))
   if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }
+  // 2026-10-27: el lienzo de la TV no puede ser position: fixed (la Samsung no dibuja el <video>).
+  const lienzo = __rf('src/components/tv/TvChrome.jsx', 'utf8')
+  if (/export function LienzoTv[\s\S]{0,1500}position: 'fixed'/.test(lienzo)) { console.error('✗ LienzoTv volvió a position: fixed: la Samsung no dibuja el video'); process.exit(1) }
 }
 
 
