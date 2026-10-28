@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   CalendarDaysIcon,
   ExclamationTriangleIcon,
@@ -11,6 +11,8 @@ import {
   LockClosedIcon,
   ShoppingCartIcon,
   ReceiptPercentIcon,
+  ClipboardDocumentListIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline'
 import { useSede } from '../contexts/SedeContext'
 import { formatARS } from '../lib/dinero'
@@ -145,6 +147,17 @@ function AlertCard({ tone, icon: Icon, loading, error, count, title, description
       {clickable && <ChevronRightIcon className="h-5 w-5 text-text-tertiary shrink-0 mt-0.5" />}
     </button>
   )
+}
+
+// Chip de cada fila de "Rutinas por terminar": motivo + sesiones restantes (rutinas_por_terminar).
+function chipRutina(r) {
+  if (r.motivo === 'vencida') {
+    const [, m, d] = String(r.valid_until).split('-')
+    return { label: `Vencida ${d}/${m}`, tone: 'error' }
+  }
+  if (r.motivo === 'terminada') return { label: 'Terminada', tone: 'error' }
+  if (r.motivo === 'vacia') return { label: 'Sin sesiones', tone: 'error' }
+  return { label: r.sesiones_restantes === 1 ? 'Queda 1' : `Quedan ${r.sesiones_restantes}`, tone: 'warning' }
 }
 
 const RIESGO_LABEL = { high_risk: 'Alto riesgo', risk: 'Riesgo' }
@@ -311,6 +324,7 @@ function useLazyList(fetcher) {
 
 export default function Hoy({ userRole }) {
   const { sedeId, sede } = useSede()
+  const navigate = useNavigate()
   // Mismo patrón de roles que el Sidebar (Accesos/Horas/Sedes): faltantes de caja es
   // información sensible del mostrador, no algo que un front_desk necesita ver de otro turno.
   const puedeVerFaltantes = userRole === 'admin' || userRole === 'super_admin'
@@ -341,7 +355,13 @@ export default function Hoy({ userRole }) {
   const [faltantesLoading, setFaltantesLoading] = useState(true)
   const [faltantesError, setFaltantesError] = useState(null)
 
-  const [activeSidecart, setActiveSidecart] = useState(null) // 'membresias' | 'leads' | 'riesgo' | 'faltantes' | null
+  // Rutinas por terminar (2026-10-28): se pide entera, como faltantes — el mismo array da el
+  // contador y la lista. null = la función no existe en este ambiente → la tarjeta no se muestra.
+  const [rutinas, setRutinas] = useState([])
+  const [rutinasLoading, setRutinasLoading] = useState(true)
+  const [rutinasError, setRutinasError] = useState(null)
+
+  const [activeSidecart, setActiveSidecart] = useState(null) // 'membresias' | 'leads' | 'riesgo' | 'faltantes' | 'rutinas' | null
 
   const membresiasList = useLazyList(useCallback(() => hoyService.getMembresiasPorVencer({ sedeId, days: MEMBERSHIP_EXPIRING_DAYS }), [sedeId]))
   const leadsList = useLazyList(useCallback(() => hoyService.getLeadsSinContactar({ sedeId }), [sedeId]))
@@ -421,14 +441,25 @@ export default function Hoy({ userRole }) {
       .finally(() => setFaltantesLoading(false))
   }, [sedeId, puedeVerFaltantes])
 
+  const fetchRutinas = useCallback(() => {
+    setRutinasLoading(true)
+    setRutinasError(null)
+    hoyService
+      .getRutinasPorTerminar({ sedeId })
+      .then(setRutinas)
+      .catch(setRutinasError)
+      .finally(() => setRutinasLoading(false))
+  }, [sedeId])
+
   useEffect(() => {
+    fetchRutinas()
     fetchResumen()
     fetchAsistidos()
     fetchClases()
     fetchCaja()
     fetchRiesgoEnSala()
     fetchFaltantes()
-  }, [fetchResumen, fetchAsistidos, fetchClases, fetchCaja, fetchRiesgoEnSala, fetchFaltantes])
+  }, [fetchRutinas, fetchResumen, fetchAsistidos, fetchClases, fetchCaja, fetchRiesgoEnSala, fetchFaltantes])
 
   const enRiesgoEnSala = useMemo(() => {
     if (enSala.length === 0 || riesgo.length === 0) return []
@@ -499,6 +530,18 @@ export default function Hoy({ userRole }) {
             description="Socios activos con baja frecuencia de asistencia (riesgo o alto riesgo de abandono)."
             onClick={() => openSidecart('riesgo', riesgoList)}
           />
+          {rutinas !== null && (
+            <AlertCard
+              tone="warning"
+              icon={ClipboardDocumentListIcon}
+              loading={rutinasLoading}
+              error={rutinasError}
+              count={rutinas.length}
+              title={(n) => `${n} rutina${n !== 1 ? 's' : ''} por terminar`}
+              description="Les quedan 2 sesiones o menos."
+              onClick={() => setActiveSidecart('rutinas')}
+            />
+          )}
           {puedeVerFaltantes && (
             <AlertCard
               tone="error"
@@ -717,6 +760,69 @@ export default function Hoy({ userRole }) {
             ))}
             {(riesgoList.data || []).length === 0 && (
               <p className="text-sm text-text-tertiary text-center py-8">No hay socios en riesgo.</p>
+            )}
+          </div>
+        )}
+      </Sidecart>
+
+      {/* Sidecart: rutinas por terminar */}
+      <Sidecart
+        isOpen={activeSidecart === 'rutinas'}
+        onClose={() => setActiveSidecart(null)}
+        title="Rutinas por terminar"
+        subtitle="Armales la próxima antes de que se queden sin entrenar"
+      >
+        {rutinasLoading ? (
+          <div className="h-40 flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : rutinasError ? (
+          <ErrorNotice error={rutinasError} />
+        ) : (
+          <div className="space-y-2">
+            {(rutinas || []).map((r) => {
+              const chip = chipRutina(r)
+              return (
+                <div
+                  key={r.user_id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/routines?rutina=${r.routine_id}`)}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/routines?rutina=${r.routine_id}`)}
+                  className="group card border-0 shadow-none cursor-pointer transition-colors hover:bg-bg-surface"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-text-primary truncate">{r.nombre || 'Socio'}</p>
+                        <WhatsappLink phone={r.phone} />
+                      </div>
+                      <p className="text-xs text-text-tertiary mt-0.5 truncate">
+                        {r.sesiones_total > 0 ? `${r.routine_title} · ${r.sesiones_total} ${r.sesiones_total === 1 ? 'sesión' : 'sesiones'}` : r.routine_title}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${chip.tone === 'error' ? 'bg-error/10 text-error' : 'bg-warning/10 text-warning'}`}>
+                        {chip.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/routines?nueva=${r.user_id}`)
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-text-primary bg-bg-surface rounded-lg px-2.5 py-1.5 transition-colors group-hover:bg-bg-secondary"
+                      >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                        Armar nueva
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {(rutinas || []).length === 0 && (
+              <p className="text-sm text-text-tertiary text-center py-8">Nadie está por terminar su rutina.</p>
             )}
           </div>
         )}

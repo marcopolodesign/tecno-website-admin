@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { 
   PlusIcon, 
   PencilIcon, 
@@ -274,6 +275,10 @@ export default function Routines() {
   // How long a member actually stays in a box, read from the queue rather than assumed: it is
   // what decides whether a Tabata fits, and a wrong number here is worse than no warning.
   const [turnoSeg, setTurnoSeg] = useState(0)
+  // Links desde la alerta "Rutinas por terminar" de Hoy (2026-10-28):
+  //   ?rutina=<id>   abre esa rutina
+  //   ?nueva=<userId> abre "Nueva rutina" con el socio ya elegido
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     fetchData()
@@ -289,6 +294,23 @@ export default function Routines() {
         if (turnos.length) setTurnoSeg(turnos.sort((a, b) => a - b)[Math.floor(turnos.length / 2)])
       })
   }, [])
+
+  useEffect(() => {
+    if (loading) return
+    const rutina = searchParams.get('rutina')
+    const nueva = searchParams.get('nueva')
+    if (!rutina && !nueva) return
+    if (rutina) fetchRoutineDetail(Number(rutina))
+    if (nueva) {
+      openRoutineModal()
+      const socio = users.find((u) => u.id === nueva)
+      setRoutineForm((f) => ({ ...f, clientId: nueva, goal: socio?.trainingGoal || '' }))
+    }
+    searchParams.delete('rutina')
+    searchParams.delete('nueva')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, searchParams])
 
   const fetchData = async () => {
     try {
