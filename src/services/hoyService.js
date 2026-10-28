@@ -140,6 +140,22 @@ export const hoyService = {
     return riesgo || []
   },
 
+  // Rutinas por terminar (2026-10-28): socios cuya rutina actual tiene <= 2 sesiones jugables sin
+  // completar, ninguna, o venció por fecha. El criterio vive en la base (rutinas_por_terminar,
+  // migración 20261028120000) para que la alerta y su control lean lo mismo. Si la función todavía
+  // no existe en el ambiente (PGRST202) devuelve null: la tarjeta no se muestra.
+  async getRutinasPorTerminar({ sedeId, umbral = 2 } = {}) {
+    const { data, error } = await supabase.rpc('rutinas_por_terminar', {
+      p_location_id: sedeId ?? null,
+      p_umbral: umbral,
+    })
+    if (error) {
+      if (error.code === 'PGRST202') return null
+      throw error
+    }
+    return data || []
+  },
+
   // Mismo risk_bucket que ChurnRiskChart (rpc_metric_churn_risk) — nunca un criterio propio
   // que después se desalinee del panel de métricas de negocio.
   async getSociosEnRiesgo({ sedeId } = {}) {
