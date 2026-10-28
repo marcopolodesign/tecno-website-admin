@@ -39,7 +39,15 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
   // 2026-10-27: el póster va ENCIMA del video y se desvanece recién cuando el video ya dibujó un
   // cuadro (avanzó el tiempo). Antes el póster se iba y quedaba un hueco hasta el primer cuadro.
   const [mostrando, setMostrando] = useState(false)
-  useEffect(() => { setMostrando(false) }, [clave, esDueño])
+  // Terminado el fundido, el póster se DESMONTA: en las Samsung cualquier capa encima del <video>
+  // (aunque tenga opacity 0) le impide dibujarlo — 2026-10-28, video-ok pero sin imagen.
+  const [posterFuera, setPosterFuera] = useState(false)
+  useEffect(() => { setMostrando(false); setPosterFuera(false) }, [clave, esDueño])
+  useEffect(() => {
+    if (!mostrando) return undefined
+    const t = setTimeout(() => setPosterFuera(true), FADE_POSTER_MS + 50)
+    return () => clearTimeout(t)
+  }, [mostrando])
   const capaPoster = {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 2,
     opacity: esDueño && mostrando ? 0 : 1,
@@ -48,7 +56,7 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
   }
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
-      {media.kind === 'hosted' && media.poster && (
+      {media.kind === 'hosted' && media.poster && !(esDueño && posterFuera) && (
         <img src={media.poster} alt={fila?.name || ''} style={capaPoster} />
       )}
       {media.kind === 'image' && (
