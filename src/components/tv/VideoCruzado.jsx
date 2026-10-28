@@ -30,34 +30,14 @@ const sinVideoIcono = (iconoSinVideo) => (
 // Modo "un video a la vez" (TVs viejas, ver tv/turnoVideo.js): el póster queda SIEMPRE puesto
 // (nunca una tarjeta en negro) y el <video> real sólo se monta para la tarjeta a la que le toca
 // el turno — así nunca hay más de un <video> vivo en toda la pantalla.
-const FADE_POSTER_MS = 350
-
 function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
   const clave = claveEjercicio(fila)
   const esDueño = useTurnoVideo(clave)
   const media = exerciseMedia(fila, 'tv')
-  // 2026-10-27: el póster va ENCIMA del video y se desvanece recién cuando el video ya dibujó un
-  // cuadro (avanzó el tiempo). Antes el póster se iba y quedaba un hueco hasta el primer cuadro.
-  const [mostrando, setMostrando] = useState(false)
-  // Terminado el fundido, el póster se DESMONTA: en las Samsung cualquier capa encima del <video>
-  // (aunque tenga opacity 0) le impide dibujarlo — 2026-10-28, video-ok pero sin imagen.
-  const [posterFuera, setPosterFuera] = useState(false)
-  useEffect(() => { setMostrando(false); setPosterFuera(false) }, [clave, esDueño])
-  useEffect(() => {
-    if (!mostrando) return undefined
-    const t = setTimeout(() => setPosterFuera(true), FADE_POSTER_MS + 50)
-    return () => clearTimeout(t)
-  }, [mostrando])
-  const capaPoster = {
-    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 2,
-    opacity: esDueño && mostrando ? 0 : 1,
-    transition: esDueño && mostrando ? `opacity ${FADE_POSTER_MS}ms ease` : 'none',
-    pointerEvents: 'none',
-  }
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
-      {media.kind === 'hosted' && media.poster && !(esDueño && posterFuera) && (
-        <img src={media.poster} alt={fila?.name || ''} style={capaPoster} />
+      {media.kind === 'hosted' && media.poster && (
+        <img src={media.poster} alt={fila?.name || ''} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
       )}
       {media.kind === 'image' && (
         <img src={media.src} alt={fila?.name || ''} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
@@ -71,7 +51,7 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
           poster={media.poster}
           recorte={media.recorte}
           preload="auto"
-          alProgreso={(t) => { if (t > 0.05 && !mostrando) setMostrando(true); avisarAvance(clave, t) }}
+          alProgreso={(t) => avisarAvance(clave, t)}
           style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1, ...media.style }}
         />
       )}

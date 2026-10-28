@@ -20,9 +20,11 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }
   // 2026-10-27: el lienzo de la TV no puede ser position: fixed (la Samsung no dibuja el <video>).
   const lienzo = __rf('src/components/tv/TvChrome.jsx', 'utf8')
-  // 2026-10-27: en modo un video, el póster queda encima y se desvanece recién cuando el video avanzó.
+  // 2026-10-28: en modo un video el póster va DEBAJO del <video> (zIndex 0). Ponerlo encima, aunque sea
+  // con fundido/transparente, hace que la Samsung no dibuje el video (probado dos veces en la TV de Mateo).
   const cruzado = __rf('src/components/tv/VideoCruzado.jsx', 'utf8')
-  if (!/esDueño && mostrando \? 0 : 1/.test(cruzado) || !/!\(esDueño && posterFuera\)/.test(cruzado)) { console.error('✗ TarjetaUnVideo: el póster ya no espera al primer cuadro del video'); process.exit(1) }
+  const tarjeta = cruzado.slice(cruzado.indexOf('function TarjetaUnVideo'), cruzado.indexOf('function TarjetaUnVideo') + 2500)
+  if (/zIndex: [2-9]/.test(tarjeta.split('<VideoEjercicio')[0])) { console.error('✗ TarjetaUnVideo: el póster quedó encima del video'); process.exit(1) }
   if (/export function LienzoTv[\s\S]{0,1500}position: 'fixed'/.test(lienzo)) { console.error('✗ LienzoTv volvió a position: fixed: la Samsung no dibuja el video'); process.exit(1) }
 }
 
