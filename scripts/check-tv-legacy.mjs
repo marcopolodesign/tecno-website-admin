@@ -18,6 +18,7 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   for (const d of dirs) for (const f of __rd(d)) if (/\.(jsx|js)$/.test(f) && (d.endsWith('/tv') || /^(QueueTv|Tv|Anotarme)/.test(f))) tvFiles.push(`${d}/${f}`)
   const malos = tvFiles.filter((f) => /\binset\s*:/.test(__rf(f, 'utf8')))
   if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }
+  function lienzo0() { return __rf('src/components/tv/TvChrome.jsx', 'utf8') }
   // 2026-10-27: el lienzo de la TV no puede ser position: fixed (la Samsung no dibuja el <video>).
   const lienzo = __rf('src/components/tv/TvChrome.jsx', 'utf8')
   // 2026-10-28: en modo un video el póster va DEBAJO del <video> (zIndex 0). Ponerlo encima, aunque sea
@@ -25,6 +26,7 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   const cruzado = __rf('src/components/tv/VideoCruzado.jsx', 'utf8')
   const tarjeta = cruzado.slice(cruzado.indexOf('function TarjetaUnVideo'), cruzado.indexOf('function TarjetaUnVideo') + 2500)
   if (/zIndex: [2-9]/.test(tarjeta.split('<VideoEjercicio')[0])) { console.error('✗ TarjetaUnVideo: el póster quedó encima del video'); process.exit(1) }
+  if (!/UN_VIDEO && !\/\[\?&\]sinanim=0\//.test(lienzo0())) { console.error('✗ LienzoTv: las TVs Samsung tienen que ir sin animaciones CSS (si no, el video no se dibuja)'); process.exit(1) }
   if (/export function LienzoTv[\s\S]{0,1500}position: 'fixed'/.test(lienzo)) { console.error('✗ LienzoTv volvió a position: fixed: la Samsung no dibuja el video'); process.exit(1) }
 }
 

@@ -11,7 +11,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { estadoReloj, suscribirReloj } from '../../lib/serverClock'
 import { ANCHO_DISENO, medidasLienzo } from '../../lib/lienzo'
-import { BORDE, COLOR, FUENTES_TV, RADIO } from './tokens'
+import { BORDE, COLOR, FUENTES_TV, RADIO, UN_VIDEO } from './tokens'
 
 const OCULTAR_MS = 4000
 
@@ -39,7 +39,10 @@ export function LienzoTv({ children, fondo = COLOR.fondo }) {
     // `absolute` y sin recorte en el contenedor anda. El recorte va en html/body.
     <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: fondo, overflow: 'visible' }}>
       <style>{FUENTES_TV + 'html,body{margin:0;width:100%;height:100%;overflow:hidden}'}</style>
-      {dbg('sinanim') && <style>{'*,*:before,*:after{animation:none!important;transition:none!important}'}</style>}
+      {/* 2026-10-28: en las Samsung, con animaciones o transiciones CSS en pantalla el <video> se reproduce
+          pero no se dibuja (probado en la TV de Mateo: anda sólo con ?sinanim=1). En esas TVs se apagan
+          todas; en el resto quedan. ?sinanim=0 las fuerza encendidas para probar. */}
+      {(dbg('sinanim') || (UN_VIDEO && !/[?&]sinanim=0/.test(typeof window !== 'undefined' ? window.location.search : ''))) && <style>{'*,*:before,*:after{animation:none!important;transition:none!important}'}</style>}
       {dbg('sinfondo') && <style>{'[data-fondo-manchas]{display:none!important}'}</style>}
       <div style={{ width: m.ancho, height: m.alto, transform: dbg('sinescala') ? 'none' : `scale(${m.escala})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
         <LienzoContext.Provider value={{ ancho: m.ancho, alto: m.alto }}>{children}</LienzoContext.Provider>
