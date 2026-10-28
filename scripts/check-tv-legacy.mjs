@@ -22,7 +22,7 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   const lienzo = __rf('src/components/tv/TvChrome.jsx', 'utf8')
   // 2026-10-27: en modo un video, el póster queda encima y se desvanece recién cuando el video avanzó.
   const cruzado = __rf('src/components/tv/VideoCruzado.jsx', 'utf8')
-  if (!/esDueño && mostrando \? 0 : 1/.test(cruzado)) { console.error('✗ TarjetaUnVideo: el póster ya no espera al primer cuadro del video'); process.exit(1) }
+  if (!/esDueño && mostrando \? 0 : 1/.test(cruzado) || !/!\(esDueño && posterFuera\)/.test(cruzado)) { console.error('✗ TarjetaUnVideo: el póster ya no espera al primer cuadro del video'); process.exit(1) }
   if (/export function LienzoTv[\s\S]{0,1500}position: 'fixed'/.test(lienzo)) { console.error('✗ LienzoTv volvió a position: fixed: la Samsung no dibuja el video'); process.exit(1) }
 }
 
