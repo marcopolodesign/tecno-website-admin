@@ -121,6 +121,8 @@ export const routinesService = {
               ejercicios_por_minuto,
               segundos_por_ejercicio,
               is_pinned,
+              formato_fijo,
+              is_auto_generated,
               boxes (
                 id,
                 name,
@@ -303,6 +305,8 @@ export const routinesService = {
             ejercicios_por_minuto,
             segundos_por_ejercicio,
             is_pinned,
+            formato_fijo,
+            is_auto_generated,
             boxes (
               id,
               name,
@@ -509,6 +513,31 @@ export const routinesService = {
       console.error('Error updating session exercise:', error)
       throw error
     }
+  },
+
+  // Fijar/soltar la modalidad de una estación entera (como el pin de un ejercicio, pero de la
+  // estación): con la modalidad fija, el motor mantiene formato y cantidad de ejercicios al
+  // generar — ver 20261029180000_motor_segmento_por_puesto_y_modalidad_fija.sql.
+  async setEstacionFormatoFijo(sessionId, boxNumber, fijo) {
+    const { error } = await supabase
+      .from('session_exercises')
+      .update({ formato_fijo: fijo })
+      .eq('session_id', sessionId)
+      .eq('box_number', boxNumber)
+      .eq('is_cooldown', false)
+    if (error) throw error
+    return { success: true }
+  },
+
+  // Cómo quedarían las próximas sesiones generadas, sin guardar nada: previsualizar_semana()
+  // corre el motor adentro de un bloque que se deshace y devuelve el resultado.
+  async previsualizarSemana(routineId, sesiones = 5) {
+    const { data, error } = await supabase.rpc('previsualizar_semana', {
+      p_routine_id: routineId,
+      p_sesiones: sesiones,
+    })
+    if (error) throw error
+    return toCamelCase(data || [])
   },
 
   async removeExerciseFromSession(id) {
