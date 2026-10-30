@@ -17,6 +17,8 @@ import {
   ArrowPathIcon,
   Bars2Icon,
   DevicePhoneMobileIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline'
 import * as Sentry from '@sentry/react'
 import routinesService from '../services/routinesService'
@@ -218,11 +220,16 @@ export default function Routines() {
   })
   const [arquetipos, setArquetipos] = useState([])
 
+  // Las 4 categorías ya existen en el catálogo (exercises.segmento) — mismas opciones que usa
+  // la migración 20261007160000_foco_del_dia.sql para el CHECK de routine_sessions.foco.
+  const FOCOS_DEL_DIA = ['Tren inferior', 'Tren superior', 'Core', 'Full body']
+
   const [sessionForm, setSessionForm] = useState({
     routineId: null,
     sessionNumber: 1,
     title: '',
-    description: ''
+    description: '',
+    foco: ''
   })
 
   const [exerciseForm, setExerciseForm] = useState({
@@ -267,6 +274,8 @@ export default function Routines() {
   // Expanded sessions
   const [expandedSessions, setExpandedSessions] = useState({})
   const [generating, setGenerating] = useState(false)
+  // Vista previa de la semana: null cerrada; { cargando, sesiones, error } abierta.
+  const [vistaPrevia, setVistaPrevia] = useState(null)
   const [sustituyendo, setSustituyendo] = useState(null)
   // La sesión sobre la que se está cargando el peso/reps real que el socio efectivamente
   // levantó — separado de sustituyendo/exerciseForm porque no edita el plan, registra lo que
@@ -514,7 +523,8 @@ export default function Routines() {
         routineId: routineId,
         sessionNumber: session.sessionNumber,
         title: session.title || '',
-        description: session.description || ''
+        description: session.description || '',
+        foco: session.foco || ''
       })
     } else {
       setEditingItem(null)
@@ -522,7 +532,8 @@ export default function Routines() {
         routineId: routineId,
         sessionNumber: currentSessions + 1,
         title: `Sesión ${currentSessions + 1}`,
-        description: ''
+        description: '',
+        foco: ''
       })
     }
     setShowSessionModal(true)
@@ -532,11 +543,14 @@ export default function Routines() {
     e.preventDefault()
     try {
       setSaving(true)
+      // '' → null: el CHECK de routine_sessions.foco sólo acepta NULL o una de las 4 categorías,
+      // no string vacío (eso es justamente "sin foco, opcional").
+      const payload = { ...sessionForm, foco: sessionForm.foco || null }
       if (editingItem) {
-        await routinesService.updateSession(editingItem.id, sessionForm)
+        await routinesService.updateSession(editingItem.id, payload)
         toast.success('Sesión actualizada', toastOptions)
       } else {
-        await routinesService.createSession(sessionForm)
+        await routinesService.createSession(payload)
         toast.success('Sesión creada', toastOptions)
       }
       setShowSessionModal(false)
@@ -827,6 +841,40 @@ export default function Routines() {
     } catch (error) {
       Sentry.captureException(error, { extra: { context: 'Error toggling exercise pin' } })
       toast.error(error?.message || String(error), toastOptions)
+    }
+  }
+
+  // Fijar/soltar la modalidad de la estación entera — mismo gesto que el alfiler de un ejercicio.
+  const toggleFormatoFijo = async (sessionId, boxNumber, filas) => {
+    const fijo = !filas.some((se) => se.formatoFijo)
+    try {
+      await routinesService.setEstacionFormatoFijo(sessionId, boxNumber, fijo)
+      fetchRoutineDetail(selectedRoutine.id)
+    } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error toggling station modality pin' } })
+      toast.error(error?.message || String(error), toastOptions)
+    }
+  }
+
+  // Una semana de la rutina: sus sesiones repartidas en los días de vigencia. Sin fechas, 5.
+  const sesionesPorSemana = (routine) => {
+    const total = routine?.totalSessions || 30
+    const desde = routine?.validFrom ? new Date(routine.validFrom) : null
+    const hasta = routine?.validUntil ? new Date(routine.validUntil) : null
+    const dias = desde && hasta ? Math.round((hasta - desde) / 86400000) + 1 : null
+    if (!dias || dias < 7) return 5
+    return Math.min(7, Math.max(3, Math.round((total * 7) / dias)))
+  }
+
+  const abrirVistaPrevia = async () => {
+    if (!selectedRoutine) return
+    setVistaPrevia({ cargando: true, sesiones: [], error: null })
+    try {
+      const sesiones = await routinesService.previsualizarSemana(selectedRoutine.id, sesionesPorSemana(selectedRoutine))
+      setVistaPrevia({ cargando: false, sesiones, error: null })
+    } catch (error) {
+      Sentry.captureException(error, { extra: { context: 'Error previewing week' } })
+      setVistaPrevia({ cargando: false, sesiones: [], error: error?.message || String(error) })
     }
   }
 
@@ -1188,6 +1236,15 @@ export default function Routines() {
                         colgada y deja re-generar.
                       */}
                       <button
+                        onClick={abrirVistaPrevia}
+                        disabled={vistaPrevia?.cargando || !(selectedRoutine.routineSessions || []).length}
+                        className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1 disabled:opacity-50"
+                        title="Cómo quedaría la próxima semana generada. No se guarda nada."
+                      >
+                        <EyeIcon className="h-3.5 w-3.5" />
+                        Vista previa
+                      </button>
+                      <button
                         onClick={handleGenerateSessions}
                         disabled={generating || (selectedRoutine.generationStatus === 'generating' && !generacionColgada(selectedRoutine))}
                         className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50 disabled:opacity-50"
@@ -1249,7 +1306,17 @@ export default function Routines() {
                               <span className="text-brand font-bold text-sm">{session.sessionNumber}</span>
                             </div>
                             <div>
-                              <p className="font-medium text-text-primary text-sm">{session.title}</p>
+                              <p className="font-medium text-text-primary text-sm flex items-center gap-2">
+                                {session.title}
+                                {session.foco && (
+                                  <span
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand"
+                                    title="Foco del día — cada estación elige de este grupo"
+                                  >
+                                    {session.foco}
+                                  </span>
+                                )}
+                              </p>
                               {/* Qué estaciones están completas y con qué modalidad, en vez de
                                   "N ejercicios" — eso no decía si la sesión estaba armada. */}
                               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -1366,8 +1433,13 @@ export default function Routines() {
                                         </button>
                                       </div>
                                       {modalidadTexto && (
-                                        <p className="mt-0.5 text-center text-[10px] font-medium text-brand truncate">
-                                          {modalidadTexto}
+                                        <p className="mt-0.5 flex items-center justify-center gap-1 min-w-0 text-[10px] font-medium text-brand">
+                                          <span className="truncate">{modalidadTexto}</span>
+                                          {boxExercises.some((se) => se.formatoFijo && !se.isAutoGenerated) && (
+                                            <span title="Modalidad fija" aria-label="Modalidad fija" className="flex-shrink-0">
+                                              <PinIcon filled className="h-3 w-3" />
+                                            </span>
+                                          )}
                                         </p>
                                       )}
                                       {ocupado > 0 && (
@@ -1400,6 +1472,19 @@ export default function Routines() {
                                             {se.setsReps}
                                             {se.weightKg && ` • ${se.weightKg}kg`}
                                           </p>
+                                          {/* Aviso suave: notes trae tanto "sin peso de
+                                              referencia" como, cuando el día tiene foco y esta
+                                              estación no tuvo ningún candidato de ese grupo, el
+                                              motor avisa que usó la regla general en su lugar. */}
+                                          {se.notes && (
+                                            <p
+                                              className="mt-0.5 flex items-start gap-1 text-amber-600"
+                                              title={se.notes}
+                                            >
+                                              <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0 mt-px" />
+                                              <span className="line-clamp-2">{se.notes}</span>
+                                            </p>
+                                          )}
                                         </div>
                                       ))}
 
@@ -1760,6 +1845,25 @@ export default function Routines() {
                     rows={2}
                     placeholder="Notas para esta sesión..."
                   />
+                </div>
+
+                <div>
+                  <label className="form-label">Foco del día (opcional)</label>
+                  <select
+                    value={sessionForm.foco}
+                    onChange={(e) => setSessionForm({ ...sessionForm, foco: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">Sin foco — como hoy, mezcla libre</option>
+                    {FOCOS_DEL_DIA.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-text-tertiary">
+                    Con foco, cada estación de este día elige ejercicios de ese grupo. Si alguna
+                    estación no tiene ninguno disponible, usa la regla general y queda marcada en
+                    esa estación.
+                  </p>
                 </div>
         </form>
       </Sidecart>
@@ -2186,15 +2290,35 @@ export default function Routines() {
                     excede ? 'bg-red-50 border-red-200 text-red-800' : 'bg-brand/5 border-brand/20 text-text-primary'
                   }`}
                 >
-                  <span className="font-semibold">
-                    {timed ? comoTexto(primera.formato, primera) : 'Series × reps'}
-                  </span>
-                  {timed && (
-                    <span className={excede ? 'text-red-700' : 'text-text-tertiary'}>
-                      {' · '}
-                      {mmss(duracion)} de {mmss(BLOQUE_SEG)}
-                    </span>
-                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-semibold">
+                        {timed ? comoTexto(primera.formato, primera) : 'Series × reps'}
+                      </span>
+                      {timed && (
+                        <span className={excede ? 'text-red-700' : 'text-text-tertiary'}>
+                          {' · '}
+                          {mmss(duracion)} de {mmss(BLOQUE_SEG)}
+                        </span>
+                      )}
+                    </div>
+                    {/* Sólo en los días base: son los que lee el motor (igual que el alfiler
+                        de un ejercicio). Mismo ícono, sin texto; el texto va en el title. */}
+                    {filas.some((se) => !se.isAutoGenerated) && (() => {
+                      const fija = filas.some((se) => se.formatoFijo)
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => toggleFormatoFijo(estacionAbierta.sessionId, estacionAbierta.boxNumber, filas)}
+                          className={`p-0.5 flex-shrink-0 ${fija ? '' : 'opacity-50 hover:opacity-100'}`}
+                          title={`${fija ? 'Modalidad fija' : 'Fijar modalidad'} — al generar, se mantiene esta modalidad y la cantidad de ejercicios`}
+                          aria-label={fija ? 'Modalidad fija' : 'Fijar modalidad'}
+                        >
+                          <PinIcon filled={fija} className="h-3 w-3" />
+                        </button>
+                      )
+                    })()}
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-text-tertiary">Todavía no tiene ejercicios cargados.</p>
@@ -2225,7 +2349,97 @@ export default function Routines() {
           )
         })()}
       </Sidecart>
+      {/* Vista previa de la semana: las próximas 5 sesiones como las armaría el motor hoy, sin
+          guardar nada (previsualizar_semana corre el motor y lo deshace). */}
+      <Sidecart
+        isOpen={Boolean(vistaPrevia)}
+        onClose={() => setVistaPrevia(null)}
+        title="Vista previa"
+        subtitle="Próxima semana · no se guarda"
+        size="xl"
+        zIndex={60}
+        footer={
+          <div className="flex justify-between">
+            <button type="button" onClick={() => setVistaPrevia(null)} className="btn-secondary">
+              Cerrar
+            </button>
+            <button
+              type="button"
+              disabled={vistaPrevia?.cargando || !vistaPrevia?.sesiones?.length}
+              onClick={() => {
+                setVistaPrevia(null)
+                handleGenerateSessions()
+              }}
+              className="btn-primary flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <PlayIcon className="h-4 w-4" />
+              {selectedRoutine?.generationStatus === 'completed' ? 'Regenerar' : 'Generar Sesiones'}
+            </button>
+          </div>
+        }
+      >
+        {vistaPrevia?.cargando ? (
+          <div className="space-y-5" aria-label="Cargando…">
+            {[0, 1].map((k) => (
+              <div key={k} className="border border-border-default rounded-lg overflow-hidden animate-pulse">
+                <div className="h-9 bg-bg-surface/50" />
+                <div className="grid grid-cols-5 gap-px bg-border-default">
+                  {[1, 2, 3, 4, 5].map((b) => (
+                    <div key={b} className="bg-bg-secondary min-h-[110px]" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : vistaPrevia?.error ? (
+          <p className="text-sm text-error">{vistaPrevia.error}</p>
+        ) : (
+          <div className="space-y-5">
+            {(vistaPrevia?.sesiones || []).map((ses) => (
+              <div key={ses.sessionNumber} className="border border-border-default rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 bg-bg-surface/50">
+                  <span className="font-semibold text-sm text-text-primary">Sesión {ses.sessionNumber}</span>
+                  <span className="text-xs text-text-tertiary">de Sesión {ses.baseSessionNumber}</span>
+                  {ses.foco && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                      {ses.foco}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-5 gap-px bg-border-default">
+                  {[1, 2, 3, 4, 5].map((boxNum) => {
+                    const est = (ses.estaciones || []).find((e) => e.boxNumber === boxNum)
+                    const modalidad = est
+                      ? esPorTiempo(est.formato) ? comoTexto(est.formato, est) : 'Series × reps'
+                      : null
+                    return (
+                      <div key={boxNum} className="bg-bg-secondary min-h-[110px]">
+                        <div className="bg-brand/10 px-2 py-1.5 border-b border-border-default text-center">
+                          <span className="text-xs font-semibold text-brand">Estación {boxNum}</span>
+                          {modalidad && (
+                            <p className="mt-0.5 flex items-center justify-center gap-1 min-w-0 text-[10px] font-medium text-brand">
+                              <span className="truncate">{modalidad}</span>
+                              {est.formatoFijo && <PinIcon filled className="h-3 w-3 flex-shrink-0" />}
+                            </p>
+                          )}
+                        </div>
+                        <ul className="p-2 space-y-1">
+                          {(est?.ejercicios || []).map((ej, i) => (
+                            <li key={i} className="text-xs text-text-primary flex items-start gap-1" title={ej.name}>
+                              <span className="min-w-0 line-clamp-2">{ej.name}</span>
+                              {ej.isPinned && <PinIcon filled className="h-3 w-3 mt-px flex-shrink-0 text-brand" />}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Sidecart>
     </div>
   )
 }
-
