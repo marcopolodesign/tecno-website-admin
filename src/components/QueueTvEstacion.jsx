@@ -680,7 +680,9 @@ const ca = (nombre, dur, delay, easing = 'cubic-bezier(0.22,1,0.36,1)') => ({
 const DIGITO_PX = 440
 const DIGITO = { fontSize: DIGITO_PX, fontWeight: 900, lineHeight: `${DIGITO_PX}px`, height: DIGITO_PX, letterSpacing: -22, display: 'block' }
 
-function VistaChau({ box, boxes, posicion, acento }) {
+function VistaChau({ box, boxes, posicion, acento, line }) {
+  // Hacia dónde se camina a la próxima estación: se configura por línea en el admin (production_lines.flecha).
+  const izquierda = line?.flecha === 'izquierda'
   const segundos = useCountdown(box.advances_at)
   const total = boxes?.length || 0
   const esUltima = posicion >= total
@@ -712,7 +714,7 @@ function VistaChau({ box, boxes, posicion, acento }) {
             <span className="ca-anim" style={{ ...titulo, ...ca('caTitle', 0.5, 0.4) }}>
               Pasá a la<br />estación
             </span>
-            <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg data-testid="chau-flecha" data-direccion={izquierda ? 'izquierda' : 'derecha'} width="200" height="200" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={izquierda ? { WebkitTransform: 'scaleX(-1)', transform: 'scaleX(-1)' } : undefined}>
               <path className="ca-anim" d="M4 12h15M13 6l6 6-6 6" style={{ strokeDasharray: 40, ...ca('caArrow', 0.5, 0.5) }} />
             </svg>
             {/* Ventana de un dígito: sube el actual (atenuado) y entra el siguiente desde abajo. */}
@@ -816,7 +818,7 @@ function VistaEstado({ estado, box, boxes, posicion, line, fase, acento }) {
     case 'preparate': return <VistaPreparate segundos={estado.restanteExplicacionSeg} pos={posicion} line={line} acento={acento} />
     case 'explicacion': return <VistaExplicacion box={box} estado={estado} pos={posicion} line={line} acento={acento} />
     case 'estacion': return <VistaEstacion box={box} fase={fase} pos={posicion} line={line} />
-    case 'chau': return <VistaChau box={box} boxes={boxes} posicion={posicion} acento={acento} />
+    case 'chau': return <VistaChau box={box} boxes={boxes} posicion={posicion} acento={acento} line={line} />
     default: return null
   }
 }

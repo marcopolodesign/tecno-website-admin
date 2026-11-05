@@ -273,6 +273,17 @@ export default function QueueConfig() {
 
   // El demo se prende/apaga por SEDE, no por línea — todas las líneas de una ubicación corren
   // la misma demo al mismo tiempo, así que tocar una sola dejaría a la otra desincronizada.
+  const handleFlecha = async (line, valor) => {
+    if ((line.flecha || 'derecha') === valor) return
+    try {
+      await queueService.updateLine(line.id, { flecha: valor })
+      setLines((prev) => prev.map((l) => (l.id === line.id ? { ...l, flecha: valor } : l)))
+      toast.success(`${line.name}: flecha hacia la ${valor}`)
+    } catch (err) {
+      toast.error(err?.message || 'No se pudo guardar la flecha')
+    }
+  }
+
   const handleToggleDemo = async (locationId, valorActual) => {
     const nuevo = !valorActual
     const lineasSede = lines.filter((l) => l.location_id === locationId)
@@ -412,6 +423,24 @@ export default function QueueConfig() {
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
+                        {/* Hacia dónde apunta la flecha de "Pasá a la estación" en las TVs de esta línea. */}
+                        <div className="flex items-center gap-1.5 text-xs text-text-secondary" title="Flecha de 'Pasá a la estación' en las TVs">
+                          <span>Flecha</span>
+                          <div className="inline-flex rounded-md border border-border-default overflow-hidden" role="group">
+                            {[['izquierda', '←'], ['derecha', '→']].map(([valor, icono]) => (
+                              <button
+                                key={valor}
+                                type="button"
+                                aria-pressed={(line.flecha || 'derecha') === valor}
+                                aria-label={`Flecha hacia la ${valor}`}
+                                onClick={() => handleFlecha(line, valor)}
+                                className={`px-2 py-0.5 ${(line.flecha || 'derecha') === valor ? 'bg-brand text-white' : 'hover:bg-surface-secondary'}`}
+                              >
+                                {icono}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         <a
                           href={`/lista-espera/tv/${line.id}`}
                           target="_blank"
