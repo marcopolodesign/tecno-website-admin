@@ -32,7 +32,7 @@ import { LienzoTv, useLienzo } from './tv/TvChrome'
 import { ChipsElementos, ChipElemento } from './tv/Elementos'
 import logoLottie from '../assets/tf-logo.lottie.json'
 import VideoCruzado, { PrecargaVideos } from './tv/VideoCruzado'
-import { BORDE_ACENTO_PX, BORDE, COLOR, GEIST, MONO, RADIO, acentoDe, etiqueta, superficie, velo } from './tv/tokens'
+import { BORDE_ACENTO_PX, BORDE, COLOR, GEIST, MONO, RADIO, acentoDe, etiqueta, superficie, velo, UN_VIDEO } from './tv/tokens'
 import {
   Anima, Avatar, BarraProgreso, BarrasRondas, Cronometro, Encabezado, FondoManchas, KEYFRAMES, NumeroEstacion, Pildora, TarjetaComoSeJuega, TarjetaSigue, TFMarca, nombreLineaTv,
 } from './tv/Piezas'
@@ -665,6 +665,11 @@ function VistaEstacion({ box, fase, pos, line }) {
 // Secuencia de entrada (una sola vez, al montarse; ver @keyframes ca* en tv/tokens.js). El reloj
 // "Arranca en" sigue viniendo de advances_at: la animación sólo mueve opacidad/posición del contenedor.
 // BASE_CA absorbe el fundido de entrada del estado (tvFadeIn, 0.7 s) para que no se coma el arranque.
+// Mismo criterio que LienzoTv (TvChrome.jsx): en las Samsung van sin animaciones salvo ?sinanim=0.
+const SIN_ANIM = (() => {
+  const q = typeof window !== 'undefined' ? window.location.search : ''
+  return /[?&]sinanim=1/.test(q) || (UN_VIDEO && !/[?&]sinanim=0/.test(q))
+})()
 const BASE_CA = 0.25
 const ca = (nombre, dur, delay, easing = 'cubic-bezier(0.22,1,0.36,1)') => ({
   animation: `${nombre} ${dur}s ${easing} ${(BASE_CA + delay).toFixed(2)}s both`,
@@ -712,10 +717,17 @@ function VistaChau({ box, boxes, posicion, acento }) {
             </svg>
             {/* Ventana de un dígito: sube el actual (atenuado) y entra el siguiente desde abajo. */}
             <div data-testid="chau-numero" style={{ height: DIGITO_PX, overflow: 'hidden', paddingRight: 22, marginRight: -22 }}>
-              <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', ...ca('caRoll', 0.4, 1.0, 'cubic-bezier(0.33,0,0.2,1)') }}>
-                <span style={{ ...DIGITO, color: COLOR.texto45 }}>{posicion}</span>
+              {/* En las Samsung (UN_VIDEO) las animaciones van apagadas: sin el giro se quedaba a la
+                  vista el número VIEJO ("Pasá a la estación 2" estando en la 2, 2026-11-05). Ahí va
+                  sólo el siguiente, fijo. Control: scripts/check-tv-legacy.mjs. */}
+              {SIN_ANIM ? (
                 <span style={DIGITO}>{posicion + 1}</span>
-              </div>
+              ) : (
+                <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', ...ca('caRoll', 0.4, 1.0, 'cubic-bezier(0.33,0,0.2,1)') }}>
+                  <span style={{ ...DIGITO, color: COLOR.texto45 }}>{posicion}</span>
+                  <span style={DIGITO}>{posicion + 1}</span>
+                </div>
+              )}
             </div>
           </>
         )}
