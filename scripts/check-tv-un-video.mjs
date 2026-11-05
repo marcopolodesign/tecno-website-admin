@@ -202,6 +202,14 @@ try {
     }
     const cartel = await page.evaluate(() => !!document.getElementById('tv-reporte-cartel'))
     if (cartel) fallas.push('Samsung colgado: el video que no arranca pintó el cartel rojo (tiene que ir sólo a Sentry)')
+    // 2026-11-05: trabado + 15 s sin que corra ninguno → la TV se recarga sola (una vez cada 2 min).
+    let recargas = 0
+    page.on('framenavigated', (f) => { if (f === page.mainFrame()) recargas++ })
+    await page.waitForTimeout(20000)
+    console.log(`Samsung colgado: recargas solas = ${recargas}`)
+    if (recargas < 1) fallas.push('Samsung colgado: la TV no se recargó sola con el video trabado')
+    await page.waitForTimeout(30000)
+    if (recargas > 1) fallas.push(`Samsung colgado: se recargó ${recargas} veces en menos de 2 min (tiene que ser una)`)
     await ctx.close()
   }
 

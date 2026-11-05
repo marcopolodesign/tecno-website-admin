@@ -21,6 +21,9 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   // la TV de la fila se caía entera. Nada de timeZone de Intl en componentes de TV.
   // 2026-11-05: sin animaciones (Samsung) el número de "Pasá a la estación" tiene que ser el siguiente.
   if (!/SIN_ANIM \? \(\s*<span style=\{DIGITO\}>\{posicion \+ 1\}<\/span>/.test(__rf('src/components/QueueTvEstacion.jsx', 'utf8'))) { console.error('✗ VistaChau: sin animaciones tiene que mostrar sólo posicion + 1'); process.exit(1) }
+  // 2026-11-05: la Samsung se traba después de varios videos y sólo se destraba recargando: el aviso
+  // inline de index.html tiene que recargar sola la TV con 2 videos trabados seguidos.
+  { const ix = __rf('index.html', 'utf8'); if (!/function videoTrabado\(\)[\s\S]{0,1200}location\.reload\(\)/.test(ix) || !/reportarVideo\(v, 'no avanzó en '[^;]*\);\s*videoTrabado\(\)/.test(ix)) { console.error('✗ index.html: falta la recarga sola con videos trabados (videoTrabado)'); process.exit(1) } }
   const conTz = tvFiles.filter((f) => /timeZone\s*:/.test(__rf(f, 'utf8')))
   if (conTz.length) { console.error('✗ timeZone de Intl en componentes de TV (Chrome 47 tira RangeError):', conTz.join(', ')); process.exit(1) }
   if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }

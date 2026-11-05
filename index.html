@@ -293,12 +293,32 @@
             if (s.listo || s.reportado || !src) continue;
             if (v.currentTime > s.t0 + 0.3 && !v.paused) {
               s.listo = 1;
+              trabadosSeguidos = 0;
               if (!videoOk) { videoOk = true; etapa('video-ok'); }
               continue;
             }
-            if (ahora - s.desde >= VIDEO_SEG * 1000) { s.reportado = 1; reportarVideo(v, 'no avanzó en ' + VIDEO_SEG + ' s'); }
+            if (ahora - s.desde >= VIDEO_SEG * 1000) { s.reportado = 1; reportarVideo(v, 'no avanzó en ' + VIDEO_SEG + ' s'); videoTrabado(); }
           }
         }
+        // 2026-11-05 (sala en vivo, A3 y B1): después de varios cambios de video la Samsung deja de
+        // cargar (readyState 0 / networkState 2) y sólo se destraba recargando la página. Si un video
+        // queda trabado y en los 15 s siguientes ninguno corre, se recarga sola (como mucho una vez
+        // cada 2 min, contado en sessionStorage). La pantalla sale de la base: recargar no pierde nada.
+        var trabadosSeguidos = 0;
+        function videoTrabado() {
+          trabadosSeguidos++;
+          setTimeout(function () {
+            if (!trabadosSeguidos) return;
+            var ultima = 0;
+            try { ultima = +(w.sessionStorage.getItem('tvRecargaVideo') || 0); } catch (e) {}
+            var ahora = new Date().getTime();
+            if (ahora - ultima < 120000) return;
+            try { w.sessionStorage.setItem('tvRecargaVideo', '' + ahora); } catch (e) {}
+            etapa('video-recarga');
+            setTimeout(function () { w.location.reload(); }, 300);
+          }, 15000);
+        }
+        w.__tvVideoTrabado = videoTrabado;
         setInterval(revisarVideos, 2000);
         w.__tvRevisarVideos = revisarVideos;
         if (d.addEventListener) d.addEventListener('error', function (ev) {
