@@ -17,6 +17,10 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   const tvFiles = []
   for (const d of dirs) for (const f of __rd(d)) if (/\.(jsx|js)$/.test(f) && (d.endsWith('/tv') || /^(QueueTv|Tv|Anotarme)/.test(f))) tvFiles.push(`${d}/${f}`)
   const malos = tvFiles.filter((f) => /\binset\s*:/.test(__rf(f, 'utf8')))
+  // 2026-11-05: Chrome 47 no conoce 'America/Argentina/Buenos_Aires' (RangeError en toLocaleTimeString):
+  // la TV de la fila se caía entera. Nada de timeZone de Intl en componentes de TV.
+  const conTz = tvFiles.filter((f) => /timeZone\s*:/.test(__rf(f, 'utf8')))
+  if (conTz.length) { console.error('✗ timeZone de Intl en componentes de TV (Chrome 47 tira RangeError):', conTz.join(', ')); process.exit(1) }
   if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }
   function lienzo0() { return __rf('src/components/tv/TvChrome.jsx', 'utf8') }
   // 2026-10-27: el lienzo de la TV no puede ser position: fixed (la Samsung no dibuja el <video>).
