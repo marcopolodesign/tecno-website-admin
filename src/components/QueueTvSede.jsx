@@ -216,6 +216,7 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
   const nombreDeLinea = (lineNumber) => lineas.find((l) => l.line_number === lineNumber)?.name
 
   const { porPersona, nuevo } = esperasEstimadas(fila, lineas, ahora)
+  if (typeof window !== 'undefined') window.__tvEstado = { fase: `fila · ${fila.length} esperando`, socio: null }
   // Con la fila larga se muestran las que entran y "y N más". Cuántas entran depende del alto del
   // lienzo (una TV con la barra del navegador a la vista es más baja) y de la fuente: si algo se
   // sale de la columna se muestra una menos, así ninguna fila queda cortada al medio (2026-10-20).

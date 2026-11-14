@@ -57,6 +57,64 @@
         w.__tvEtapa = etapa;
         etapa('html');
 
+        // ── Telemetría en vivo (2026-11-14) ─────────────────────────────────────────────────────
+        // Cada 10 s la TV manda su foto (fase, socio, videos con readyState/avance) y, al instante,
+        // sus eventos (carga, error, video trabado/ok, recarga) a la RPC tv_reportar de Supabase.
+        // El admin los muestra en Lista de espera → Monitor de TVs. Sin fetch ni Promise (Chrome 47).
+        var SB_URL = '%VITE_SUPABASE_URL%', SB_KEY = '%VITE_SUPABASE_ANON_KEY%';
+        var teleOk = SB_URL.indexOf('http') === 0 && SB_KEY.length > 20;
+        var pantallaId = (function () {
+          if (pantalla === 'sede' || pantalla === 'indice') return sede;
+          var p = pantalla.split('/');
+          if (p.length >= 2 && /^[a-z]$/i.test(p[0])) return sede + '/' + p[0].toUpperCase() + '/' + p[1];
+          return sede + '/' + pantalla;
+        })();
+        var cola = [], cont = { errores: 0, trabados: 0, recargas: 0, videos_ok: 0 }, cargadaAt = new Date().toISOString();
+        function codigoDe(src) { var m = /\/(EJ\d+)\//.exec(src || ''); return m ? m[1] : corto(String(src || '').split('/').pop(), 40); }
+        function fotoVideos() {
+          var out = [], vs = d.getElementsByTagName('video');
+          for (var k = 0; k < vs.length && k < 6; k++) {
+            var v = vs[k];
+            out.push({ codigo: codigoDe(v.currentSrc || v.src), readyState: v.readyState, networkState: v.networkState,
+              paused: v.paused, t: Math.round(v.currentTime * 10) / 10, error: v.error ? v.error.code : null,
+              trabado: !!(v.__tv && v.__tv.reportado), corriendo: !!(v.__tv && v.__tv.listo) });
+          }
+          return out;
+        }
+        function mandarTele(sincrono) {
+          if (!teleOk) return;
+          var e = w.__tvEstado || {};
+          var cuerpo = { pantalla: pantallaId, eventos: cola.splice(0, 10), estado: {
+            sede: sede, linea: pantallaId.split('/')[1] || null, posicion: pantallaId.split('/')[2] || null,
+            version: VERSION, bundle: bundle(), ua: corto(navigator.userAgent, 300), fase: e.fase || null,
+            socio: e.socio || null, videos: fotoVideos(), contadores: cont, cargada_at: cargadaAt } };
+          try {
+            var x = new XMLHttpRequest();
+            x.open('POST', SB_URL + '/rest/v1/rpc/tv_reportar', !sincrono);
+            x.setRequestHeader('Content-Type', 'application/json');
+            x.setRequestHeader('apikey', SB_KEY);
+            x.setRequestHeader('Authorization', 'Bearer ' + SB_KEY);
+            x.send(JSON.stringify({ p: cuerpo }));
+          } catch (err) {}
+        }
+        var teleTimer = null;
+        function tvEvento(tipo, mensaje, datos, sincrono) {
+          cola.push({ tipo: tipo, mensaje: corto(mensaje, 400), datos: datos || null });
+          if (sincrono) { mandarTele(true); return; }
+          if (!teleTimer) teleTimer = setTimeout(function () { teleTimer = null; mandarTele(); }, 1000);
+        }
+        w.__tvEvento = tvEvento;
+        var motivoCarga = 'carga';
+        try {
+          var rv = +(w.sessionStorage.getItem('tvRecargaVideo') || 0);
+          if (rv && new Date().getTime() - rv < 60000) motivoCarga = 'recarga por video trabado';
+          var rg = JSON.parse(w.sessionStorage.getItem('tvRecargas') || 'null');
+          if (rg && new Date().getTime() - rg.t < 60000) motivoCarga = 'recarga por error (' + rg.n + ')';
+        } catch (err) {}
+        tvEvento('carga', motivoCarga + ' · ' + VERSION, null);
+        setInterval(function () { mandarTele(); }, 10000);
+        setTimeout(function () { mandarTele(); }, 4000);
+
         function hex32() {
           var s = '';
           for (var j = 0; j < 32; j++) s += Math.floor(Math.random() * 16).toString(16);
@@ -173,6 +231,7 @@
           } catch (e) {}
           recargaEn = Math.min(60 * Math.pow(2, n), 600);
           setTimeout(function () {
+            try { tvEvento('recarga', 'error a pantalla completa (' + n + ')', null, true); } catch (e) {}
             try { w.sessionStorage.setItem('tvRecargas', JSON.stringify({ n: n + 1, t: new Date().getTime() })); } catch (e) {}
             loc.reload();
           }, recargaEn * 1000);
@@ -191,6 +250,8 @@
           vistos[clave] = 1;
           if (info.origen !== 'watchdog') etapa('error');
           enviar(info);
+          cont.errores++;
+          tvEvento(info.origen === 'watchdog' ? 'sigue_cargando' : 'error', info.mensaje, { origen: info.origen, archivo: info.archivo, linea: info.linea });
           // Un error real reemplaza al cartel de "sigue cargando"; los siguientes sólo suman a la cuenta.
           if (primero && primero.origen !== 'watchdog') { extras++; if (cartel) pintar(info.completo || vacia()); return; }
           primero = info;
@@ -293,11 +354,13 @@
             if (s.listo || s.reportado || !src) continue;
             if (v.currentTime > s.t0 + 0.3 && !v.paused) {
               s.listo = 1;
+              cont.videos_ok++;
+              if (!videoOk || trabadosSeguidos) tvEvento('video_ok', codigoDe(src) + ' corre', null);
               trabadosSeguidos = 0;
               if (!videoOk) { videoOk = true; etapa('video-ok'); }
               continue;
             }
-            if (ahora - s.desde >= VIDEO_SEG * 1000) { s.reportado = 1; reportarVideo(v, 'no avanzó en ' + VIDEO_SEG + ' s'); videoTrabado(); }
+            if (ahora - s.desde >= VIDEO_SEG * 1000) { s.reportado = 1; reportarVideo(v, 'no avanzó en ' + VIDEO_SEG + ' s'); cont.trabados++; tvEvento('video_trabado', codigoDe(src) + ' no avanzó en ' + VIDEO_SEG + ' s', { readyState: v.readyState, networkState: v.networkState, error: v.error ? v.error.code : null }); videoTrabado(); }
           }
         }
         // 2026-11-05 (sala en vivo, A3 y B1): después de varios cambios de video la Samsung deja de
@@ -315,6 +378,8 @@
             if (ahora - ultima < 120000) return;
             try { w.sessionStorage.setItem('tvRecargaVideo', '' + ahora); } catch (e) {}
             etapa('video-recarga');
+            cont.recargas++;
+            tvEvento('recarga', 'video trabado 15 s sin ningún otro corriendo', null, true);
             setTimeout(function () { w.location.reload(); }, 300);
           }, 15000);
         }

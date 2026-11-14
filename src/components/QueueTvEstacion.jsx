@@ -880,6 +880,14 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
 
   const box = boxes.find((b) => Number(b.line_position) === pos)
   const { estado, box: boxVista, boxes: boxesVista } = useEstadoEstacion({ box, boxes, confirmando: confirming, posicion: pos, line })
+  // Telemetría (index.html → tv_reportar): qué muestra la pantalla y a quién. Lo lee el Monitor de TVs.
+  if (typeof window !== 'undefined') {
+    const prev = window.__tvEstado
+    const fase = estado?.estado || null
+    const socio = boxVista?.status === 'occupied' ? nombreDeSaludo(boxVista) || null : null
+    window.__tvEstado = { fase, socio }
+    if (prev && prev.fase !== fase && window.__tvEvento) window.__tvEvento('fase', `${prev.fase || '-'} → ${fase || '-'}${socio ? ` · ${socio}` : ''}`)
+  }
   const grupo =
     estado.estado === 'off' ? 'off' : estado.estado === 'llegando' ? 'llegando' : estado.estado === 'chau' || estado.estado === 'resumen' ? 'cambio' : 'oculto'
   // El reloj de formato vive acá (y no en la vista) para que el fondo cambie de color con el descanso.

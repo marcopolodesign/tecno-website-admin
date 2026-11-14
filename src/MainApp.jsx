@@ -27,6 +27,7 @@ import AccessLogs from './components/AccessLogs'
 import Horas from './components/Horas'
 import QueueMonitor from './components/QueueMonitor'
 import QueueConfig from './components/QueueConfig'
+import MonitorTvs from './components/MonitorTvs'
 import QueueTv from './components/QueueTv'
 import QueueTvEstacion from './components/QueueTvEstacion'
 import QueueTvSede from './components/QueueTvSede'
@@ -339,6 +340,9 @@ function AuthenticatedShell({
               )}
               {canAccess('/lista-espera/config') && (
                 <Route path="/lista-espera/config" element={<QueueConfig />} />
+              )}
+              {canAccess('/lista-espera/tvs') && (
+                <Route path="/lista-espera/tvs" element={<MonitorTvs />} />
               )}
 
               {/* Check-in also accessible while authenticated */}
