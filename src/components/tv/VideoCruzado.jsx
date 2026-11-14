@@ -31,9 +31,12 @@ const sinVideoIcono = (iconoSinVideo) => (
 // (nunca una tarjeta en negro) y el <video> real sólo se monta para la tarjeta a la que le toca
 // el turno — así nunca hay más de un <video> vivo en toda la pantalla.
 function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
-  const clave = claveEjercicio(fila)
-  const esDueño = useTurnoVideo(clave)
   const media = exerciseMedia(fila, 'tv')
+  // Sólo las tarjetas con video entran a la ronda del turno. Una sin video (p. ej. INCLINACIONES
+  // LATERALES C/DB, A3 en vivo 2026-11-05) se quedaba con el turno para siempre: nunca reproduce,
+  // así que el turno no pasaba y la estación quedaba sin video. Control: check-tv-un-video.mjs.
+  const clave = media.kind === 'hosted' && media.src ? claveEjercicio(fila) : null
+  const esDueño = useTurnoVideo(clave)
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
       {media.kind === 'hosted' && media.poster && (

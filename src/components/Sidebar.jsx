@@ -18,6 +18,7 @@ import {
   // Lista de espera icons
   QueueListIcon,
   Cog6ToothIcon,
+  TvIcon,
   // Space switcher
   ChevronUpDownIcon,
   CheckIcon,
@@ -100,6 +101,7 @@ const catalogoNav = [
 
 const queueNav = [
   { name: 'Monitor', href: '/lista-espera', icon: QueueListIcon, roles: ['super_admin', 'admin', 'front_desk'] },
+  { name: 'TVs', href: '/lista-espera/tvs', icon: TvIcon, roles: ['super_admin', 'admin', 'front_desk'] },
   { name: 'Configuración', href: '/lista-espera/config', icon: Cog6ToothIcon, roles: ['super_admin', 'admin'] },
 ]
 

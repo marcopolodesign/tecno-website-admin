@@ -87,10 +87,11 @@ function linea() {
 function boxLibre(pos) {
   return { kg: null, socio: null, nombre: null, riesgo: null, status: 'free', ejercicio: null, elementos: [], iniciales: null, avatar_url: null, ejercicios: [], entered_at: null, ingreso_at: null, advances_at: null, line_position: pos }
 }
+let EJERCICIOS_BOX = EXERCISES
 function boxOcupado(pos, enteredMs) {
   return {
     kg: 1240, socio: 'Maximiliano R.', nombre: 'Maximiliano', riesgo: { dias: 4, bucket: 'very_good' }, status: 'occupied',
-    ejercicio: EXERCISES[0], elementos: [], iniciales: 'MR', avatar_url: null, ejercicios: EXERCISES,
+    ejercicio: EJERCICIOS_BOX[0], elementos: [], iniciales: 'MR', avatar_url: null, ejercicios: EJERCICIOS_BOX,
     entered_at: iso(enteredMs), ingreso_at: iso(enteredMs - 47 * 60000), advances_at: iso(enteredMs + (E + S + T) * 1000), line_position: pos,
   }
 }
@@ -202,6 +203,35 @@ try {
     }
     const cartel = await page.evaluate(() => !!document.getElementById('tv-reporte-cartel'))
     if (cartel) fallas.push('Samsung colgado: el video que no arranca pintó el cartel rojo (tiene que ir sólo a Sentry)')
+    // 2026-11-05: trabado + 15 s sin que corra ninguno → la TV se recarga sola (una vez cada 2 min).
+    let recargas = 0
+    page.on('framenavigated', (f) => { if (f === page.mainFrame()) recargas++ })
+    await page.waitForTimeout(20000)
+    console.log(`Samsung colgado: recargas solas = ${recargas}`)
+    if (recargas < 1) fallas.push('Samsung colgado: la TV no se recargó sola con el video trabado')
+    await page.waitForTimeout(30000)
+    if (recargas > 1) fallas.push(`Samsung colgado: se recargó ${recargas} veces en menos de 2 min (tiene que ser una)`)
+    await ctx.close()
+  }
+
+  // ── 1c) 2026-11-05 (A3 en vivo): una tarjeta SIN video no puede quedarse con el turno ───────
+  {
+    EJERCICIOS_BOX = EXERCISES.map((e, i) => (i === 1 ? { ...e, tv_path: null, poster_path: null, processing_status: null } : e))
+    const ctx = await contextoConRuta(browser, SAMSUNG_UA)
+    await ctx.addInitScript(SIN_AUTOPLAY)
+    const page = await ctx.newPage()
+    await page.goto(`${BASE}/tv/palermo/a/2`, { waitUntil: 'load' })
+    const vistos = []
+    for (let k = 0; k < 8; k++) {
+      await page.waitForTimeout(3500)
+      const m = await page.evaluate(MEDIR)
+      vistos.push(m.videoSrcs[0] ? m.videoSrcs[0].match(/ej(\d)-tv/)[1] : '-')
+    }
+    console.log(`Samsung con una tarjeta sin video: turnos vistos ${vistos.join(' ')}`)
+    if (vistos.includes('1')) fallas.push('Samsung sin video: la tarjeta sin video recibió el turno')
+    if (vistos.filter((v) => v === '-').length > 1) fallas.push(`Samsung sin video: quedó sin video en pantalla (${vistos.join(' ')}) — el turno se trabó en la tarjeta sin video`)
+    if (new Set(vistos.filter((v) => v !== '-')).size < 2) fallas.push(`Samsung sin video: el turno no rotó (${vistos.join(' ')})`)
+    EJERCICIOS_BOX = EXERCISES
     await ctx.close()
   }
 

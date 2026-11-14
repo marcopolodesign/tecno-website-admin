@@ -32,7 +32,7 @@ import { LienzoTv, useLienzo } from './tv/TvChrome'
 import { ChipsElementos, ChipElemento } from './tv/Elementos'
 import logoLottie from '../assets/tf-logo.lottie.json'
 import VideoCruzado, { PrecargaVideos } from './tv/VideoCruzado'
-import { BORDE_ACENTO_PX, BORDE, COLOR, GEIST, MONO, RADIO, acentoDe, etiqueta, superficie, velo } from './tv/tokens'
+import { BORDE_ACENTO_PX, BORDE, COLOR, GEIST, MONO, RADIO, acentoDe, etiqueta, superficie, velo, UN_VIDEO } from './tv/tokens'
 import {
   Anima, Avatar, BarraProgreso, BarrasRondas, Cronometro, Encabezado, FondoManchas, KEYFRAMES, NumeroEstacion, Pildora, TarjetaComoSeJuega, TarjetaSigue, TFMarca, nombreLineaTv,
 } from './tv/Piezas'
@@ -665,6 +665,11 @@ function VistaEstacion({ box, fase, pos, line }) {
 // Secuencia de entrada (una sola vez, al montarse; ver @keyframes ca* en tv/tokens.js). El reloj
 // "Arranca en" sigue viniendo de advances_at: la animación sólo mueve opacidad/posición del contenedor.
 // BASE_CA absorbe el fundido de entrada del estado (tvFadeIn, 0.7 s) para que no se coma el arranque.
+// Mismo criterio que LienzoTv (TvChrome.jsx): en las Samsung van sin animaciones salvo ?sinanim=0.
+const SIN_ANIM = (() => {
+  const q = typeof window !== 'undefined' ? window.location.search : ''
+  return /[?&]sinanim=1/.test(q) || (UN_VIDEO && !/[?&]sinanim=0/.test(q))
+})()
 const BASE_CA = 0.25
 const ca = (nombre, dur, delay, easing = 'cubic-bezier(0.22,1,0.36,1)') => ({
   animation: `${nombre} ${dur}s ${easing} ${(BASE_CA + delay).toFixed(2)}s both`,
@@ -675,7 +680,9 @@ const ca = (nombre, dur, delay, easing = 'cubic-bezier(0.22,1,0.36,1)') => ({
 const DIGITO_PX = 440
 const DIGITO = { fontSize: DIGITO_PX, fontWeight: 900, lineHeight: `${DIGITO_PX}px`, height: DIGITO_PX, letterSpacing: -22, display: 'block' }
 
-function VistaChau({ box, boxes, posicion, acento }) {
+function VistaChau({ box, boxes, posicion, acento, line }) {
+  // Hacia dónde se camina a la próxima estación: se configura por línea en el admin (production_lines.flecha).
+  const izquierda = line?.flecha === 'izquierda'
   const segundos = useCountdown(box.advances_at)
   const total = boxes?.length || 0
   const esUltima = posicion >= total
@@ -707,15 +714,22 @@ function VistaChau({ box, boxes, posicion, acento }) {
             <span className="ca-anim" style={{ ...titulo, ...ca('caTitle', 0.5, 0.4) }}>
               Pasá a la<br />estación
             </span>
-            <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg data-testid="chau-flecha" data-direccion={izquierda ? 'izquierda' : 'derecha'} width="200" height="200" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={izquierda ? { WebkitTransform: 'scaleX(-1)', transform: 'scaleX(-1)' } : undefined}>
               <path className="ca-anim" d="M4 12h15M13 6l6 6-6 6" style={{ strokeDasharray: 40, ...ca('caArrow', 0.5, 0.5) }} />
             </svg>
             {/* Ventana de un dígito: sube el actual (atenuado) y entra el siguiente desde abajo. */}
             <div data-testid="chau-numero" style={{ height: DIGITO_PX, overflow: 'hidden', paddingRight: 22, marginRight: -22 }}>
-              <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', ...ca('caRoll', 0.4, 1.0, 'cubic-bezier(0.33,0,0.2,1)') }}>
-                <span style={{ ...DIGITO, color: COLOR.texto45 }}>{posicion}</span>
+              {/* En las Samsung (UN_VIDEO) las animaciones van apagadas: sin el giro se quedaba a la
+                  vista el número VIEJO ("Pasá a la estación 2" estando en la 2, 2026-11-05). Ahí va
+                  sólo el siguiente, fijo. Control: scripts/check-tv-legacy.mjs. */}
+              {SIN_ANIM ? (
                 <span style={DIGITO}>{posicion + 1}</span>
-              </div>
+              ) : (
+                <div className="ca-anim" style={{ display: 'flex', flexDirection: 'column', ...ca('caRoll', 0.4, 1.0, 'cubic-bezier(0.33,0,0.2,1)') }}>
+                  <span style={{ ...DIGITO, color: COLOR.texto45 }}>{posicion}</span>
+                  <span style={DIGITO}>{posicion + 1}</span>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -804,7 +818,7 @@ function VistaEstado({ estado, box, boxes, posicion, line, fase, acento }) {
     case 'preparate': return <VistaPreparate segundos={estado.restanteExplicacionSeg} pos={posicion} line={line} acento={acento} />
     case 'explicacion': return <VistaExplicacion box={box} estado={estado} pos={posicion} line={line} acento={acento} />
     case 'estacion': return <VistaEstacion box={box} fase={fase} pos={posicion} line={line} />
-    case 'chau': return <VistaChau box={box} boxes={boxes} posicion={posicion} acento={acento} />
+    case 'chau': return <VistaChau box={box} boxes={boxes} posicion={posicion} acento={acento} line={line} />
     default: return null
   }
 }
@@ -866,6 +880,14 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
 
   const box = boxes.find((b) => Number(b.line_position) === pos)
   const { estado, box: boxVista, boxes: boxesVista } = useEstadoEstacion({ box, boxes, confirmando: confirming, posicion: pos, line })
+  // Telemetría (index.html → tv_reportar): qué muestra la pantalla y a quién. Lo lee el Monitor de TVs.
+  if (typeof window !== 'undefined') {
+    const prev = window.__tvEstado
+    const fase = estado?.estado || null
+    const socio = boxVista?.status === 'occupied' ? nombreDeSaludo(boxVista) || null : null
+    window.__tvEstado = { fase, socio }
+    if (prev && prev.fase !== fase && window.__tvEvento) window.__tvEvento('fase', `${prev.fase || '-'} → ${fase || '-'}${socio ? ` · ${socio}` : ''}`)
+  }
   const grupo =
     estado.estado === 'off' ? 'off' : estado.estado === 'llegando' ? 'llegando' : estado.estado === 'chau' || estado.estado === 'resumen' ? 'cambio' : 'oculto'
   // El reloj de formato vive acá (y no en la vista) para que el fondo cambie de color con el descanso.

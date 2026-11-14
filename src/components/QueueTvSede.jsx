@@ -64,11 +64,20 @@ function useAhora() {
   return ahora
 }
 
+// Hora de Buenos Aires a mano (UTC-3 fijo, sin horario de verano): el Chrome 47 de las Samsung de
+// la sala no conoce 'America/Argentina/Buenos_Aires' en toLocaleTimeString y tiraba RangeError,
+// que rompía la pantalla entera (2026-11-05). Nada de timeZone en Intl en la TV.
+export function horaBuenosAires(ms) {
+  const d = new Date(ms - 3 * 3600 * 1000)
+  const dd = (n) => (n < 10 ? '0' : '') + n
+  return dd(d.getUTCHours()) + ':' + dd(d.getUTCMinutes())
+}
+
 function Reloj() {
   const ahora = useAhora()
   return (
     <span style={{ fontFamily: MONO, color: COLOR.texto }}>
-      {new Date(ahora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })}
+      {horaBuenosAires(ahora)}
     </span>
   )
 }
@@ -207,6 +216,7 @@ export default function QueueTvSede({ overrideLocationId } = {}) {
   const nombreDeLinea = (lineNumber) => lineas.find((l) => l.line_number === lineNumber)?.name
 
   const { porPersona, nuevo } = esperasEstimadas(fila, lineas, ahora)
+  if (typeof window !== 'undefined') window.__tvEstado = { fase: `fila · ${fila.length} esperando`, socio: null }
   // Con la fila larga se muestran las que entran y "y N más". Cuántas entran depende del alto del
   // lienzo (una TV con la barra del navegador a la vista es más baja) y de la fuente: si algo se
   // sale de la columna se muestra una menos, así ninguna fila queda cortada al medio (2026-10-20).
