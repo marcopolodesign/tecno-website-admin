@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { blobDe } from './tv/precargaBlob'
 
 // An exercise clip playing the way it was set up: framed by its crop, looping only the span
 // that was kept.
@@ -33,7 +34,10 @@ const RESPALDO_MS = 7000
 export default function VideoEjercicio({ src: srcPrincipal, srcRespaldo, poster, style, recorte, alProgreso, onLoadedData, onCanPlay, onPlaying, ...rest }) {
   const [usarRespaldo, setUsarRespaldo] = useState(false)
   useEffect(() => { setUsarRespaldo(false) }, [srcPrincipal])
-  const src = usarRespaldo && srcRespaldo ? srcRespaldo : srcPrincipal
+  const srcRed = usarRespaldo && srcRespaldo ? srcRespaldo : srcPrincipal
+  // Si el video ya está bajado en memoria (precargaBlob, TVs de la sala), se reproduce de ahí. Se decide al
+  // cambiar la fuente, no a mitad de reproducción (cambiarle el src a un video que ya corre lo reinicia).
+  const src = useMemo(() => blobDe(srcRed) || srcRed, [srcRed])
   const ref = useRef(null)
   const arranco = useRef(false)
   const inicio = Number(recorte?.inicio) || 0

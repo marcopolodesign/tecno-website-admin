@@ -168,10 +168,12 @@ try {
     if (m1.posters < 3) fallas.push(`Samsung t0: sólo ${m1.posters} póster(es) en pantalla — tendría que haber uno por tarjeta sin turno`)
     if (!r1 || r1.paused || r1.t <= 0) fallas.push(`Samsung sin autoplay: el video no arrancó (${JSON.stringify(r1)}) — falta el play() explícito de VideoEjercicio`)
 
-    await page.waitForTimeout(TURNO_MS + 3000)
+    await page.waitForTimeout(TURNO_MS + 8000)
     const m2 = await page.evaluate(MEDIR)
     if (OUT) await page.screenshot({ path: join(OUT, 'samsung-t1.png') })
-    console.log(`Samsung t1 (+${Math.round((TURNO_MS + 3000) / 1000)}s): ${m2.videosTotal} video(s) en el DOM — ${JSON.stringify(m2.videoSrcs)}`)
+    console.log(`Samsung t1 (+${Math.round((TURNO_MS + 8000) / 1000)}s): ${m2.videosTotal} video(s) en el DOM — ${JSON.stringify(m2.videoSrcs)}`)
+    // 2026-11-18: como el sistema viejo, los videos de la estación se bajan a memoria y se reproducen de ahí.
+    if (!m2.videoSrcs.some((x) => String(x).startsWith('blob:'))) fallas.push('Samsung: el video no se reproduce desde la precarga en memoria (blob:)')
     if (m2.videosTotal > 1) fallas.push(`Samsung t1: ${m2.videosTotal} <video> a la vez (tiene que ser ≤ 1)`)
     if (m1.videos === 1 && m2.videos === 1 && m1.videoSrcs[0] === m2.videoSrcs[0]) {
       fallas.push('Samsung: el turno no rotó — el video reprodujo el intervalo y sigue siendo el dueño')
@@ -228,8 +230,9 @@ try {
     const vistos = []
     for (let k = 0; k < Math.ceil((TURNO_MS * 1.4) / 3500); k++) {
       await page.waitForTimeout(3500)
-      const m = await page.evaluate(MEDIR)
-      vistos.push(m.videoSrcs[0] ? m.videoSrcs[0].match(/ej(\d)-tv/)[1] : '-')
+      // El video puede venir de memoria (blob:, precargaBlob): el ejercicio se lee de data-clave.
+      const c = await page.evaluate(() => { const v = document.querySelector('video'); return v ? v.getAttribute('data-clave') : null })
+      vistos.push(c ? (/\|EJ(\d)\|/.exec(c) || [])[1] || '?' : '-')
     }
     console.log(`Samsung con una tarjeta sin video: turnos vistos ${vistos.join(' ')}`)
     if (vistos.includes('1')) fallas.push('Samsung sin video: la tarjeta sin video recibió el turno')

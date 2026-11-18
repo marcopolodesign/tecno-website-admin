@@ -30,12 +30,18 @@ const sinVideoIcono = (iconoSinVideo) => (
 // Modo "un video a la vez" (TVs viejas, ver tv/turnoVideo.js): el póster queda SIEMPRE puesto
 // (nunca una tarjeta en negro) y el <video> real sólo se monta para la tarjeta a la que le toca
 // el turno — así nunca hay más de un <video> vivo en toda la pantalla.
+let contadorTarjetas = 0
 function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
   const media = exerciseMedia(fila, 'tv')
   // Sólo las tarjetas con video entran a la ronda del turno. Una sin video (p. ej. INCLINACIONES
   // LATERALES C/DB, A3 en vivo 2026-11-05) se quedaba con el turno para siempre: nunca reproduce,
   // así que el turno no pasaba y la estación quedaba sin video. Control: check-tv-un-video.mjs.
-  const clave = media.kind === 'hosted' && media.src ? claveEjercicio(fila) : null
+  // 2026-11-18: el turno es de la TARJETA (un id fijo por componente), no del ejercicio. Así, cuando la
+  // tarjeta grande del Tabata pasa al ejercicio siguiente, el <video> es el mismo y sólo cambia de archivo
+  // (como el sistema viejo: pausa, vacía, src nuevo, play) en vez de desarmarse y armarse uno nuevo.
+  const slot = useRef(null)
+  if (!slot.current) slot.current = `tarjeta-${++contadorTarjetas}`
+  const clave = media.kind === 'hosted' && media.src ? slot.current : null
   const esDueño = useTurnoVideo(clave)
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: COLOR.fondo, overflow: 'hidden', ...style }}>
@@ -48,8 +54,8 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
       {media.kind !== 'hosted' && media.kind !== 'image' && sinVideoIcono(iconoSinVideo)}
       {esDueño && media.kind === 'hosted' && media.src && (
         <VideoEjercicio
-          key={clave}
-          data-clave={clave}
+          key={slot.current}
+          data-clave={claveEjercicio(fila)}
           src={media.src}
 
           srcRespaldo={media.srcRespaldo}

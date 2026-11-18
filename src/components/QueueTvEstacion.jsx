@@ -32,7 +32,8 @@ import { LienzoTv, useLienzo } from './tv/TvChrome'
 import { ChipsElementos, ChipElemento } from './tv/Elementos'
 import logoLottie from '../assets/tf-logo.lottie.json'
 import VideoCruzado, { PrecargaVideos } from './tv/VideoCruzado'
-import { setVideosLocales } from '../lib/exerciseMedia'
+import { setVideosLocales, exerciseMedia } from '../lib/exerciseMedia'
+import { precargarVideos } from './tv/precargaBlob'
 import { BORDE_ACENTO_PX, BORDE, COLOR, GEIST, MONO, RADIO, acentoDe, etiqueta, superficie, velo, UN_VIDEO } from './tv/tokens'
 import {
   Anima, Avatar, BarraProgreso, BarrasRondas, Cronometro, Encabezado, FondoManchas, KEYFRAMES, NumeroEstacion, Pildora, TarjetaComoSeJuega, TarjetaSigue, TFMarca, nombreLineaTv,
@@ -883,6 +884,13 @@ export default function QueueTvEstacion({ overrideLineaId, overridePosicion } = 
   const { estado, box: boxVista, boxes: boxesVista } = useEstadoEstacion({ box, boxes, confirmando: confirming, posicion: pos, line })
   // Prueba 4: videos del server local si la línea lo tiene prendido (antes de que las tarjetas pidan su media).
   setVideosLocales(line)
+  // TVs de la sala: al llegar alguien al box se bajan a memoria todos los videos de su estación (como el
+  // sistema viejo), así durante el entrenamiento no se pide nada por la red.
+  const srcsEstacion = UN_VIDEO && boxVista?.status === 'occupied'
+    ? ejerciciosDe(boxVista).map((e) => exerciseMedia(e, 'tv')).filter((m) => m.kind === 'hosted' && m.src).map((m) => m.src)
+    : []
+  const claveSrcs = srcsEstacion.join('|')
+  useEffect(() => { if (claveSrcs) precargarVideos(claveSrcs.split('|')) }, [claveSrcs])
   // Telemetría (index.html → tv_reportar): qué muestra la pantalla y a quién. Lo lee el Monitor de TVs.
   if (typeof window !== 'undefined') {
     const prev = window.__tvEstado
