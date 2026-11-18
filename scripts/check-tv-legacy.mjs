@@ -26,6 +26,8 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   { const ix = __rf('index.html', 'utf8'); if (!/function videoTrabado\(\)[\s\S]{0,1800}location\.reload\(\)/.test(ix) || !/reportarVideo\(v, 'no avanzó en '[\s\S]{0,400}?videoTrabado\(\)/.test(ix)) { console.error('✗ index.html: falta la recarga sola con videos trabados (videoTrabado)'); process.exit(1) } }
   // 2026-11-14: la TV reporta su estado y sus eventos al Monitor de TVs (tv_reportar).
   { const ix = __rf('index.html', 'utf8'); if (!/rpc\/tv_reportar/.test(ix) || !/tvEvento\('video_trabado'/.test(ix) || !/tvEvento\('recarga'/.test(ix)) { console.error('✗ index.html: falta la telemetría al Monitor de TVs (tv_reportar)'); process.exit(1) } }
+  // 2026-11-18 prueba 4: la TV prueba el server local del gimnasio y reporta de dónde salió cada video.
+  { const ix = __rf('index.html', 'utf8'); if (!/function sondaLocal\(\)/.test(ix) || !/origen: \/\^https/.test(ix)) { console.error('✗ index.html: falta la sonda del server local / el origen de los videos'); process.exit(1) } }
   const conTz = tvFiles.filter((f) => /timeZone\s*:/.test(__rf(f, 'utf8')))
   if (conTz.length) { console.error('✗ timeZone de Intl en componentes de TV (Chrome 47 tira RangeError):', conTz.join(', ')); process.exit(1) }
   if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }

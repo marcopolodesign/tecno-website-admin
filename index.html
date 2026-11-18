@@ -75,7 +75,8 @@
           var out = [], vs = d.getElementsByTagName('video');
           for (var k = 0; k < vs.length && k < 6; k++) {
             var v = vs[k];
-            out.push({ codigo: codigoDe(v.currentSrc || v.src), readyState: v.readyState, networkState: v.networkState,
+            var srcV = v.currentSrc || v.src || '';
+            out.push({ origen: /^https?:\/\/(192\.168|10\.|172\.)/.test(srcV) ? 'local' : 'supabase', codigo: codigoDe(srcV), readyState: v.readyState, networkState: v.networkState,
               paused: v.paused, t: Math.round(v.currentTime * 10) / 10, error: v.error ? v.error.code : null,
               trabado: !!(v.__tv && v.__tv.reportado), corriendo: !!(v.__tv && v.__tv.listo) });
           }
@@ -112,6 +113,25 @@
           if (rg && new Date().getTime() - rg.t < 60000) motivoCarga = 'recarga por error (' + rg.n + ')';
         } catch (err) {}
         tvEvento('carga', motivoCarga + ' · ' + VERSION, null);
+        // Prueba 4: si la línea pide videos del server local, cada 60 s se prueba que responda (una imagen
+        // chica del mismo server: el <img> http dentro de la página https lo deja pasar Chrome 47).
+        function sondaLocal() {
+          var base = w.__tvVideosLocales;
+          if (!base) { cont.server_local = null; return; }
+          var raiz = base.replace(/videos\/?$/, ''), t0 = new Date().getTime(), img = new Image(), listo = false;
+          var fin = function (ok) {
+            if (listo) return; listo = true;
+            var antes = cont.server_local;
+            cont.server_local = ok ? 'responde ' + (new Date().getTime() - t0) + ' ms' : 'no responde';
+            if (!antes || (antes.indexOf('no') === 0) !== !ok) tvEvento('server_local', raiz + ' ' + cont.server_local, null);
+          };
+          img.onload = function () { fin(true); };
+          img.onerror = function () { fin(false); };
+          setTimeout(function () { fin(false); }, 5000);
+          img.src = raiz + 'img/logo_transparente.png?t=' + t0;
+        }
+        setTimeout(sondaLocal, 6000);
+        setInterval(sondaLocal, 60000);
         setInterval(function () { mandarTele(); }, 10000);
         setTimeout(function () { mandarTele(); }, 4000);
 

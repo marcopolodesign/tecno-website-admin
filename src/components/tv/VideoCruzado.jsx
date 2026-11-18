@@ -51,6 +51,8 @@ function TarjetaUnVideo({ fila, style, iconoSinVideo }) {
           key={clave}
           data-clave={clave}
           src={media.src}
+
+          srcRespaldo={media.srcRespaldo}
           poster={media.poster}
           recorte={media.recorte}
           preload="auto"
@@ -144,6 +146,8 @@ export default function VideoCruzado({ fila, proximas = [], style, iconoSinVideo
               key={clave}
               data-clave={clave}
               src={media.src}
+
+              srcRespaldo={media.srcRespaldo}
               recorte={media.recorte}
               preload="auto"
               onLoadedData={() => marcar(clave)}

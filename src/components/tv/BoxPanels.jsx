@@ -119,6 +119,8 @@ export function ExercisePanel({ exercise, exercises, estacionInicioIso }) {
         {media.kind === 'hosted' ? (
           <VideoEjercicio
             src={media.src}
+
+            srcRespaldo={media.srcRespaldo}
             poster={media.poster}
             recorte={media.recorte}
             style={{ ...panelStyles.mediaEl, ...media.style }}

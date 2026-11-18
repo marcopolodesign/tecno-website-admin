@@ -25,6 +25,8 @@ const TIPOS = {
   video_ok: { texto: 'Video OK', clase: 'bg-emerald-500/15 text-emerald-700' },
   carga: { texto: 'Cargó', clase: 'bg-sky-500/15 text-sky-700' },
   fase: { texto: 'Pantalla', clase: 'bg-surface-secondary text-text-secondary' },
+  video_respaldo: { texto: 'Pasó a Supabase', clase: 'bg-amber-500/15 text-amber-700' },
+  server_local: { texto: 'Server local', clase: 'bg-sky-500/15 text-sky-700' },
 }
 
 const FASES = { off: 'Libre', llegando: 'Llegando', explicacion: 'Explicación', preparate: 'Preparate', estacion: 'Entrenando', chau: 'Cambio de estación', resumen: 'Fin del circuito' }
@@ -70,7 +72,7 @@ function Tarjeta({ titulo, fila, eventos, activa, onClick }) {
               const e = estadoVideo(v)
               return (
                 <div key={i} className="flex justify-between text-[11px] font-mono">
-                  <span className="text-text-secondary">{v.codigo}</span>
+                  <span className="text-text-secondary">{v.codigo}{v.origen === 'local' ? <span className="ml-1 text-sky-700">local</span> : null}</span>
                   <span className={e.clase}>{e.texto}</span>
                 </div>
               )
@@ -81,6 +83,7 @@ function Tarjeta({ titulo, fila, eventos, activa, onClick }) {
             <span className={c.trabados ? 'text-amber-700' : ''}>trabados {c.trabados ?? 0}</span>
             <span className={c.errores ? 'text-red-600' : ''}>errores {c.errores ?? 0}</span>
             <span>cargada {hace(segDesde(fila.cargada_at))}</span>
+            {c.server_local && <span className={c.server_local.startsWith('no') ? 'text-red-600' : 'text-sky-700'}>server local {c.server_local}</span>}
           </div>
           {ultimo && (
             <div className="text-[11px] text-text-tertiary truncate">
@@ -96,6 +99,7 @@ function Tarjeta({ titulo, fila, eventos, activa, onClick }) {
 
 function Pruebas() {
   const [socios, setSocios] = useState([])
+  const [locales, setLocales] = useState(false)
   const [n, setN] = useState(4)
   const [ocupado, setOcupado] = useState(false)
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false)
@@ -107,10 +111,12 @@ function Pruebas() {
       if (error) throw error
       if (!data?.ok) throw new Error(data?.mensaje || 'No se pudo')
       if (accion === 'limpiar') {
-        toast.success(`Pruebas borradas: ${data.socios} socios`)
+        toast.success(`Pruebas borradas: ${data.socios} socios · videos de vuelta en Supabase`)
         setSocios([])
+        setLocales(false)
       } else {
         setSocios(data.socios || [])
+        setLocales(!!data.videos_locales)
         if (accion === 'armar') toast.success(`Prueba "${escenario}" cargada: ${n} socios en la fila`)
       }
     } catch (e) {
@@ -131,6 +137,7 @@ function Pruebas() {
     ['ayer', 'Como el 05/11', 'Tu rutina (sesión 2): todo Tabata, todos en la misma sesión.'],
     ['videos', 'Todos con video', 'Modalidades mezcladas; los ejercicios sin video se cambian por uno con video.'],
     ['tabata', 'Tabata + video', 'Todo Tabata 6 × 40/20 y todos los ejercicios con video.'],
+    ['local', 'Videos del server local', 'Como "Todos con video", pero las teles piden cada video al server del gimnasio (192.168.1.109), como el sistema viejo.'],
   ]
   return (
     <div className="card space-y-4">
@@ -148,7 +155,12 @@ function Pruebas() {
           </select>
         </label>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      {locales && (
+        <div className="rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-800">
+          Videos del server local prendidos: las teles piden los videos al server del gimnasio. Se apaga con "Borrar socios de prueba".
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ESCENARIOS.map(([clave, titulo, detalle]) => (
           <button key={clave} type="button" disabled={ocupado} onClick={() => correr('armar', clave)}
             className="text-left rounded-lg bg-surface-secondary hover:bg-brand/10 p-3 disabled:opacity-50">

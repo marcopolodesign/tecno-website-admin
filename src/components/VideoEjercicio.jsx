@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 // An exercise clip playing the way it was set up: framed by its crop, looping only the span
 // that was kept.
@@ -25,7 +25,15 @@ export function reproducirSeguro(v) {
   } catch (e) { /* TVs viejas pueden tirar si todavía no hay fuente */ }
 }
 
-export default function VideoEjercicio({ src, poster, style, recorte, alProgreso, onLoadedData, onCanPlay, onPlaying, ...rest }) {
+// Respaldo (prueba 4, 2026-11-18): si llega `srcRespaldo` (video del server local del gimnasio con el de
+// Supabase de respaldo) y el principal tira error o no arranca en RESPALDO_MS, se pasa al respaldo y se
+// avisa al Monitor de TVs (evento video_respaldo).
+const RESPALDO_MS = 7000
+
+export default function VideoEjercicio({ src: srcPrincipal, srcRespaldo, poster, style, recorte, alProgreso, onLoadedData, onCanPlay, onPlaying, ...rest }) {
+  const [usarRespaldo, setUsarRespaldo] = useState(false)
+  useEffect(() => { setUsarRespaldo(false) }, [srcPrincipal])
+  const src = usarRespaldo && srcRespaldo ? srcRespaldo : srcPrincipal
   const ref = useRef(null)
   const arranco = useRef(false)
   const inicio = Number(recorte?.inicio) || 0
@@ -54,6 +62,18 @@ export default function VideoEjercicio({ src, poster, style, recorte, alProgreso
     v.setAttribute('muted', '')
     reproducirSeguro(v)
   }, [src])
+
+  const pasarAlRespaldo = useCallback((motivo) => {
+    if (!srcRespaldo || usarRespaldo) return
+    setUsarRespaldo(true)
+    try { if (window.__tvEvento) window.__tvEvento('video_respaldo', `${String(srcPrincipal).split('/').pop()} → Supabase (${motivo})`) } catch (e) { /* sin telemetría */ }
+  }, [srcRespaldo, usarRespaldo, srcPrincipal])
+
+  useEffect(() => {
+    if (!srcRespaldo || usarRespaldo) return undefined
+    const t = setTimeout(() => { if (!arranco.current) pasarAlRespaldo(`no arrancó en ${RESPALDO_MS / 1000} s`) }, RESPALDO_MS)
+    return () => clearTimeout(t)
+  }, [srcPrincipal, srcRespaldo, usarRespaldo, pasarAlRespaldo])
 
   const insistir = (ev) => {
     if (!arranco.current) reproducirSeguro(ev.currentTarget)
@@ -84,6 +104,7 @@ export default function VideoEjercicio({ src, poster, style, recorte, alProgreso
       onCanPlay={(ev) => { insistir(ev); if (onCanPlay) onCanPlay(ev) }}
       onPlaying={(ev) => { arranco.current = true; if (onPlaying) onPlaying(ev) }}
       onTimeUpdate={alAvanzar}
+      onError={() => pasarAlRespaldo('error al cargar')}
       onEnded={alInicio}
       style={style}
       {...rest}

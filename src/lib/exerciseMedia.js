@@ -37,6 +37,18 @@ export function cropStyle(crop) {
   }
 }
 
+// Prueba 4 de la sala (2026-11-18): con production_lines.videos_locales prendido, la TV pide cada video
+// al servidor del gimnasio (http://192.168.1.109:8000/videos/<archivo de CENTRAL>, como el sistema
+// viejo) y deja el de Supabase como respaldo (VideoEjercicio cambia si el local no arranca).
+// La pantalla lo setea con la línea que recibe de tv_linea().
+let videosLocales = { activo: false, base: null }
+export function setVideosLocales(linea) {
+  const activo = !!linea?.videos_locales
+  const base = linea?.videos_locales_base || null
+  videosLocales = { activo, base }
+  if (typeof window !== 'undefined') window.__tvVideosLocales = activo ? base : null
+}
+
 // `destino` is 'tv' or 'app' — the two have their own rendition and their own framing, and
 // neither is derived from the other.
 export function exerciseMedia(ex, destino = 'tv') {
@@ -45,6 +57,22 @@ export function exerciseMedia(ex, destino = 'tv') {
   const listo = ex.processing_status === 'ready'
   const path = destino === 'app' ? ex.app_path : ex.tv_path
   const crop = destino === 'app' ? ex.crop_app : ex.crop_tv
+
+  const local = destino === 'tv' && videosLocales.activo && videosLocales.base && ex.video_local
+    ? videosLocales.base.replace(/\/?$/, '/') + ex.video_local
+    : null
+  if (local) {
+    return {
+      kind: 'hosted',
+      src: local,
+      srcRespaldo: listo && path ? mediaUrl(path) : null,
+      origen: 'local',
+      poster: listo ? mediaUrl(ex.poster_path) : null,
+      crop: null,
+      style: cropStyle(null),
+      recorte: null, // los originales del server local no tienen el recorte de los nuestros
+    }
+  }
 
   if (listo && path) {
     return {
