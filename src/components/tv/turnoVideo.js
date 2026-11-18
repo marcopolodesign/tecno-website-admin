@@ -18,7 +18,9 @@
 // Control: scripts/check-tv-un-video.mjs.
 import { useEffect, useState } from 'react'
 
-export const TURNO_MS = 10000
+// 2026-11-18 (pruebas en la sala): con turnos de 10 s la Samsung del box 1 se trababa cada pocos minutos
+// (muchos cambios de video seguidos). Ahora cada tarjeta se queda 30 s de video reproducido.
+export const TURNO_MS = 30000
 const TICK_MS = 500
 
 let claves = [] // orden de registro — estable mientras no cambian las tarjetas en pantalla

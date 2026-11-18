@@ -33,7 +33,8 @@ const DIST = process.env.DIST || new URL('../dist/', import.meta.url).pathname
 const OUT = process.env.OUT || ''
 const SAMSUNG_UA = 'Mozilla/5.0 (SMART-TV; Linux; Tizen 3.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.0 Chrome/47.0.2526.69 TV safari/537.36'
 const DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
-const TURNO_MS = 10000 // tiene que matchear src/components/tv/turnoVideo.js
+// Se lee de src/components/tv/turnoVideo.js (antes estaba copiado a mano).
+const TURNO_MS = Number(/export const TURNO_MS = (\d+)/.exec(readFileSync(new URL('../src/components/tv/turnoVideo.js', import.meta.url), 'utf8'))[1])
 const CLIP = readFileSync(new URL('./fixtures/tv-clip.mp4', import.meta.url)) // H.264 Main, 3 s
 // La Samsung no hace caso del atributo autoplay (peor caso): sin play() explícito no arranca nunca.
 const SIN_AUTOPLAY = `(() => {
@@ -184,6 +185,11 @@ try {
     const sentry = []
     const ctx = await contextoConRuta(browser, SAMSUNG_UA, { video: 'colgado', sentry })
     const page = await ctx.newPage()
+    // Desde el principio: con turnos de 30 s la recarga (rearme a los 10 s, trabado a los 20 s, recarga ~35 s)
+    // pasa antes de las mediciones de abajo.
+    let recargas = 0 // las navegaciones de los primeros 3 s son la carga inicial (la SPA navega dos veces)
+    const t0Nav = Date.now()
+    page.on('framenavigated', (f) => { if (f === page.mainFrame() && Date.now() - t0Nav > 3000) { recargas++; if (process.env.VERBOSE) console.log('  nav', Math.round((Date.now() - t0Nav) / 1000), 's', f.url()) } })
     await page.goto(`${BASE}/tv/palermo/a/2`, { waitUntil: 'load' })
     await page.waitForTimeout(2500)
     const m1 = await page.evaluate(MEDIR)
@@ -204,9 +210,7 @@ try {
     const cartel = await page.evaluate(() => !!document.getElementById('tv-reporte-cartel'))
     if (cartel) fallas.push('Samsung colgado: el video que no arranca pintó el cartel rojo (tiene que ir sólo a Sentry)')
     // 2026-11-05: trabado + 15 s sin que corra ninguno → la TV se recarga sola (una vez cada 2 min).
-    let recargas = 0
-    page.on('framenavigated', (f) => { if (f === page.mainFrame()) recargas++ })
-    await page.waitForTimeout(20000)
+    await page.waitForTimeout(5000)
     console.log(`Samsung colgado: recargas solas = ${recargas}`)
     if (recargas < 1) fallas.push('Samsung colgado: la TV no se recargó sola con el video trabado')
     await page.waitForTimeout(30000)
@@ -222,7 +226,7 @@ try {
     const page = await ctx.newPage()
     await page.goto(`${BASE}/tv/palermo/a/2`, { waitUntil: 'load' })
     const vistos = []
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < Math.ceil((TURNO_MS * 1.4) / 3500); k++) {
       await page.waitForTimeout(3500)
       const m = await page.evaluate(MEDIR)
       vistos.push(m.videoSrcs[0] ? m.videoSrcs[0].match(/ej(\d)-tv/)[1] : '-')

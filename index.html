@@ -369,7 +369,7 @@
           var vs = d.getElementsByTagName('video'), ahora = new Date().getTime();
           for (var k = 0; k < vs.length; k++) {
             var v = vs[k], src = v.currentSrc || v.src || '';
-            if (!v.__tv || v.__tv.src !== src) v.__tv = { desde: ahora, t0: v.currentTime, src: src };
+            if (!v.__tv || v.__tv.src !== src) v.__tv = { desde: ahora, t0: v.currentTime, src: src, rearmado: v.__tvRearmadoSrc === src ? 1 : 0 };
             var s = v.__tv;
             if (s.listo || s.reportado || !src) continue;
             if (v.currentTime > s.t0 + 0.3 && !v.paused) {
@@ -380,6 +380,10 @@
               if (!videoOk) { videoOk = true; etapa('video-ok'); }
               continue;
             }
+            // 2026-11-18: antes de dar el video por trabado (y terminar recargando la página = pantalla
+            // blanca), se rearma sólo el <video>: se le saca la fuente, se vacía y se le vuelve a poner.
+            // Si con eso tampoco avanza en VIDEO_SEG, sigue el camino de siempre (aviso + recarga).
+            if (ahora - s.desde >= VIDEO_SEG * 1000 && !s.rearmado) { s.rearmado = 1; s.desde = ahora; s.t0 = v.currentTime; cont.rearmados = (cont.rearmados || 0) + 1; v.__tvRearmadoSrc = src; tvEvento('video_rearmado', codigoDe(src) + ' no avanzó en ' + VIDEO_SEG + ' s: se rearma el video', null); rearmarVideo(v, src); continue; }
             if (ahora - s.desde >= VIDEO_SEG * 1000) { s.reportado = 1; reportarVideo(v, 'no avanzó en ' + VIDEO_SEG + ' s'); cont.trabados++; tvEvento('video_trabado', codigoDe(src) + ' no avanzó en ' + VIDEO_SEG + ' s', { readyState: v.readyState, networkState: v.networkState, error: v.error ? v.error.code : null }); videoTrabado(); }
           }
         }
@@ -387,6 +391,13 @@
         // cargar (readyState 0 / networkState 2) y sólo se destraba recargando la página. Si un video
         // queda trabado y en los 15 s siguientes ninguno corre, se recarga sola (como mucho una vez
         // cada 2 min, contado en sessionStorage). La pantalla sale de la base: recargar no pierde nada.
+        function rearmarVideo(v, src) {
+          try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
+          setTimeout(function () {
+            try { v.src = src; v.load(); var p = v.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+          }, 300);
+        }
+        w.__tvRearmarVideo = rearmarVideo;
         var trabadosSeguidos = 0;
         function videoTrabado() {
           trabadosSeguidos++;
