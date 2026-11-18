@@ -31,7 +31,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 // Emails allowed to see fitness section (beta feature)
-const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
+const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test', 'barralf.lucas@gmail.com']
 
 // La estructura de Gestión la definió Mateo (2026-09-09): primero el día de hoy, después
 // las personas, después la sede, y al final lo que sólo toca un super admin. Los subtítulos

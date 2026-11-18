@@ -41,7 +41,7 @@ import { SedeProvider } from './contexts/SedeContext'
 import { ConAvisoTv } from './components/TvAviso'
 
 // Emails que ven la sección de fitness (beta). Se perdió al separar el CRM de App.jsx (2026-10-19).
-const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test']
+const FITNESS_ALLOWED_EMAILS = ['mateoaldao@gmail.com', 'lucas@tecnofit.test', 'barralf.lucas@gmail.com']
 
 
 // Emails allowed to see fitness section (beta feature)
