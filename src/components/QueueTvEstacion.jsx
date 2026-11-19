@@ -292,6 +292,26 @@ function CabeceraBasica({ pos, line }) {
 // ── Piezas del contenido de estación ─────────────────────────────────────────────────────
 // Video grande (1180 de ancho) con radio 32: VideoCruzado dentro, velo y texto abajo. NO se
 // remonta entre trabajo y descanso: sólo cambia el ejercicio (cruce de video) y los textos.
+// Pausa del Tabata: sin <video>. "PAUSA" y la foto (póster) del ejercicio que sigue con su nombre.
+function PausaTabata({ fila }) {
+  const media = exerciseMedia(fila, 'tv')
+  const foto = media.kind === 'hosted' ? media.poster : media.kind === 'image' ? media.src : null
+  return (
+    <div data-testid="tv-pausa" style={{ display: 'flex', flexDirection: 'column', gap: 28, minHeight: 0 }}>
+      <span style={{ fontSize: 200, fontWeight: 900, lineHeight: 0.9, letterSpacing: -6, color: COLOR.texto }}>PAUSA</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 32, minHeight: 0 }}>
+        {foto ? (
+          <img src={foto} alt={fila?.name || ''} style={{ width: 420, height: 245, objectFit: 'cover', borderRadius: RADIO.tarjeta, flexShrink: 0 }} />
+        ) : null}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+          <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: 6, color: COLOR.texto }}>SIGUE</span>
+          <span style={{ fontSize: 64, fontWeight: 800, lineHeight: 1.02, color: COLOR.texto }}>{fila?.name}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MediaGrande({ fila, proximas, chips = [], numero, nombreSize = 92, pillSigue, acento }) {
   return (
     <div data-testid="tv-media" style={{ position: 'relative', borderRadius: RADIO.panel, overflow: 'hidden', border: BORDE, background: COLOR.fondo, minHeight: 0 }}>
@@ -525,7 +545,7 @@ const ANCHO_VIDEO = 1180
 const HUECO_ESTACION = 48
 const ANCHO_COLUMNA_RELOJ = 1920 - 2 * 56 - ANCHO_VIDEO - HUECO_ESTACION
 
-function VistaEstacion({ box, fase, pos, line }) {
+function VistaEstacion({ box, boxes, fase, pos, line }) {
   const exercises = ejerciciosDe(box)
   const primero = box.ejercicio || exercises[0]
   const tipo = primero?.formato
@@ -550,6 +570,14 @@ function VistaEstacion({ box, fase, pos, line }) {
   let tarjeta = null // abajo a la derecha
   let progreso = 0
 
+  // Pedido de Lucas (2026-11-19): el Tabata dura menos que la estación; después de la última ronda la
+  // pantalla quedaba más de un minuto en "descanso"/"listo". El último descanso y lo que sobra ya son el
+  // tiempo para ir al próximo box: se muestra el cambio de estación con su cuenta regresiva.
+  if (tipo === 'Tabata' && f && (termino || (f.fase === 'descanso' && f.ronda >= rondas))) {
+    return <VistaChau box={box} boxes={boxes || []} posicion={pos} acento={COLOR.descanso} line={line} />
+  }
+
+  let fondoPausa = null
   if (tipo === 'Tabata' && f) {
     const td = tabataDeFase(exercises, f, rondas)
     const enDescanso = f.fase === 'descanso'
@@ -560,15 +588,20 @@ function VistaEstacion({ box, fase, pos, line }) {
     const mostrado = enDescanso && td.siguiente ? td.siguiente : td.ejercicio || ejercicioDeRonda(exercises, termino ? rondas : f.ronda)
     const idx = Math.max(0, exercises.findIndex((x) => x.exercise_order === mostrado.exercise_order))
     const proximas = exercises.length > 1 ? [exercises[(idx + 1) % exercises.length], exercises[(idx + 2) % exercises.length]] : []
-    medio = (
+    // Pedido de Lucas (2026-11-19): en la pausa no se reproduce video (la tele trabaja menos y se lee mejor):
+    // pantalla azul, PAUSA grande y la foto con el nombre del que sigue.
+    medio = enDescanso ? (
+      <PausaTabata fila={mostrado} />
+    ) : (
       <MediaGrande
         fila={mostrado}
         proximas={proximas.filter((x) => x && x.exercise_order !== mostrado.exercise_order)}
         chips={[capital(prescripcionDe(mostrado))].filter(Boolean)}
-        pillSigue={enDescanso && Boolean(td.siguiente)}
+        pillSigue={false}
         acento={acento}
       />
     )
+    if (enDescanso) fondoPausa = COLOR.descanso
     debajoDelReloj = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <BarrasRondas n={rondas} acento={acento} estado={(i) => (i < f.ronda ? 'hecha' : 'falta')} />
@@ -638,7 +671,7 @@ function VistaEstacion({ box, fase, pos, line }) {
   }
 
   return (
-    <Marco>
+    <Marco estilo={fondoPausa ? { background: fondoPausa } : undefined}>
       <Encabezado
         numero={pos}
         eyebrow={`ESTACIÓN ${pos}${line?.name ? ` · ${nombreLinea(line)}` : ''}`}
@@ -649,7 +682,7 @@ function VistaEstacion({ box, fase, pos, line }) {
       <Grilla cols={[ANCHO_VIDEO, 'fr']} gap={HUECO_ESTACION} llenar style={{ flex: 1, minHeight: 0 }}>
         {medio}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28, minHeight: 0 }}>
-          <Anima k={etiquetaEstado} data-testid="tv-etiqueta" style={{ fontSize: 34, fontWeight: 800, letterSpacing: 8, color: acento, transition: 'color 0.5s ease' }}>
+          <Anima k={etiquetaEstado} data-testid="tv-etiqueta" style={{ fontSize: 34, fontWeight: 800, letterSpacing: 8, color: fondoPausa ? COLOR.texto : acento, transition: 'color 0.5s ease' }}>
             {etiquetaEstado}
           </Anima>
           <Cronometro valor={valorReloj} ancho={ANCHO_COLUMNA_RELOJ} muestra={mmss(Math.max(duracionSeg(formato) || 0, estacionSegDeLinea(line) || 0))} data-testid="tv-reloj" />
@@ -819,7 +852,7 @@ function VistaEstado({ estado, box, boxes, posicion, line, fase, acento }) {
     case 'resumen': return <VistaResumen estado={estado} acento={acento} />
     case 'preparate': return <VistaPreparate segundos={estado.restanteExplicacionSeg} pos={posicion} line={line} acento={acento} />
     case 'explicacion': return <VistaExplicacion box={box} estado={estado} pos={posicion} line={line} acento={acento} />
-    case 'estacion': return <VistaEstacion box={box} fase={fase} pos={posicion} line={line} />
+    case 'estacion': return <VistaEstacion box={box} boxes={boxes} fase={fase} pos={posicion} line={line} />
     case 'chau': return <VistaChau box={box} boxes={boxes} posicion={posicion} acento={acento} line={line} />
     default: return null
   }

@@ -131,6 +131,24 @@
           img.src = raiz + 'img/logo_transparente.png?t=' + t0;
         }
         setTimeout(sondaLocal, 6000);
+        // Se actualizan solas (2026-11-19, pedido de Mateo): cada 2 min la TV pide la página y, si salió una
+        // versión nueva, se recarga — sólo cuando no hay nadie entrenando en ella (pantalla libre o la fila).
+        function buscarVersionNueva() {
+          try {
+            var x = new XMLHttpRequest();
+            x.open('GET', loc.pathname + '?v=' + new Date().getTime(), true);
+            x.onload = function () {
+              var m = /var VERSION = '([a-z0-9]+)'/.exec(x.responseText || '');
+              if (!m || m[1] === VERSION || VERSION.indexOf('__') === 0) return;
+              var fase = (w.__tvEstado && w.__tvEstado.fase) || 'off';
+              if (fase !== 'off' && String(fase).indexOf('fila') !== 0) return;
+              tvEvento('actualizacion', VERSION + ' → ' + m[1], null, true);
+              setTimeout(function () { loc.reload(); }, 300);
+            };
+            x.send();
+          } catch (e) {}
+        }
+        setInterval(buscarVersionNueva, 120000);
         setInterval(sondaLocal, 60000);
         setInterval(function () { mandarTele(); }, 10000);
         setTimeout(function () { mandarTele(); }, 4000);

@@ -26,6 +26,7 @@ const TIPOS = {
   carga: { texto: 'Cargó', clase: 'bg-sky-500/15 text-sky-700' },
   fase: { texto: 'Pantalla', clase: 'bg-surface-secondary text-text-secondary' },
   video_respaldo: { texto: 'Pasó a Supabase', clase: 'bg-amber-500/15 text-amber-700' },
+  actualizacion: { texto: 'Se actualizó', clase: 'bg-sky-500/15 text-sky-700' },
   video_rearmado: { texto: 'Video rearmado', clase: 'bg-sky-500/15 text-sky-700' },
   server_local: { texto: 'Server local', clase: 'bg-sky-500/15 text-sky-700' },
 }

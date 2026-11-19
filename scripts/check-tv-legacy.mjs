@@ -30,6 +30,8 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   { const ix = __rf('index.html', 'utf8'); if (!/function sondaLocal\(\)/.test(ix) || !/origen: \/\^https/.test(ix)) { console.error('✗ index.html: falta la sonda del server local / el origen de los videos'); process.exit(1) } }
   // 2026-11-18: un video trabado primero se rearma (sin recargar la página) antes de recargar.
   { const ix = __rf('index.html', 'utf8'); if (!/function rearmarVideo\(v, src\)/.test(ix) || !/!s\.rearmado\) \{[^}]*rearmarVideo\(v, src\)/.test(ix)) { console.error('✗ index.html: falta rearmar el video antes de recargar'); process.exit(1) } }
+  // 2026-11-19: las TVs se actualizan solas (con la pantalla libre) cuando sale una versión nueva.
+  { const ix = __rf('index.html', 'utf8'); if (!/function buscarVersionNueva\(\)/.test(ix)) { console.error('✗ index.html: falta la actualización sola de las TVs'); process.exit(1) } }
   const conTz = tvFiles.filter((f) => /timeZone\s*:/.test(__rf(f, 'utf8')))
   if (conTz.length) { console.error('✗ timeZone de Intl en componentes de TV (Chrome 47 tira RangeError):', conTz.join(', ')); process.exit(1) }
   if (malos.length) { console.error('✗ `inset:` en estilos inline de TV (Chrome 47 lo ignora):', malos.join(', ')); process.exit(1) }
