@@ -32,9 +32,12 @@ export function reproducirSeguro(v) {
 const RESPALDO_MS = 7000
 
 export default function VideoEjercicio({ src: srcPrincipal, srcRespaldo, poster, style, recorte, alProgreso, onLoadedData, onCanPlay, onPlaying, ...rest }) {
-  const [usarRespaldo, setUsarRespaldo] = useState(false)
-  useEffect(() => { setUsarRespaldo(false) }, [srcPrincipal])
-  const srcRed = usarRespaldo && srcRespaldo ? srcRespaldo : srcPrincipal
+  // srcRespaldo: un string o una lista (copia local → archivo viejo → Supabase); se avanza de a uno.
+  const respaldos = Array.isArray(srcRespaldo) ? srcRespaldo : srcRespaldo ? [srcRespaldo] : []
+  const [nivel, setNivel] = useState(0)
+  useEffect(() => { setNivel(0) }, [srcPrincipal])
+  const usarRespaldo = nivel > 0
+  const srcRed = nivel > 0 && respaldos[nivel - 1] ? respaldos[nivel - 1] : srcPrincipal
   // Si el video ya está bajado en memoria (precargaBlob, TVs de la sala), se reproduce de ahí. Se decide al
   // cambiar la fuente, no a mitad de reproducción (cambiarle el src a un video que ya corre lo reinicia).
   const src = useMemo(() => blobDe(srcRed) || srcRed, [srcRed])
@@ -67,17 +70,21 @@ export default function VideoEjercicio({ src: srcPrincipal, srcRespaldo, poster,
     reproducirSeguro(v)
   }, [src])
 
+  const destinoDe = (u) => (/tecno-videos\//.test(u) ? 'copia local' : /\/videos\//.test(u) && /^http:/.test(u) ? 'video viejo' : 'Supabase')
   const pasarAlRespaldo = useCallback((motivo) => {
-    if (!srcRespaldo || usarRespaldo) return
-    setUsarRespaldo(true)
-    try { if (window.__tvEvento) window.__tvEvento('video_respaldo', `${String(srcPrincipal).split('/').pop()} → Supabase (${motivo})`) } catch (e) { /* sin telemetría */ }
-  }, [srcRespaldo, usarRespaldo, srcPrincipal])
+    if (nivel >= respaldos.length) return
+    const desde = nivel === 0 ? srcPrincipal : respaldos[nivel - 1]
+    const hacia = respaldos[nivel]
+    setNivel(nivel + 1)
+    try { if (window.__tvEvento) window.__tvEvento('video_respaldo', `${String(desde).split('/').slice(-3).join('/')} → ${destinoDe(hacia)} (${motivo})`) } catch (e) { /* sin telemetría */ }
+  }, [nivel, respaldos.length, srcPrincipal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!srcRespaldo || usarRespaldo) return undefined
+    if (nivel >= respaldos.length) return undefined
+    arranco.current = false
     const t = setTimeout(() => { if (!arranco.current) pasarAlRespaldo(`no arrancó en ${RESPALDO_MS / 1000} s`) }, RESPALDO_MS)
     return () => clearTimeout(t)
-  }, [srcPrincipal, srcRespaldo, usarRespaldo, pasarAlRespaldo])
+  }, [srcPrincipal, nivel, respaldos.length, pasarAlRespaldo])
 
   const insistir = (ev) => {
     if (!arranco.current) reproducirSeguro(ev.currentTarget)

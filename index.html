@@ -76,7 +76,7 @@
           for (var k = 0; k < vs.length && k < 6; k++) {
             var v = vs[k];
             var srcV = v.currentSrc || v.src || '';
-            out.push({ origen: /^https?:\/\/(192\.168|10\.|172\.)/.test(srcV) ? 'local' : 'supabase', codigo: codigoDe(srcV), readyState: v.readyState, networkState: v.networkState,
+            out.push({ origen: /tecno-videos\//.test(srcV) ? 'copia' : /^https?:\/\/(192\.168|10\.|172\.)/.test(srcV) ? 'local' : 'supabase', codigo: codigoDe(srcV), readyState: v.readyState, networkState: v.networkState,
               paused: v.paused, t: Math.round(v.currentTime * 10) / 10, error: v.error ? v.error.code : null,
               trabado: !!(v.__tv && v.__tv.reportado), corriendo: !!(v.__tv && v.__tv.listo) });
           }

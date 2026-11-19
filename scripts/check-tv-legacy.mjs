@@ -27,7 +27,7 @@ import { readFileSync as __rf, readdirSync as __rd } from 'node:fs'
   // 2026-11-14: la TV reporta su estado y sus eventos al Monitor de TVs (tv_reportar).
   { const ix = __rf('index.html', 'utf8'); if (!/rpc\/tv_reportar/.test(ix) || !/tvEvento\('video_trabado'/.test(ix) || !/tvEvento\('recarga'/.test(ix)) { console.error('✗ index.html: falta la telemetría al Monitor de TVs (tv_reportar)'); process.exit(1) } }
   // 2026-11-18 prueba 4: la TV prueba el server local del gimnasio y reporta de dónde salió cada video.
-  { const ix = __rf('index.html', 'utf8'); if (!/function sondaLocal\(\)/.test(ix) || !/origen: \/\^https/.test(ix)) { console.error('✗ index.html: falta la sonda del server local / el origen de los videos'); process.exit(1) } }
+  { const ix = __rf('index.html', 'utf8'); if (!/function sondaLocal\(\)/.test(ix) || !/origen: \/tecno-videos/.test(ix)) { console.error('✗ index.html: falta la sonda del server local / el origen de los videos'); process.exit(1) } }
   // 2026-11-18: un video trabado primero se rearma (sin recargar la página) antes de recargar.
   { const ix = __rf('index.html', 'utf8'); if (!/function rearmarVideo\(v, src\)/.test(ix) || !/!s\.rearmado\) \{[^}]*rearmarVideo\(v, src\)/.test(ix)) { console.error('✗ index.html: falta rearmar el video antes de recargar'); process.exit(1) } }
   // 2026-11-19: las TVs se actualizan solas (con la pantalla libre) cuando sale una versión nueva.

@@ -58,19 +58,30 @@ export function exerciseMedia(ex, destino = 'tv') {
   const path = destino === 'app' ? ex.app_path : ex.tv_path
   const crop = destino === 'app' ? ex.crop_app : ex.crop_tv
 
-  const local = destino === 'tv' && videosLocales.activo && videosLocales.base && ex.video_local
-    ? videosLocales.base.replace(/\/?$/, '/') + ex.video_local
-    : null
-  if (local) {
-    return {
-      kind: 'hosted',
-      src: local,
-      srcRespaldo: listo && path ? mediaUrl(path) : null,
-      origen: 'local',
-      poster: listo ? mediaUrl(ex.poster_path) : null,
-      crop: null,
-      style: cropStyle(null),
-      recorte: null, // los originales del server local no tienen el recorte de los nuestros
+  // Orden con videos locales prendidos (2026-11-19): 1) nuestra copia en el server del gimnasio
+  // (tecno-videos/<tv_path>, la mantiene ~/tecno-videos/copiar.py en PC10: mismo archivo que Supabase, con
+  // recorte y faststart, y los videos nuevos de Lucas llegan solos) → 2) el archivo de CENTRAL del sistema
+  // viejo → 3) Supabase. VideoEjercicio pasa al siguiente si uno da error o no arranca.
+  if (destino === 'tv' && videosLocales.activo && videosLocales.base) {
+    const raiz = videosLocales.base.replace(/videos\/?$/, '')
+    const copia = listo && path ? `${raiz}tecno-videos/${path}` : null
+    const central = ex.video_local ? videosLocales.base.replace(/\/?$/, '/') + ex.video_local : null
+    const supa = listo && path ? mediaUrl(path) : null
+    const cadena = [copia, central, supa].filter(Boolean)
+    if (cadena.length) {
+      return {
+        kind: 'hosted',
+        src: cadena[0],
+        srcRespaldo: cadena.slice(1),
+        origen: 'local',
+        poster: listo ? mediaUrl(ex.poster_path) : null,
+        crop: copia ? crop || null : null,
+        style: cropStyle(copia ? crop : null),
+        // nuestra copia es el mismo archivo que Supabase (con su recorte); el de CENTRAL es el original
+        recorte: copia && (ex.recorte_inicio != null || ex.recorte_fin != null)
+          ? { inicio: Number(ex.recorte_inicio) || 0, fin: Number(ex.recorte_fin) || null }
+          : null,
+      }
     }
   }
 
